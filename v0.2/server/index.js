@@ -25,12 +25,15 @@ app.use(express.static(clientDist));
 
 app.get('/api/health', (_req, res) => res.json({ status: 'online', game: 'STRIKE/VOID v2' }));
 
-// Redireciona qualquer outra rota para o SPA se os estáticos existirem
-app.get('*', (_req, res, next) => {
-  const indexPath = path.join(clientDist, 'index.html');
-  res.sendFile(indexPath, (err) => {
-    if (err) next();
-  });
+// Redireciona qualquer outra rota para o SPA se os estáticos existirem (compatível com Express 5)
+app.use((req, res, next) => {
+  if (req.method === 'GET') {
+    const indexPath = path.join(clientDist, 'index.html');
+    return res.sendFile(indexPath, (err) => {
+      if (err) next();
+    });
+  }
+  next();
 });
 
 const server = http.createServer(app);
