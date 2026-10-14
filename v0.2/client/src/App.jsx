@@ -1,6 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Settings, Skull as SkullIcon, Play, Plus, X, Pause, SkipForward, Crosshair, Hand, Trophy } from 'lucide-react';
+import {
+  Settings,
+  Skull as SkullIcon,
+  Pause,
+  SkipForward,
+  Crosshair,
+  Hand,
+  Trophy,
+  Copy,
+  Check,
+  LogOut,
+} from 'lucide-react';
 import { socket } from './lib/socket';
 import { cn } from './lib/cn';
 import InscryptionCard from './components/InscryptionCard';
@@ -8,6 +19,8 @@ import PlayerSeat from './components/PlayerSeat';
 import TargetArrowsSVG from './components/TargetArrowsSVG';
 import SettingsModal from './components/SettingsModal';
 import AudioControls from './components/AudioControls';
+import HomeHub from './components/HomeHub';
+import RoomLobby from './components/RoomLobby';
 import { audio } from './lib/audio';
 
 const PHASE_LABELS = {
@@ -77,7 +90,9 @@ const CentralClock = React.memo(function CentralClock({ socket, myAllowedTime, p
         <div className="w-14 h-14 rounded-full border-4 border-gold-aged/70 bg-wood-dark flex items-center justify-center font-mono font-bold text-gold-aged text-lg shadow-[0_0_14px_rgba(212,175,55,0.4)]">
           {analysis.remainingSec.toFixed(0)}
         </div>
-        <span className="text-[9px] font-mono text-parchment-dark mt-1 tracking-widest">{analysis.paused ? 'PAUSADO' : 'LEITURA'}</span>
+        <span className="text-[9px] font-mono text-parchment-dark mt-1 tracking-widest">
+          {analysis.paused ? 'PAUSADO' : 'LEITURA'}
+        </span>
       </div>
     );
   }
@@ -85,14 +100,22 @@ const CentralClock = React.memo(function CentralClock({ socket, myAllowedTime, p
   const frac = allowed > 0 ? Math.min(1, remaining / allowed) : 0;
   const urgent = phase === 'PLANNING' && !locked && remaining <= 3 && allowed > 0;
   const R = 44;
-  const C = 2 * Math.PI * R;
 
   return (
     <div id="central-clock" className="relative w-[clamp(96px,10vw,128px)] aspect-square">
       <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
         <circle cx="50" cy="50" r="48" fill="#1a110b" stroke="#d4af37" strokeWidth="2" opacity="0.9" />
         {Array.from({ length: 12 }).map((_, i) => (
-          <line key={i} x1="50" y1="4" x2="50" y2={i % 3 === 0 ? 12 : 9} stroke="#9e8a63" strokeWidth="1.5" transform={`rotate(${i * 30} 50 50)`} />
+          <line
+            key={i}
+            x1="50"
+            y1="4"
+            x2="50"
+            y2={i % 3 === 0 ? 12 : 9}
+            stroke="#9e8a63"
+            strokeWidth="1.5"
+            transform={`rotate(${i * 30} 50 50)`}
+          />
         ))}
         <circle cx="50" cy="50" r={R - 6} fill="#0d0906" stroke="#2c1d12" strokeWidth="2" />
         <circle
@@ -112,10 +135,17 @@ const CentralClock = React.memo(function CentralClock({ socket, myAllowedTime, p
       <div className={cn('absolute inset-0 flex flex-col items-center justify-center', urgent && 'animate-pulse')}>
         {phase === 'PLANNING' ? (
           <>
-            <span className={cn('font-mono font-bold text-2xl leading-none', urgent ? 'text-blood-bright' : locked ? 'text-iron' : 'text-parchment')}>
+            <span
+              className={cn(
+                'font-mono font-bold text-2xl leading-none',
+                urgent ? 'text-blood-bright' : locked ? 'text-iron' : 'text-parchment'
+              )}
+            >
               {remaining.toFixed(1)}
             </span>
-            <span className="text-[8px] font-mono text-parchment-dark mt-1 tracking-widest">{locked ? 'TRAVADO' : 'SEGUNDOS'}</span>
+            <span className="text-[8px] font-mono text-parchment-dark mt-1 tracking-widest">
+              {locked ? 'TRAVADO' : 'SEGUNDOS'}
+            </span>
           </>
         ) : (
           <span className="text-[9px] font-grimoire font-bold text-center text-parchment-dark leading-tight px-3 tracking-wider">
@@ -154,124 +184,89 @@ function LogPanel({ logs }) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Lobby                                                               */
-/* ------------------------------------------------------------------ */
-function Lobby({ state, me, onOpenSettings }) {
-  const [name, setName] = useState('');
-  const players = state.players;
-
-  return (
-    <div className="flex-1 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="w-[min(560px,94vw)] rounded-lg border-4 border-stone-900 bg-gradient-to-b from-wood-mid to-wood-dark p-6 shadow-[0_0_60px_rgba(139,0,0,0.35),inset_0_0_40px_rgba(0,0,0,0.7)]"
-      >
-        <h1 className="font-grimoire font-extrabold text-4xl text-center tracking-[0.2em] text-parchment drop-shadow-[0_0_14px_rgba(220,38,38,0.6)]">
-          STRIKE<span className="text-blood-bright">/</span>VOID
-        </h1>
-        <p className="text-center font-typewriter text-parchment-dark text-xs mt-1 mb-5 tracking-widest">
-          TACTICAL ROULETTE · FACAS · PAREDES · REVERSOS
-        </p>
-
-        {!me ? (
-          <div className="flex gap-2">
-            <input
-              id="input-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && socket.emit('join_game', { name })}
-              maxLength={16}
-              placeholder="Seu nome, condenado..."
-              className="flex-1 bg-black/60 border-2 border-iron rounded px-3 py-2 font-typewriter text-parchment outline-none focus:border-gold-aged"
-            />
-            <button
-              id="btn-join"
-              onClick={() => socket.emit('join_game', { name })}
-              className="px-4 py-2 rounded border-2 border-gold-aged bg-blood/70 hover:bg-blood text-parchment font-grimoire font-bold tracking-wider"
-            >
-              ENTRAR
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="space-y-1.5 mb-4">
-              {players.map((p) => (
-                <div key={p.id} className="flex items-center justify-between rounded border border-iron/60 bg-black/50 px-3 py-1.5">
-                  <span className="font-typewriter text-sm">
-                    {p.isBot ? '🤖' : '👤'} {p.name}
-                    {p.id === me.id && <span className="ml-2 text-[10px] text-gold-aged font-mono">(VOCÊ)</span>}
-                  </span>
-                  {p.isBot && (
-                    <button onClick={() => socket.emit('remove_bot', p.id)} className="text-blood-bright hover:text-white" title="Remover bot">
-                      <X size={16} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <div className="text-right text-[10px] font-mono text-parchment-dark">{players.length}/8 na mesa</div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                id="btn-add-bot"
-                onClick={() => socket.emit('add_bot')}
-                disabled={players.length >= 8}
-                className="flex-1 flex items-center justify-center gap-1 py-2 rounded border-2 border-iron hover:border-gold-aged font-grimoire font-bold text-sm disabled:opacity-40"
-              >
-                <Plus size={16} /> ADICIONAR BOT
-              </button>
-              <button
-                id="btn-start"
-                onClick={() => socket.emit('start_game')}
-                className="flex-1 flex items-center justify-center gap-1 py-2 rounded border-2 border-gold-aged bg-blood/70 hover:bg-blood font-grimoire font-bold text-sm"
-              >
-                <Play size={16} /> INICIAR PARTIDA
-              </button>
-            </div>
-            <button
-              onClick={onOpenSettings}
-              className="mt-3 w-full py-1.5 rounded border border-iron/70 text-xs font-mono text-parchment-dark hover:text-gold-aged"
-            >
-              ⚙️ CONFIGURAR TEMPO / REGRAS
-            </button>
-          </>
-        )}
-      </motion.div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* App                                                                 */
+/* App Principal                                                       */
 /* ------------------------------------------------------------------ */
 export default function App() {
   const [gameState, setGameState] = useState(null);
+  const [publicRooms, setPublicRooms] = useState([]);
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
   const [toast, setToast] = useState(null);
-  const [connected, setConnected] = useState(socket.connected);
+  const [copiedCode, setCopiedCode] = useState(false);
+  const [, setConnected] = useState(socket.connected);
   const dragCardRef = useRef(null);
   const toastTimer = useRef(null);
 
-  const showToast = useCallback((msg) => {
-    audio.play('error');
-    setToast(msg);
+  // Nickname persistido no localStorage
+  const [nickname, setNickname] = useState(() => {
+    return localStorage.getItem('strike_void_nickname') || '';
+  });
+
+  useEffect(() => {
+    if (nickname) {
+      localStorage.setItem('strike_void_nickname', nickname);
+    }
+  }, [nickname]);
+
+  const showToast = useCallback((msg, type = 'error') => {
+    if (type === 'error') audio.play('error');
+    setToast({ text: msg, type });
     clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3200);
+    toastTimer.current = setTimeout(() => setToast(null), 3500);
   }, []);
 
   useEffect(() => {
     const onState = (s) => setGameState(s);
+    const onRoomUpdated = ({ roomState }) => setGameState(roomState);
+    const onRoomJoined = ({ roomState }) => {
+      setGameState(roomState);
+      showToast(`Bem-vindo à sala ${roomState.roomCode}!`, 'success');
+    };
+    const onPublicRooms = (rooms) => setPublicRooms(rooms || []);
+    const onRoomError = ({ message }) => showToast(message || 'Erro na sala.');
     const onErr = (m) => showToast(m);
-    const onConnect = () => setConnected(true);
+    const onKicked = ({ message }) => {
+      setGameState(null);
+      showToast(message || 'Você foi expulso da sala.', 'error');
+    };
+    const onLeftRoom = () => {
+      setGameState(null);
+    };
+    const onHostMigrated = ({ newHostId }) => {
+      const isMe = socket.id === newHostId;
+      showToast(isMe ? '👑 Você agora é o líder da sala!' : '👑 A liderança da sala foi transferida.', 'info');
+    };
+    const onConnect = () => {
+      setConnected(true);
+      socket.emit('get_public_rooms');
+    };
     const onDisconnect = () => setConnected(false);
+
     socket.on('game_state', onState);
+    socket.on('room_updated', onRoomUpdated);
+    socket.on('room_joined', onRoomJoined);
+    socket.on('public_rooms_updated', onPublicRooms);
+    socket.on('room_error', onRoomError);
     socket.on('error_message', onErr);
+    socket.on('kicked_from_room', onKicked);
+    socket.on('left_room', onLeftRoom);
+    socket.on('host_migrated', onHostMigrated);
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
+
+    // Carrega lista inicial de salas públicas
+    socket.emit('get_public_rooms');
+
     return () => {
       socket.off('game_state', onState);
+      socket.off('room_updated', onRoomUpdated);
+      socket.off('room_joined', onRoomJoined);
+      socket.off('public_rooms_updated', onPublicRooms);
+      socket.off('room_error', onRoomError);
       socket.off('error_message', onErr);
+      socket.off('kicked_from_room', onKicked);
+      socket.off('left_room', onLeftRoom);
+      socket.off('host_migrated', onHostMigrated);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
     };
@@ -279,7 +274,9 @@ export default function App() {
 
   const players = gameState?.players || [];
   const me = players.find((p) => p.id === gameState?.you) || null;
+  const isHost = gameState?.hostId && socket.id === gameState.hostId;
   const phase = gameState?.phase || 'LOBBY';
+  const roomStatus = gameState?.roomStatus || 'LOBBY';
   const localIndex = Math.max(0, players.findIndex((p) => p.id === gameState?.you));
   const aliveCount = players.filter((p) => p.isAlive).length;
 
@@ -293,7 +290,6 @@ export default function App() {
   stateRef.current = gameState;
   const audioPrev = useRef({ alive: 0, lockedOthers: 0 });
 
-  // SFX por fase (os efeitos visuais chegam no mesmo game_state da troca de fase)
   useEffect(() => {
     const s = stateRef.current;
     if (!s) return;
@@ -346,30 +342,26 @@ export default function App() {
     audioPrev.current.lockedOthers = 0;
   }, [gameState?.phase, gameState?.round]);
 
-  // Minha jogada travada
   useEffect(() => {
     if (phase === 'PLANNING' && me?.lockedIn) audio.play('lock');
   }, [me?.lockedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Outros jogadores travando a jogada
   const lockedOthers = players.filter((p) => p.id !== me?.id && p.isAlive && p.lockedIn).length;
   useEffect(() => {
     if (phase === 'PLANNING' && lockedOthers > audioPrev.current.lockedOthers) audio.play('lockOther');
     audioPrev.current.lockedOthers = lockedOthers;
   }, [lockedOthers]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Música dinâmica por vidas e som ambiente exclusivo para espectadores
   useEffect(() => {
-    const inMatch = phase !== 'LOBBY' && phase !== 'GAME_OVER';
+    const inMatch = roomStatus === 'IN_GAME' && phase !== 'LOBBY' && phase !== 'GAME_OVER';
     audio.setPlayerState({
       inGame: inMatch,
       isAlive: !!me?.isAlive,
       lives: me?.lives ?? 3,
       phase,
     });
-  }, [phase, me?.lives, me?.isAlive]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [roomStatus, phase, me?.lives, me?.isAlive]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Som de clique em qualquer botão
   useEffect(() => {
     const onClick = (e) => {
       const btn = e.target.closest && e.target.closest('button');
@@ -417,6 +409,7 @@ export default function App() {
     audio.play('select');
     setSelectedCardId((cur) => (cur === card.id ? null : card.id));
   }, []);
+
   const onCardDragStart = useCallback((e, card) => {
     e.dataTransfer.setData('text/plain', card.id);
     e.dataTransfer.effectAllowed = 'move';
@@ -425,47 +418,140 @@ export default function App() {
 
   const logs = useMemo(() => gameState?.logs || [], [gameState?.logs]);
 
-  if (!gameState) {
-    return (
-      <div className="h-full flex items-center justify-center font-grimoire text-parchment-dark tracking-widest animate-pulse">
-        {connected ? 'INVOCANDO A MESA...' : 'CONECTANDO AO VOID (porta 3001)...'}
-      </div>
-    );
-  }
+  /* Handlers para o Hub e Lobby */
+  const handleJoinRoom = (roomCode) => {
+    const cleanPlayer = nickname.trim() || 'CONDENADO';
+    socket.emit('join_room', { playerName: cleanPlayer, roomCode });
+  };
 
-  const inGame = phase !== 'LOBBY';
+  const handleCreateRoom = ({ roomName, isPublic }) => {
+    const cleanPlayer = nickname.trim() || 'CONDENADO';
+    socket.emit('create_room', { playerName: cleanPlayer, roomName, isPublic });
+  };
+
+  const handleLeaveRoom = () => {
+    socket.emit('leave_room');
+    setGameState(null);
+  };
+
+  const handleTogglePrivacy = () => {
+    socket.emit('toggle_room_privacy');
+  };
+
+  const handleAddBot = () => {
+    socket.emit('add_bot');
+  };
+
+  const handleRemoveBot = (botId) => {
+    socket.emit('remove_bot', botId);
+  };
+
+  const handleKickPlayer = (targetId) => {
+    socket.emit('kick_player', { targetId });
+  };
+
+  const handleStartGame = () => {
+    socket.emit('start_game');
+  };
+
+  const handleRestartGame = () => {
+    socket.emit('restart_game');
+  };
+
+  const handleCopyHeaderCode = () => {
+    if (gameState?.roomCode) {
+      navigator.clipboard.writeText(gameState.roomCode);
+      setCopiedCode(true);
+      showToast(`Código ${gameState.roomCode} copiado!`, 'success');
+      setTimeout(() => setCopiedCode(false), 2000);
+    }
+  };
+
+  // Se não estiver em nenhuma sala: Mostra a Home / Hub (estilo jklm.fun)
+  const inAnyRoom = Boolean(gameState?.roomCode);
+  const inGame = inAnyRoom && (roomStatus === 'IN_GAME' || phase !== 'LOBBY');
 
   return (
-    <div className="h-full flex flex-col relative overflow-hidden">
+    <div className="h-full flex flex-col relative overflow-hidden bg-void-bg text-parchment">
       {/* Brilho de velas */}
       <div className="candle pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
 
       {/* Barra superior */}
-      <header className="relative z-40 flex items-center justify-between px-4 py-2 border-b border-iron/40 bg-black/40">
-        <div className="font-grimoire font-extrabold tracking-[0.25em] text-parchment text-sm">
-          STRIKE<span className="text-blood-bright">/</span>VOID
+      <header className="relative z-40 flex items-center justify-between px-4 py-2 border-b border-iron/40 bg-black/50 backdrop-blur-sm">
+        <div className="flex items-center gap-3">
+          <div className="font-grimoire font-extrabold tracking-[0.25em] text-parchment text-sm">
+            STRIKE<span className="text-blood-bright">/</span>VOID
+          </div>
+
+          {inAnyRoom && (
+            <button
+              onClick={handleCopyHeaderCode}
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-gold-aged/50 bg-black/60 font-mono text-[11px] text-gold-aged hover:bg-gold-aged/20 transition-colors shadow-sm"
+              title="Clique para copiar código da sala"
+            >
+              <span>SALA: <strong className="tracking-wider">{gameState.roomCode}</strong></span>
+              {copiedCode ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+            </button>
+          )}
         </div>
-        <div className="font-mono text-[11px] text-parchment-dark tracking-widest">
-          {inGame && <span className="mr-3">ROUND {gameState.round}</span>}
-          <span className="text-gold-aged">{PHASE_LABELS[phase]}</span>
+
+        <div className="font-mono text-[11px] text-parchment-dark tracking-widest flex items-center gap-3">
+          {inGame && <span className="text-parchment">ROUND {gameState.round}</span>}
+          {inAnyRoom && <span className="text-gold-aged">{PHASE_LABELS[phase]}</span>}
         </div>
+
         <div className="flex items-center gap-2">
           <AudioControls />
-          <button
-            id="btn-settings"
-            onClick={() => setShowSettings(true)}
-            className="flex items-center gap-1.5 px-3 py-1 rounded border border-gold-aged/70 text-[11px] font-mono text-gold-aged hover:bg-gold-aged/10"
-          >
-            <Settings size={13} /> ⚙️ CONFIGURAR TEMPO / REGRAS
-          </button>
+          {inAnyRoom && (
+            <button
+              id="btn-settings"
+              onClick={() => setShowSettings(true)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded border border-gold-aged/70 text-[11px] font-mono text-gold-aged hover:bg-gold-aged/10 transition-colors"
+            >
+              <Settings size={13} /> <span className="hidden sm:inline">REGRAS</span>
+            </button>
+          )}
+          {inAnyRoom && (
+            <button
+              onClick={handleLeaveRoom}
+              className="flex items-center gap-1 px-2.5 py-1 rounded border border-iron text-[11px] font-mono text-parchment-dark hover:text-white hover:bg-blood/40 hover:border-blood-bright transition-colors"
+              title="Sair da sala"
+            >
+              <LogOut size={12} /> <span className="hidden sm:inline">SAIR</span>
+            </button>
+          )}
         </div>
       </header>
 
-      {!inGame ? (
-        <Lobby state={gameState} me={me} onOpenSettings={() => setShowSettings(true)} />
+      {/* Roteamento de Tela */}
+      {!inAnyRoom ? (
+        /* 1. Hub Inicial estilo jklm.fun */
+        <HomeHub
+          nickname={nickname}
+          setNickname={setNickname}
+          publicRooms={publicRooms}
+          onJoinRoom={handleJoinRoom}
+          onCreateRoom={handleCreateRoom}
+          onRefreshRooms={() => socket.emit('get_public_rooms')}
+        />
+      ) : !inGame ? (
+        /* 2. Sala de Espera / Lobby da Sala */
+        <RoomLobby
+          roomState={gameState}
+          me={me}
+          isHost={isHost}
+          onLeaveRoom={handleLeaveRoom}
+          onTogglePrivacy={handleTogglePrivacy}
+          onAddBot={handleAddBot}
+          onRemoveBot={handleRemoveBot}
+          onKickPlayer={handleKickPlayer}
+          onStartGame={handleStartGame}
+          onOpenSettings={() => setShowSettings(true)}
+          onCopyCode={(code) => showToast(`Código ${code} copiado!`, 'success')}
+        />
       ) : (
+        /* 3. Mesa de Partida em Andamento */
         <>
-          {/* Mesa */}
           <main className="relative flex-1 min-h-0 flex items-center justify-center">
             <div className="relative" style={{ width: 'min(100%, calc(100vh - 300px))', aspectRatio: '1 / 1' }}>
               <div className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.9)]" />
@@ -499,14 +585,14 @@ export default function App() {
                       onClick={() => socket.emit('toggle_pause')}
                       className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/80 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20"
                     >
-                      <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR LEITURA' : '⏸️ PAUSAR PARA LER LOGS'}
+                      <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR LEITURA' : '⏸️ PAUSAR LOGS'}
                     </button>
                     <button
                       id="btn-skip"
                       onClick={() => socket.emit('skip_analysis')}
                       className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/80 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30"
                     >
-                      <SkipForward size={11} /> ⏭️ PRÓXIMO ROUND AGORA
+                      <SkipForward size={11} /> ⏭️ PRÓXIMO ROUND
                     </button>
                   </div>
                 )}
@@ -526,7 +612,7 @@ export default function App() {
             </div>
           </main>
 
-          {/* Mão */}
+          {/* Mão de cartas */}
           <footer className="relative z-40 h-[200px] flex items-end justify-center pb-3">
             {me && me.isAlive ? (
               <div className="flex items-end gap-4">
@@ -594,20 +680,23 @@ export default function App() {
         </>
       )}
 
-      <SettingsModal
-        open={showSettings}
-        settings={gameState.settings}
-        aliveCount={aliveCount || players.length}
-        onClose={() => setShowSettings(false)}
-        onSave={(s) => socket.emit('update_settings', s)}
-      />
+      {/* Modal de Configurações */}
+      {gameState?.settings && (
+        <SettingsModal
+          open={showSettings}
+          settings={gameState.settings}
+          aliveCount={aliveCount || players.length}
+          onClose={() => setShowSettings(false)}
+          onSave={(s) => socket.emit('update_settings', s)}
+        />
+      )}
 
       {/* Fim de jogo */}
       <AnimatePresence>
         {phase === 'GAME_OVER' && (
           <motion.div
             key="gameover"
-            className="absolute inset-0 z-[150] flex items-center justify-center bg-black/75"
+            className="absolute inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
           >
@@ -615,28 +704,41 @@ export default function App() {
               initial={{ scale: 0.7 }}
               animate={{ scale: 1 }}
               transition={{ type: 'spring' }}
-              className="rounded-lg border-4 border-gold-aged bg-wood-dark px-10 py-8 text-center shadow-[0_0_80px_rgba(212,175,55,0.35)]"
+              className="rounded-lg border-4 border-gold-aged bg-wood-dark px-10 py-8 text-center shadow-[0_0_80px_rgba(212,175,55,0.4)] max-w-md w-full mx-4"
             >
-              {gameState.winner ? <Trophy className="mx-auto text-gold-aged mb-2" size={42} /> : <SkullIcon className="mx-auto text-blood-bright mb-2" size={42} />}
+              {gameState?.winner ? (
+                <Trophy className="mx-auto text-gold-aged mb-2" size={48} />
+              ) : (
+                <SkullIcon className="mx-auto text-blood-bright mb-2" size={48} />
+              )}
               <div className="font-grimoire font-extrabold text-3xl tracking-widest text-parchment">
-                {gameState.winner ? gameState.winner.name : 'NINGUÉM'}
+                {gameState?.winner ? gameState.winner.name : 'NINGUÉM'}
               </div>
-              <div className="font-typewriter text-parchment-dark mt-1 mb-5">
-                {gameState.winner ? 'sobreviveu ao Void.' : 'foi engolido pelo Void. Empate.'}
+              <div className="font-typewriter text-parchment-dark mt-1 mb-6">
+                {gameState?.winner ? 'sobreviveu ao Void.' : 'foi engolido pelo Void. Empate.'}
               </div>
-              <button
-                id="btn-restart"
-                onClick={() => socket.emit('restart_game')}
-                className="px-5 py-2 rounded border-2 border-gold-aged bg-blood/70 hover:bg-blood font-grimoire font-bold tracking-wider"
-              >
-                VOLTAR AO LOBBY
-              </button>
+
+              <div className="flex flex-col gap-2">
+                <button
+                  id="btn-restart"
+                  onClick={handleRestartGame}
+                  className="w-full py-2.5 rounded border-2 border-gold-aged bg-blood/80 hover:bg-blood text-parchment font-grimoire font-bold tracking-wider transition-colors shadow-[0_0_15px_rgba(139,0,0,0.5)]"
+                >
+                  VOLTAR AO LOBBY DA SALA
+                </button>
+                <button
+                  onClick={handleLeaveRoom}
+                  className="w-full py-2 rounded border border-iron/80 bg-black/60 hover:bg-black text-parchment-dark hover:text-white font-mono text-xs transition-colors"
+                >
+                  SAIR PARA O MENU PRINCIPAL
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Toast de erro */}
+      {/* Toast de notificações / erros */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -644,9 +746,15 @@ export default function App() {
             initial={{ y: -40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: -40, opacity: 0 }}
-            className="absolute top-14 left-1/2 -translate-x-1/2 z-[300] px-4 py-2 rounded border-2 border-blood-bright bg-black/95 text-blood-bright font-mono text-xs font-bold"
+            className={`absolute top-14 left-1/2 -translate-x-1/2 z-[300] px-4 py-2 rounded border-2 font-mono text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 ${
+              toast.type === 'success'
+                ? 'border-emerald-500 bg-black/95 text-emerald-400'
+                : toast.type === 'info'
+                  ? 'border-gold-aged bg-black/95 text-gold-aged'
+                  : 'border-blood-bright bg-black/95 text-blood-bright'
+            }`}
           >
-            {toast}
+            {toast.text}
           </motion.div>
         )}
       </AnimatePresence>

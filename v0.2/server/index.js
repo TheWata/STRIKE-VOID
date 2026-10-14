@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const crypto = require('crypto');
+const path = require('path');
 const { Server } = require('socket.io');
 
 // uuid v9 (CJS) works with require; newer majors are ESM-only -> fall back to crypto.
@@ -12,8 +13,6 @@ try {
 } catch (e) {
   uuid = () => crypto.randomUUID();
 }
-
-const path = require('path');
 
 const PORT = process.env.PORT || 3001;
 const app = express();
@@ -40,42 +39,80 @@ const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
 /* ------------------------------------------------------------------ */
-/* 3.1 ESTADO DA SALA                                                  */
+/* 1. GERENCIAMENTO DE MÚLTIPLAS SALAS EM MEMÓRIA                    */
 /* ------------------------------------------------------------------ */
-const room = {
-  phase: 'LOBBY', // 'LOBBY' | 'DEALING' | 'PLANNING' | 'REVEAL_REVERSO' | 'REVEAL_PAREDE' | 'REVEAL_FACA' | 'ANALYSIS' | 'GAME_OVER'
-  round: 0,
-  isPaused: false,
-  settings: {
-    useFixedTime: false,
-    baseTestTime: 10, // 10 segundos de folga padrão para testes
-    secondsPerPlayer: 2.0, // 2s por jogador vivo
-    damagePenalty: 0.33, // 33% menos tempo por dano
-    analysisDuration: 8.0, // 8s para ler os logs entre os rounds
-  },
-  deck: [],
-  discardPile: [],
-  players: [],
-  logs: [],
-  winner: null,
-};
+const rooms = new Map();
 
-const BOT_NAMES = ['LESHY_BOT', 'DEALER_X', 'GRIMORA', 'MAGNIFICUS', 'PO3_UNIT', 'BONE_LORD', 'HOUND_7'];
-const MAX_PLAYERS = 8;
-const MIN_PLAYERS = 2;
+const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Sem 0, O, 1, I
+function generateRoomCode() {
+  let code = '';
+  do {
+    code = '';
+    for (let i = 0; i < 4; i++) {
+      code += ROOM_CODE_CHARS.charAt(Math.floor(Math.random() * ROOM_CODE_CHARS.length));
+    }
+  } while (rooms.has(code));
+  return code;
+}
 
-// Metadados auxiliares fora do objeto "room" (não vão para o cliente)
-let gameToken = 0; // incrementa a cada partida/reset para abortar loops antigos
-let skipAnalysisFlag = false;
-let planningElapsed = 0;
-let logCounter = 0;
+function getPublicRoomsList() {
+  const list = [];
+  for (const [, room] of rooms.entries()) {
+    if (room.isPublic && room.status === 'LOBBY') {
+      list.push({
+        code: room.code,
+        name: room.name,
+        playerCount: room.players.length,
+        maxPlayers: room.maxPlayers,
+      });
+    }
+  }
+  return list;
+}
+
+function createRoom({ code, name, hostId, isPublic }) {
+  return {
+    code,
+    name: name || `Sala ${code}`,
+    hostId,
+    isPublic: Boolean(isPublic),
+    maxPlayers: 8,
+    minPlayers: 4,
+    status: 'LOBBY', // 'LOBBY' | 'IN_GAME' | 'FINISHED'
+    players: [],
+    gameState: {
+      phase: 'LOBBY',
+      round: 0,
+      isPaused: false,
+      settings: {
+        useFixedTime: false,
+        baseTestTime: 10,
+        secondsPerPlayer: 2.0,
+        damagePenalty: 0.33,
+        analysisDuration: 8.0,
+      },
+      deck: [],
+      discardPile: [],
+      logs: [],
+      winner: null,
+      gameToken: 0,
+      skipAnalysisFlag: false,
+      planningElapsed: 0,
+      logCounter: 0,
+      planningInterval: null,
+    },
+  };
+}
+
+const BOT_NAMES = ['LESHY_BOT', 'DEALER_X', 'GRIMORA', 'MAGNIFICUS', 'PO3_UNIT', 'BONE_LORD', 'HOUND_7', 'TRAPPER_BOT'];
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const getPlayer = (id) => room.players.find((p) => p.id === id);
-const alivePlayers = () => room.players.filter((p) => p.isAlive);
+const getPlayer = (room, id) => room.players.find((p) => p.id === id);
+const alivePlayers = (room) => room.players.filter((p) => p.isAlive);
+const connectedHumans = (room) => room.players.filter((p) => !p.isBot && io.sockets.sockets.has(p.id));
 
 /* ------------------------------------------------------------------ */
-/* 3.2 JOGADOR                                                         */
+/* 2. JOGADOR                                                         */
 /* ------------------------------------------------------------------ */
 function createPlayer(id, name, isBot) {
   return {
@@ -96,7 +133,7 @@ function createPlayer(id, name, isBot) {
 }
 
 /* ------------------------------------------------------------------ */
-/* 3.3 BARALHO PROPORCIONAL (96 cartas)                                */
+/* 3. BARALHO PROPORCIONAL (96 cartas)                                */
 /* ------------------------------------------------------------------ */
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -114,17 +151,17 @@ function buildDeck() {
   return shuffle(deck);
 }
 
-function drawCard() {
-  if (room.deck.length === 0) {
-    room.deck = room.discardPile;
-    room.discardPile = [];
-    shuffle(room.deck);
+function drawCard(room) {
+  if (room.gameState.deck.length === 0) {
+    room.gameState.deck = room.gameState.discardPile;
+    room.gameState.discardPile = [];
+    shuffle(room.gameState.deck);
   }
-  return room.deck.pop();
+  return room.gameState.deck.pop();
 }
 
 /* ------------------------------------------------------------------ */
-/* 3.4 EQUAÇÃO DE TEMPO INDIVIDUAL                                     */
+/* 4. EQUAÇÃO DE TEMPO INDIVIDUAL                                     */
 /* ------------------------------------------------------------------ */
 function calculatePlayerTime(player, aliveCount, settings) {
   if (!player.isAlive) return 0;
@@ -136,11 +173,17 @@ function calculatePlayerTime(player, aliveCount, settings) {
 }
 
 /* ------------------------------------------------------------------ */
-/* LOGS + SANITIZAÇÃO DE ESTADO                                        */
+/* 5. LOGS + SANITIZAÇÃO DE ESTADO                                    */
 /* ------------------------------------------------------------------ */
-function addLog(type, text) {
-  room.logs.push({ id: ++logCounter, round: room.round, type, text, timestamp: Date.now() });
-  if (room.logs.length > 300) room.logs.shift();
+function addLog(room, type, text) {
+  room.gameState.logs.push({
+    id: ++room.gameState.logCounter,
+    round: room.gameState.round,
+    type,
+    text,
+    timestamp: Date.now(),
+  });
+  if (room.gameState.logs.length > 300) room.gameState.logs.shift();
 }
 
 const REVEAL_ORDER = {
@@ -152,31 +195,32 @@ const REVEAL_ORDER = {
   GAME_OVER: ['REVERSO', 'PAREDE', 'FACA', 'NONE'],
 };
 
-/**
- * Estado sanitizado para um cliente específico: esconde mãos alheias e ações
- * ainda não reveladas (ninguém "vê" a jogada do outro durante o PLANNING).
- */
-function sanitizeStateForClients(viewerId) {
-  const revealed = REVEAL_ORDER[room.phase] || [];
-  const hostId = room.players.find((p) => !p.isBot)?.id || null;
+function sanitizeStateForClients(room, viewerId) {
+  const revealed = REVEAL_ORDER[room.gameState.phase] || [];
   return {
     you: viewerId,
-    hostId,
-    phase: room.phase,
-    round: room.round,
-    isPaused: room.isPaused,
-    settings: room.settings,
-    logs: room.logs.slice(-120),
-    winner: room.winner,
-    deckCount: room.deck.length,
+    roomCode: room.code,
+    roomName: room.name,
+    hostId: room.hostId,
+    isPublic: room.isPublic,
+    roomStatus: room.status,
+    minPlayers: room.minPlayers,
+    maxPlayers: room.maxPlayers,
+    phase: room.gameState.phase,
+    round: room.gameState.round,
+    isPaused: room.gameState.isPaused,
+    settings: room.gameState.settings,
+    logs: room.gameState.logs.slice(-120),
+    winner: room.gameState.winner,
+    deckCount: room.gameState.deck ? room.gameState.deck.length : 0,
     players: room.players.map((p) => {
       const isMe = p.id === viewerId;
       let action = null;
       if (p.selectedAction) {
         const a = p.selectedAction;
-        if (isMe && room.phase === 'PLANNING') {
+        if (isMe && room.gameState.phase === 'PLANNING') {
           action = { ...a };
-        } else if (revealed.includes(a.cardType) || (a.status === 'REFLECTED' && room.phase !== 'PLANNING')) {
+        } else if (revealed.includes(a.cardType) || (a.status === 'REFLECTED' && room.gameState.phase !== 'PLANNING')) {
           action = { ...a };
         } else {
           action = { hidden: true, cardType: null, targetId: null, status: 'PENDING' };
@@ -192,7 +236,7 @@ function sanitizeStateForClients(viewerId) {
         isWalled: p.isWalled,
         isReflecting: p.isReflecting,
         hand: isMe ? p.hand : [],
-        handCount: p.hand.length,
+        handCount: p.hand ? p.hand.length : 0,
         selectedAction: action,
         lockedIn: p.lockedIn,
         allowedTime: p.allowedTime,
@@ -202,9 +246,13 @@ function sanitizeStateForClients(viewerId) {
   };
 }
 
-function emitState() {
-  for (const [sid, sock] of io.sockets.sockets) {
-    sock.emit('game_state', sanitizeStateForClients(sid));
+function emitRoomState(room) {
+  for (const p of room.players) {
+    if (!p.isBot) {
+      const sanitized = sanitizeStateForClients(room, p.id);
+      io.to(p.id).emit('game_state', sanitized);
+      io.to(p.id).emit('room_updated', { roomState: sanitized });
+    }
   }
 }
 
@@ -213,15 +261,14 @@ function toast(socketId, message) {
 }
 
 /* ------------------------------------------------------------------ */
-/* AÇÕES                                                               */
+/* 6. AÇÕES DO JOGO                                                   */
 /* ------------------------------------------------------------------ */
-function applyAction(player, cardId, targetId) {
+function applyAction(room, player, cardId, targetId) {
   const idx = player.hand.findIndex((c) => c.id === cardId);
   if (idx === -1) return { ok: false, error: 'Carta inválida.' };
   const card = player.hand[idx];
-  // REVERSO pode mirar em si mesmo (defesa) ou em qualquer outro jogador (ofensivo/roubo)
   const finalTarget = targetId || player.id;
-  const target = getPlayer(finalTarget);
+  const target = getPlayer(room, finalTarget);
   if (!target || !target.isAlive) return { ok: false, error: 'Alvo inválido.' };
   if (player.isWalled && finalTarget !== player.id) {
     return {
@@ -230,7 +277,7 @@ function applyAction(player, cardId, targetId) {
     };
   }
   player.hand.splice(idx, 1);
-  room.discardPile.push(card);
+  room.gameState.discardPile.push(card);
   player.selectedAction = {
     cardId: card.id,
     cardType: card.type,
@@ -247,81 +294,80 @@ function passAction(player) {
   player.lockedIn = true;
 }
 
-function scheduleBot(bot, token, round) {
+function scheduleBot(room, bot, token, round) {
   const delay = 1500 + Math.random() * 2000;
   setTimeout(() => {
-    if (token !== gameToken || room.phase !== 'PLANNING' || room.round !== round) return;
+    if (token !== room.gameState.gameToken || room.gameState.phase !== 'PLANNING' || room.gameState.round !== round) return;
     if (!bot.isAlive || bot.lockedIn) return;
     if (bot.isWalled) {
       const knife = bot.hand.find((c) => c.type === 'FACA');
-      if (knife) applyAction(bot, knife.id, bot.id);
+      if (knife) applyAction(room, bot, knife.id, bot.id);
       else passAction(bot);
     } else {
       const card = bot.hand[Math.floor(Math.random() * bot.hand.length)];
       if (!card) {
         passAction(bot);
       } else if (card.type === 'REVERSO') {
-        const others = alivePlayers().filter((p) => p.id !== bot.id);
-        // Bot varia entre auto-defesa (60%) e reverter um oponente (40%)
+        const others = alivePlayers(room).filter((p) => p.id !== bot.id);
         if (others.length > 0 && Math.random() < 0.4) {
-          applyAction(bot, card.id, others[Math.floor(Math.random() * others.length)].id);
+          applyAction(room, bot, card.id, others[Math.floor(Math.random() * others.length)].id);
         } else {
-          applyAction(bot, card.id, bot.id);
+          applyAction(room, bot, card.id, bot.id);
         }
       } else {
-        const others = alivePlayers().filter((p) => p.id !== bot.id);
+        const others = alivePlayers(room).filter((p) => p.id !== bot.id);
         if (others.length === 0) passAction(bot);
-        else applyAction(bot, card.id, others[Math.floor(Math.random() * others.length)].id);
+        else applyAction(room, bot, card.id, others[Math.floor(Math.random() * others.length)].id);
       }
     }
-    emitState();
+    emitRoomState(room);
   }, delay);
 }
 
 /* ------------------------------------------------------------------ */
-/* 3.5 MÁQUINA DE ESTADOS                                              */
+/* 7. MÁQUINA DE ESTADOS DO JOGO                                      */
 /* ------------------------------------------------------------------ */
-function checkDeaths() {
+function checkDeaths(room) {
   for (const p of room.players) {
     if (p.lives <= 0 && p.isAlive) {
       p.isAlive = false;
       p.isWalled = false;
-      addLog('DEATH', '💀 ' + p.name + ' FOI ELIMINADO DA MESA!');
+      addLog(room, 'DEATH', '💀 ' + p.name + ' FOI ELIMINADO DA MESA!');
     }
   }
 }
 
-async function runGame(token) {
-  const aborted = () => token !== gameToken;
+async function runGame(room, token) {
+  const aborted = () => token !== room.gameState.gameToken;
 
   while (!aborted()) {
     /* ---------------- DEALING ---------------- */
-    room.phase = 'DEALING';
-    room.round += 1;
-    room.isPaused = false;
-    skipAnalysisFlag = false;
+    room.gameState.phase = 'DEALING';
+    room.gameState.round += 1;
+    room.gameState.isPaused = false;
+    room.gameState.skipAnalysisFlag = false;
     for (const p of room.players) {
       p.visualEffect = null;
       p.isReflecting = false;
       p.selectedAction = null;
       p.lockedIn = false;
     }
-    const aliveCount = alivePlayers().length;
-    for (const p of alivePlayers()) {
-      while (p.hand.length < 3) p.hand.push(drawCard());
-      p.allowedTime = calculatePlayerTime(p, aliveCount, room.settings);
+    const aliveCount = alivePlayers(room).length;
+    for (const p of alivePlayers(room)) {
+      while (p.hand.length < 3) p.hand.push(drawCard(room));
+      p.allowedTime = calculatePlayerTime(p, aliveCount, room.gameState.settings);
     }
-    addLog('SYSTEM', '— ROUND ' + room.round + ' —');
-    emitState();
+    addLog(room, 'SYSTEM', '— ROUND ' + room.gameState.round + ' —');
+    emitRoomState(room);
     await wait(1200);
     if (aborted()) return;
 
     /* ---------------- PLANNING ---------------- */
-    room.phase = 'PLANNING';
-    planningElapsed = 0;
-    emitState();
-    const round = room.round;
-    for (const bot of alivePlayers().filter((p) => p.isBot)) scheduleBot(bot, token, round);
+    room.gameState.phase = 'PLANNING';
+    room.gameState.planningElapsed = 0;
+    emitRoomState(room);
+    const round = room.gameState.round;
+    for (const bot of alivePlayers(room).filter((p) => p.isBot)) scheduleBot(room, bot, token, round);
 
     await new Promise((resolve) => {
       const startedAt = Date.now();
@@ -331,32 +377,33 @@ async function runGame(token) {
           return resolve();
         }
         const elapsedSec = (Date.now() - startedAt) / 1000;
-        planningElapsed = elapsedSec;
-        io.emit('timer_tick', { elapsedSec });
+        room.gameState.planningElapsed = elapsedSec;
+        io.to(room.code).emit('timer_tick', { elapsedSec });
 
         let forced = false;
-        for (const p of alivePlayers()) {
+        for (const p of alivePlayers(room)) {
           if (elapsedSec >= p.allowedTime && !p.lockedIn) {
             p.lockedIn = true;
             p.selectedAction = { cardType: 'NONE', targetId: null, originalTargetId: null, status: 'PENDING' };
             forced = true;
           }
         }
-        if (forced) emitState();
+        if (forced) emitRoomState(room);
 
-        if (alivePlayers().every((p) => p.lockedIn)) {
+        if (alivePlayers(room).every((p) => p.lockedIn)) {
           clearInterval(interval);
           resolve();
         }
       }, 100);
+      room.gameState.planningInterval = interval;
     });
     if (aborted()) return;
 
-    const alive = () => alivePlayers();
+    const alive = () => alivePlayers(room);
     const actionOf = (p) => p.selectedAction || { cardType: 'NONE', targetId: null };
 
     /* ---------------- REVEAL_REVERSO ---------------- */
-    room.phase = 'REVEAL_REVERSO';
+    room.gameState.phase = 'REVEAL_REVERSO';
     for (const p of room.players) p.visualEffect = null;
     const revUsers = alive().filter((p) => actionOf(p).cardType === 'REVERSO');
 
@@ -375,7 +422,7 @@ async function runGame(token) {
           revPlayer.lives = Math.max(0, revPlayer.lives - 1);
           revPlayer.visualEffect = 'VACUUM';
           revAction.status = 'MISFIRE';
-          addLog('VACUUM', '[VÁCUO] ' + revPlayer.name + ' usou Reverso em si mesmo no vazio e perdeu 1 Vida!');
+          addLog(room, 'VACUUM', '[VÁCUO] ' + revPlayer.name + ' usou Reverso em si mesmo no vazio e perdeu 1 Vida!');
         } else {
           revPlayer.isReflecting = true;
           revPlayer.visualEffect = 'REFLECT';
@@ -384,38 +431,35 @@ async function runGame(token) {
             attacker.selectedAction.targetId = attacker.id;
             attacker.selectedAction.status = 'REFLECTED';
             if (attacker.selectedAction.cardType === 'PAREDE') {
-              addLog('REFLECT', '[PAREDE REFLETIDA] ' + revPlayer.name + ' refletiu a Parede de volta para ' + attacker.name + '!');
+              addLog(room, 'REFLECT', '[PAREDE REFLETIDA] ' + revPlayer.name + ' refletiu a Parede de volta para ' + attacker.name + '!');
             } else {
-              addLog('REFLECT', '[REVERSO] ' + revPlayer.name + ' refletiu a Faca de ' + attacker.name + ' de volta para ' + attacker.name + '!');
+              addLog(room, 'REFLECT', '[REVERSO] ' + revPlayer.name + ' refletiu a Faca de ' + attacker.name + ' de volta para ' + attacker.name + '!');
             }
           }
         }
       } else {
         // CASO 2: Usou em OUTRA pessoa (Reverso Ofensivo / Intervenção)
-        const target = getPlayer(targetId);
+        const target = getPlayer(room, targetId);
         const tAction = target ? target.selectedAction : null;
 
         if (!target || !target.isAlive || !tAction || tAction.cardType === 'NONE' || tAction.cardType === 'REVERSO') {
-          // O alvo não atacou nem usou parede -> Vácuo!
           revPlayer.lives = Math.max(0, revPlayer.lives - 1);
           revPlayer.visualEffect = 'VACUUM';
           revAction.status = 'MISFIRE';
-          addLog('VACUUM', '[VÁCUO] ' + revPlayer.name + ' tentou reverter ' + (target ? target.name : 'o vazio') + ', mas não havia ação reversível (-1 Vida)!');
+          addLog(room, 'VACUUM', '[VÁCUO] ' + revPlayer.name + ' tentou reverter ' + (target ? target.name : 'o vazio') + ', mas não havia ação reversível (-1 Vida)!');
         } else if (tAction.cardType === 'PAREDE') {
           revPlayer.isReflecting = true;
           revPlayer.visualEffect = 'REFLECT';
           revAction.status = 'RESOLVED';
 
           if (tAction.targetId === target.id) {
-            // "se reverter alguem que usou a parede em si mesmo, rouba a parede"
             tAction.targetId = revPlayer.id;
             tAction.status = 'REFLECTED';
-            addLog('STEAL', '🛡️ [ROUBO DE PAREDE] ' + revPlayer.name + ' reverteu a Parede de ' + target.name + ' e ROUBOU para si!');
+            addLog(room, 'STEAL', '🛡️ [ROUBO DE PAREDE] ' + revPlayer.name + ' reverteu a Parede de ' + target.name + ' e ROUBOU para si!');
           } else {
-            // "Reverso em parede, volta pro remetente"
             tAction.targetId = target.id;
             tAction.status = 'REFLECTED';
-            addLog('REFLECT', '[PAREDE REFLETIDA] ' + revPlayer.name + ' reverteu a Parede de ' + target.name + ' de volta para ' + target.name + '!');
+            addLog(room, 'REFLECT', '[PAREDE REFLETIDA] ' + revPlayer.name + ' reverteu a Parede de ' + target.name + ' de volta para ' + target.name + '!');
           }
         } else if (tAction.cardType === 'FACA') {
           revPlayer.isReflecting = true;
@@ -425,44 +469,44 @@ async function runGame(token) {
           if (tAction.targetId === target.id) {
             tAction.targetId = revPlayer.id;
             tAction.status = 'REFLECTED';
-            addLog('REFLECT', '[REVERSO] ' + revPlayer.name + ' reverteu o golpe interno de ' + target.name + ' para si!');
+            addLog(room, 'REFLECT', '[REVERSO] ' + revPlayer.name + ' reverteu o golpe interno de ' + target.name + ' para si!');
           } else {
             tAction.targetId = target.id;
             tAction.status = 'REFLECTED';
-            addLog('REFLECT', '[REVERSO] ' + revPlayer.name + ' reverteu a Faca de ' + target.name + ' de volta para ' + target.name + '!');
+            addLog(room, 'REFLECT', '[REVERSO] ' + revPlayer.name + ' reverteu a Faca de ' + target.name + ' de volta para ' + target.name + '!');
           }
         }
       }
     }
-    emitState();
+    emitRoomState(room);
     await wait(2500);
     if (aborted()) return;
 
     /* ---------------- REVEAL_PAREDE ---------------- */
-    room.phase = 'REVEAL_PAREDE';
+    room.gameState.phase = 'REVEAL_PAREDE';
     for (const p of room.players) p.visualEffect = null;
     for (const player of alive().filter((p) => actionOf(p).cardType === 'PAREDE')) {
       const action = player.selectedAction;
-      const target = getPlayer(action.targetId);
+      const target = getPlayer(room, action.targetId);
       if (!target) continue;
       target.isWalled = true;
       target.visualEffect = 'WALLED';
       if (action.status === 'REFLECTED') {
         if (action.targetId === player.id) {
-          addLog('WALL', '[PAREDE REFLETIDA] ' + target.name + ' ficou preso na própria Parede!');
+          addLog(room, 'WALL', '[PAREDE REFLETIDA] ' + target.name + ' ficou preso na própria Parede!');
         } else {
-          addLog('WALL', '🛡️ [PAREDE ROUBADA] ' + target.name + ' recebeu a Parede roubada de ' + player.name + '!');
+          addLog(room, 'WALL', '🛡️ [PAREDE ROUBADA] ' + target.name + ' recebeu a Parede roubada de ' + player.name + '!');
         }
       } else {
-        addLog('WALL', '[PAREDE] ' + player.name + ' isolou ' + target.name + ' na Parede!');
+        addLog(room, 'WALL', '[PAREDE] ' + player.name + ' isolou ' + target.name + ' na Parede!');
       }
     }
-    emitState();
+    emitRoomState(room);
     await wait(2500);
     if (aborted()) return;
 
     /* ---------------- REVEAL_FACA ---------------- */
-    room.phase = 'REVEAL_FACA';
+    room.gameState.phase = 'REVEAL_FACA';
     for (const p of room.players) p.visualEffect = null;
     const knives = alive().filter((p) => actionOf(p).cardType === 'FACA');
 
@@ -474,12 +518,12 @@ async function runGame(token) {
           player.isWalled = false;
           player.visualEffect = 'WALL_BROKEN';
           action.processed = true;
-          addLog('BREAK', '[QUEBRA INTERNA] ' + player.name + ' usou a própria Faca e destruiu sua Parede!');
+          addLog(room, 'BREAK', '[QUEBRA INTERNA] ' + player.name + ' usou a própria Faca e destruiu sua Parede!');
         } else {
           player.lives = Math.max(0, player.lives - 1);
           player.visualEffect = 'DAMAGE';
           action.processed = true;
-          addLog('DAMAGE', '[AUTO-DANO] ' + player.name + ' se cortou com a própria Faca (-1 Vida)!');
+          addLog(room, 'DAMAGE', '[AUTO-DANO] ' + player.name + ' se cortou com a própria Faca (-1 Vida)!');
         }
       }
     }
@@ -488,66 +532,69 @@ async function runGame(token) {
     for (const player of knives) {
       const action = player.selectedAction;
       if (action.processed) continue;
-      const target = getPlayer(action.targetId);
+      const target = getPlayer(room, action.targetId);
       if (!target) continue;
       if (target.isWalled) {
         target.isWalled = false;
         target.visualEffect = 'WALL_BROKEN';
-        addLog('BREAK', '[ESTILHAÇO] A Faca de ' + player.name + ' destruiu a Parede de ' + target.name + ' (0 Dano)!');
+        addLog(room, 'BREAK', '[ESTILHAÇO] A Faca de ' + player.name + ' destruiu a Parede de ' + target.name + ' (0 Dano)!');
       } else {
         target.lives = Math.max(0, target.lives - 1);
         target.visualEffect = 'DAMAGE';
-        addLog('DAMAGE', '[SANGUE] Faca atingiu ' + target.name + ' em cheio (-1 Vida)!');
+        addLog(room, 'DAMAGE', '[SANGUE] Faca atingiu ' + target.name + ' em cheio (-1 Vida)!');
       }
       action.processed = true;
     }
-    checkDeaths();
-    emitState();
+    checkDeaths(room);
+    emitRoomState(room);
     await wait(3000);
     if (aborted()) return;
 
     /* ---------------- ANALYSIS / VITÓRIA ---------------- */
-    const survivors = alivePlayers();
+    const survivors = alivePlayers(room);
     if (survivors.length <= 1) {
-      room.phase = 'GAME_OVER';
-      room.winner = survivors[0] ? { id: survivors[0].id, name: survivors[0].name } : null;
-      addLog('SYSTEM', room.winner ? '🏆 ' + room.winner.name + ' VENCEU A PARTIDA!' : 'Ninguém sobreviveu. EMPATE NO VAZIO.');
-      emitState();
+      room.gameState.phase = 'GAME_OVER';
+      room.status = 'FINISHED';
+      room.gameState.winner = survivors[0] ? { id: survivors[0].id, name: survivors[0].name } : null;
+      addLog(room, 'SYSTEM', room.gameState.winner ? '🏆 ' + room.gameState.winner.name + ' VENCEU A PARTIDA!' : 'Ninguém sobreviveu. EMPATE NO VAZIO.');
+      emitRoomState(room);
       return;
     }
 
-    room.phase = 'ANALYSIS';
-    emitState();
-    let remainingMs = room.settings.analysisDuration * 1000;
-    skipAnalysisFlag = false;
-    while (remainingMs > 0 && !skipAnalysisFlag && !aborted()) {
+    room.gameState.phase = 'ANALYSIS';
+    emitRoomState(room);
+    let remainingMs = room.gameState.settings.analysisDuration * 1000;
+    room.gameState.skipAnalysisFlag = false;
+    while (remainingMs > 0 && !room.gameState.skipAnalysisFlag && !aborted()) {
       await wait(100);
-      if (!room.isPaused) remainingMs -= 100;
-      io.emit('analysis_tick', { remainingSec: Math.max(0, remainingMs / 1000), paused: room.isPaused });
+      if (!room.gameState.isPaused) remainingMs -= 100;
+      io.to(room.code).emit('analysis_tick', { remainingSec: Math.max(0, remainingMs / 1000), paused: room.gameState.isPaused });
     }
     if (aborted()) return;
-    room.isPaused = false;
+    room.gameState.isPaused = false;
   }
 }
 
-/* ------------------------------------------------------------------ */
-/* LOBBY / PARTIDA                                                     */
-/* ------------------------------------------------------------------ */
-const connectedHumans = () => room.players.filter((p) => !p.isBot && io.sockets.sockets.has(p.id));
+function resetToLobby(room) {
+  room.gameState.gameToken++;
+  if (room.gameState.planningInterval) {
+    clearInterval(room.gameState.planningInterval);
+    room.gameState.planningInterval = null;
+  }
+  room.status = 'LOBBY';
+  room.gameState.phase = 'LOBBY';
+  room.gameState.round = 0;
+  room.gameState.isPaused = false;
+  room.gameState.deck = [];
+  room.gameState.discardPile = [];
+  room.gameState.logs = [];
+  room.gameState.winner = null;
 
-function resetToLobby() {
-  gameToken++;
-  // Humanos desconectados não fazem parte do próximo lobby
+  // Manter apenas jogadores conectados ou bots
   room.players = room.players.filter((p) => p.isBot || io.sockets.sockets.has(p.id));
-  room.phase = 'LOBBY';
-  room.round = 0;
-  room.isPaused = false;
-  room.deck = [];
-  room.discardPile = [];
-  room.logs = [];
-  room.winner = null;
   room.players.forEach((p) => {
     p.lives = 3;
+    p.maxLives = 3;
     p.isAlive = true;
     p.isWalled = false;
     p.isReflecting = false;
@@ -556,18 +603,22 @@ function resetToLobby() {
     p.lockedIn = false;
     p.visualEffect = null;
   });
-  emitState();
+  emitRoomState(room);
+  io.emit('public_rooms_updated', getPublicRoomsList());
 }
 
-function startGame() {
-  gameToken++;
-  room.deck = buildDeck();
-  room.discardPile = [];
-  room.logs = [];
-  room.winner = null;
-  room.round = 0;
+function startGame(room) {
+  room.gameState.gameToken++;
+  room.status = 'IN_GAME';
+  room.gameState.phase = 'DEALING';
+  room.gameState.deck = buildDeck();
+  room.gameState.discardPile = [];
+  room.gameState.logs = [];
+  room.gameState.winner = null;
+  room.gameState.round = 0;
   room.players.forEach((p) => {
     p.lives = 3;
+    p.maxLives = 3;
     p.isAlive = true;
     p.isWalled = false;
     p.isReflecting = false;
@@ -576,52 +627,233 @@ function startGame() {
     p.lockedIn = false;
     p.visualEffect = null;
   });
-  addLog('SYSTEM', 'A mesa foi selada. Que comece o ritual.');
-  runGame(gameToken).catch((err) => console.error('Erro no loop de jogo:', err));
+  addLog(room, 'SYSTEM', 'A mesa foi selada. Que comece o ritual.');
+  io.to(room.code).emit('game_started', { roomCode: room.code });
+  emitRoomState(room);
+  io.emit('public_rooms_updated', getPublicRoomsList());
+  runGame(room, room.gameState.gameToken).catch((err) => console.error(`[Sala ${room.code}] Erro no loop de jogo:`, err));
+}
+
+function cleanUpRoom(roomCode) {
+  const room = rooms.get(roomCode);
+  if (!room) return;
+  room.gameState.gameToken++;
+  if (room.gameState.planningInterval) {
+    clearInterval(room.gameState.planningInterval);
+    room.gameState.planningInterval = null;
+  }
+  rooms.delete(roomCode);
+  io.emit('public_rooms_updated', getPublicRoomsList());
+}
+
+function handlePlayerLeave(socket) {
+  const roomCode = socket.data?.roomCode;
+  if (!roomCode) return;
+  const room = rooms.get(roomCode);
+  if (!room) {
+    socket.data.roomCode = null;
+    return;
+  }
+
+  socket.leave(roomCode);
+  socket.data.roomCode = null;
+
+  const player = getPlayer(room, socket.id);
+  if (!player) return;
+
+  if (room.status === 'LOBBY') {
+    room.players = room.players.filter((p) => p.id !== socket.id);
+  } else {
+    player.isAlive = false;
+    player.lives = 0;
+    player.isWalled = false;
+    if (!player.lockedIn) {
+      player.lockedIn = true;
+      player.selectedAction = { cardType: 'NONE', targetId: null, originalTargetId: null, status: 'PENDING' };
+    }
+    addLog(room, 'DEATH', '💀 ' + player.name + ' abandonou a mesa.');
+  }
+
+  const humans = connectedHumans(room);
+  if (humans.length === 0) {
+    cleanUpRoom(roomCode);
+    return;
+  }
+
+  // Se o host saiu, migra a liderança para o próximo humano
+  if (room.hostId === socket.id) {
+    const nextHost = humans[0];
+    if (nextHost) {
+      room.hostId = nextHost.id;
+      io.to(room.code).emit('host_migrated', { newHostId: room.hostId });
+    }
+  }
+
+  emitRoomState(room);
+  io.emit('public_rooms_updated', getPublicRoomsList());
 }
 
 /* ------------------------------------------------------------------ */
-/* 3.6 EVENTOS SOCKET.IO                                               */
+/* 8. EVENTOS SOCKET.IO                                               */
 /* ------------------------------------------------------------------ */
 io.on('connection', (socket) => {
-  console.log('conectado:', socket.id);
-  // Sala órfã (ninguém conectado numa partida antiga): volta ao lobby limpo
-  if (room.phase !== 'LOBBY' && connectedHumans().length === 0) {
-    room.players = [];
-    resetToLobby();
-  }
-  socket.emit('game_state', sanitizeStateForClients(socket.id));
+  // Envia lista pública atualizada ao conectar
+  socket.emit('public_rooms_updated', getPublicRoomsList());
 
-  socket.on('join_game', ({ name } = {}) => {
-    if (room.phase !== 'LOBBY') return toast(socket.id, 'A partida já começou.');
-    if (getPlayer(socket.id)) return;
-    if (room.players.length >= MAX_PLAYERS) return toast(socket.id, 'Mesa cheia (8 jogadores).');
-    const clean = String(name || '').trim().slice(0, 16) || 'JOGADOR_' + (room.players.length + 1);
-    room.players.push(createPlayer(socket.id, clean, false));
-    emitState();
+  socket.on('get_public_rooms', () => {
+    socket.emit('public_rooms_updated', getPublicRoomsList());
+  });
+
+  socket.on('create_room', ({ playerName, roomName, isPublic } = {}) => {
+    // Se o socket já estava em uma sala, sai dela primeiro
+    if (socket.data?.roomCode) {
+      handlePlayerLeave(socket);
+    }
+
+    const cleanPlayer = String(playerName || '').trim().slice(0, 16) || 'JOGADOR_1';
+    const cleanRoom = String(roomName || '').trim().slice(0, 24) || `SALA DE ${cleanPlayer.toUpperCase()}`;
+    const code = generateRoomCode();
+
+    const room = createRoom({
+      code,
+      name: cleanRoom,
+      hostId: socket.id,
+      isPublic: isPublic !== false, // Padrão pública se não especificado
+    });
+
+    const hostPlayer = createPlayer(socket.id, cleanPlayer, false);
+    room.players.push(hostPlayer);
+    rooms.set(code, room);
+
+    socket.join(code);
+    socket.data = socket.data || {};
+    socket.data.roomCode = code;
+
+    const sanitized = sanitizeStateForClients(room, socket.id);
+    socket.emit('room_joined', { roomState: sanitized });
+    emitRoomState(room);
+
+    if (room.isPublic) {
+      io.emit('public_rooms_updated', getPublicRoomsList());
+    }
+  });
+
+  socket.on('join_room', ({ playerName, roomCode } = {}) => {
+    if (!roomCode) {
+      return socket.emit('room_error', { message: 'Código de sala é obrigatório.' });
+    }
+
+    const normalizedCode = String(roomCode).toUpperCase().trim();
+    const room = rooms.get(normalizedCode);
+
+    if (!room) {
+      return socket.emit('room_error', { message: 'Sala não encontrada. Verifique o código.' });
+    }
+
+    if (room.status !== 'LOBBY') {
+      return socket.emit('room_error', { message: 'A partida nesta sala já está em andamento.' });
+    }
+
+    if (room.players.length >= room.maxPlayers) {
+      return socket.emit('room_error', { message: 'Esta sala já atingiu a capacidade máxima (8 jogadores).' });
+    }
+
+    if (socket.data?.roomCode && socket.data.roomCode !== normalizedCode) {
+      handlePlayerLeave(socket);
+    }
+
+    const cleanPlayer = String(playerName || '').trim().slice(0, 16) || `JOGADOR_${room.players.length + 1}`;
+
+    // Evita duplicar se já estiver na lista
+    let player = getPlayer(room, socket.id);
+    if (!player) {
+      player = createPlayer(socket.id, cleanPlayer, false);
+      room.players.push(player);
+    } else {
+      player.name = cleanPlayer;
+    }
+
+    socket.join(normalizedCode);
+    socket.data = socket.data || {};
+    socket.data.roomCode = normalizedCode;
+
+    const sanitized = sanitizeStateForClients(room, socket.id);
+    socket.emit('room_joined', { roomState: sanitized });
+    emitRoomState(room);
+    io.emit('public_rooms_updated', getPublicRoomsList());
+  });
+
+  socket.on('leave_room', () => {
+    handlePlayerLeave(socket);
+    socket.emit('left_room');
+  });
+
+  /* ---- CONTROLES DE HOST ---- */
+  socket.on('toggle_room_privacy', () => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id) return;
+    room.isPublic = !room.isPublic;
+    emitRoomState(room);
+    io.emit('public_rooms_updated', getPublicRoomsList());
   });
 
   socket.on('add_bot', () => {
-    if (room.phase !== 'LOBBY') return;
-    if (!getPlayer(socket.id)) return;
-    if (room.players.length >= MAX_PLAYERS) return toast(socket.id, 'Mesa cheia (8 jogadores).');
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
+    if (room.players.length >= room.maxPlayers) {
+      return toast(socket.id, 'Sala cheia (8 jogadores).');
+    }
     const used = room.players.filter((p) => p.isBot).map((p) => p.name);
     const name = BOT_NAMES.find((n) => !used.includes(n)) || 'BOT_' + uuid().slice(0, 4);
     room.players.push(createPlayer('bot-' + uuid(), name, true));
-    emitState();
+    emitRoomState(room);
+    io.emit('public_rooms_updated', getPublicRoomsList());
   });
 
   socket.on('remove_bot', (botId) => {
-    if (room.phase !== 'LOBBY') return;
-    const bot = getPlayer(botId);
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
+    const bot = getPlayer(room, botId);
     if (!bot || !bot.isBot) return;
     room.players = room.players.filter((p) => p.id !== botId);
-    emitState();
+    emitRoomState(room);
+    io.emit('public_rooms_updated', getPublicRoomsList());
+  });
+
+  socket.on('kick_player', ({ targetId } = {}) => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
+    if (targetId === socket.id) return;
+
+    const targetPlayer = getPlayer(room, targetId);
+    if (!targetPlayer) return;
+
+    if (targetPlayer.isBot) {
+      room.players = room.players.filter((p) => p.id !== targetId);
+    } else {
+      const targetSocket = io.sockets.sockets.get(targetId);
+      if (targetSocket) {
+        targetSocket.leave(room.code);
+        targetSocket.data.roomCode = null;
+        targetSocket.emit('kicked_from_room', { message: 'Você foi expulso da sala pelo líder.' });
+      }
+      room.players = room.players.filter((p) => p.id !== targetId);
+    }
+
+    emitRoomState(room);
+    io.emit('public_rooms_updated', getPublicRoomsList());
   });
 
   socket.on('update_settings', (newSettings = {}) => {
-    if (!getPlayer(socket.id)) return;
-    const s = room.settings;
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id) return;
+
+    const s = room.gameState.settings;
     const num = (v, min, max, fallback) => {
       const n = Number(v);
       return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
@@ -631,72 +863,68 @@ io.on('connection', (socket) => {
     s.secondsPerPlayer = num(newSettings.secondsPerPlayer, 1, 5, s.secondsPerPlayer);
     s.damagePenalty = num(newSettings.damagePenalty, 0, 0.5, s.damagePenalty);
     s.analysisDuration = num(newSettings.analysisDuration, 3, 20, s.analysisDuration);
-    emitState();
+    emitRoomState(room);
   });
 
   socket.on('start_game', () => {
-    if (room.phase !== 'LOBBY') return;
-    const me = getPlayer(socket.id);
-    if (!me) return;
-    if (room.players.length < MIN_PLAYERS) return toast(socket.id, 'Mínimo de 2 jogadores (adicione um bot).');
-    startGame();
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id || room.status !== 'LOBBY') return;
+    if (room.players.length < room.minPlayers) {
+      return toast(socket.id, `Mínimo de ${room.minPlayers} jogadores para iniciar. Adicione bots ou convide amigos.`);
+    }
+    startGame(room);
   });
 
   socket.on('restart_game', () => {
-    if (room.phase !== 'GAME_OVER') return;
-    resetToLobby();
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.gameState.phase !== 'GAME_OVER') return;
+    resetToLobby(room);
   });
 
-  socket.on('toggle_pause', () => {
-    if (room.phase !== 'ANALYSIS' || !getPlayer(socket.id)) return;
-    room.isPaused = !room.isPaused;
-    emitState();
-  });
-
-  socket.on('skip_analysis', () => {
-    if (room.phase !== 'ANALYSIS' || !getPlayer(socket.id)) return;
-    skipAnalysisFlag = true;
-    room.isPaused = false;
-  });
-
+  /* ---- AÇÕES DE GAMEPLAY NA PARTIDA ---- */
   socket.on('select_action', ({ cardId, targetId } = {}) => {
-    const player = getPlayer(socket.id);
-    if (!player || room.phase !== 'PLANNING' || !player.isAlive || player.lockedIn) return;
-    const result = applyAction(player, cardId, targetId);
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.gameState.phase !== 'PLANNING') return;
+    const player = getPlayer(room, socket.id);
+    if (!player || !player.isAlive || player.lockedIn) return;
+
+    const result = applyAction(room, player, cardId, targetId);
     if (!result.ok) return toast(socket.id, result.error);
-    emitState();
+    emitRoomState(room);
   });
 
   socket.on('pass_turn', () => {
-    const player = getPlayer(socket.id);
-    if (!player || room.phase !== 'PLANNING' || !player.isAlive || player.lockedIn) return;
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.gameState.phase !== 'PLANNING') return;
+    const player = getPlayer(room, socket.id);
+    if (!player || !player.isAlive || player.lockedIn) return;
+
     passAction(player);
-    emitState();
+    emitRoomState(room);
+  });
+
+  socket.on('toggle_pause', () => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.gameState.phase !== 'ANALYSIS' || !getPlayer(room, socket.id)) return;
+    room.gameState.isPaused = !room.gameState.isPaused;
+    emitRoomState(room);
+  });
+
+  socket.on('skip_analysis', () => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.gameState.phase !== 'ANALYSIS' || !getPlayer(room, socket.id)) return;
+    room.gameState.skipAnalysisFlag = true;
+    room.gameState.isPaused = false;
   });
 
   socket.on('disconnect', () => {
-    console.log('desconectado:', socket.id);
-    const player = getPlayer(socket.id);
-    if (!player) return;
-    if (room.phase === 'LOBBY') {
-      room.players = room.players.filter((p) => p.id !== socket.id);
-    } else {
-      player.isAlive = false;
-      player.lives = 0;
-      player.isWalled = false;
-      if (!player.lockedIn) {
-        player.lockedIn = true;
-        player.selectedAction = { cardType: 'NONE', targetId: null, originalTargetId: null, status: 'PENDING' };
-      }
-      addLog('DEATH', '💀 ' + player.name + ' abandonou a mesa.');
-    }
-    // Sem humanos restantes: zera a sala
-    if (connectedHumans().length === 0) {
-      room.players = [];
-      resetToLobby();
-      return;
-    }
-    emitState();
+    handlePlayerLeave(socket);
   });
 });
 
