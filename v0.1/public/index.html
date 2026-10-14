@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STRIKE/VOID Prototype</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand">STRIKE/VOID</div>
+      <div class="status-wrap">
+        <div id="phaseLabel" class="badge">LOBBY</div>
+        <div id="timer" class="timer">TIME: --:--</div>
+        <div id="globalTimer" class="subtimer">ROUND END: --:--</div>
+      </div>
+      <div class="identity">
+        <input id="nameInput" maxlength="20" placeholder="Your name" />
+        <button id="renameBtn">Set Name</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="table-panel">
+        <div id="table" class="table">
+          <svg id="arrows" class="arrows" viewBox="0 0 1000 700" preserveAspectRatio="none"></svg>
+        </div>
+        <div class="actions-row">
+          <div id="selectionInfo">Drag a card to any player slot (including your own) to lock your move.</div>
+          <button id="idleBtn">VOID: do nothing (+1 card)</button>
+          <button id="restartBtn">Restart Match</button>
+        </div>
+      </section>
+
+      <aside class="right-panel">
+        <div class="panel">
+          <h2>Round Log</h2>
+          <div id="logs" class="logs"></div>
+        </div>
+        <div class="panel chat-panel">
+          <h2>Chat</h2>
+          <div id="chat" class="chat"></div>
+          <div class="chat-input-row">
+            <input id="chatInput" maxlength="300" placeholder="Type message" />
+            <button id="sendChatBtn">Send</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer class="hand-panel">
+      <h2>Your Hand</h2>
+      <div id="hand" class="hand"></div>
+    </footer>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "strike-void",
+  "version": "0.2.0",
+  "description": "STRIKE/VOID - Jogo de Roleta Tática e Blefe em Tempo Real",
+  "scripts": {
+    "build": "npm --prefix v0.2/client install && npm --prefix v0.2/client run build && npm --prefix v0.2/server install",
+    "start": "node v0.2/server/index.js",
+    "start:v1": "node v0.1/server.js",
+    "dev:server": "node v0.2/server/index.js",
+    "dev:client": "npm --prefix v0.2/client run dev"
+  },
+  "keywords": [
+    "game",
+    "socket.io",
+    "react",
+    "tailwind",
+    "multiplayer"
+  ],
+  "author": "TheWata",
+  "license": "ISC"
+}

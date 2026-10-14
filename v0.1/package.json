@@ -1,0 +1,13 @@
+{
+  "name": "strike-void-prototype",
+  "version": "1.0.0",
+  "description": "Web multiplayer prototype for STRIKE/VOID",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.8.1"
+  }
+}
