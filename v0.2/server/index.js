@@ -117,7 +117,7 @@ function createRoom({ code, name, hostId, isPublic }) {
     hostId,
     isPublic: Boolean(isPublic),
     maxPlayers: 8,
-    minPlayers: 4,
+    minPlayers: 2,
     status: 'LOBBY', // 'LOBBY' | 'IN_GAME' | 'FINISHED'
     players: [],
     gameState: {

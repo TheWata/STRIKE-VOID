@@ -140,7 +140,7 @@ export default function HomeHub({
                     CRIAR NOVA SALA
                   </h2>
                   <p className="text-[11px] font-mono text-parchment-dark">
-                    Você será o líder e controlará as regras e bots.
+                    Você será o líder (2 a 8 jogadores, com suporte a bots).
                   </p>
                 </div>
               </div>

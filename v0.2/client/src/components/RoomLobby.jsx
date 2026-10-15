@@ -153,7 +153,7 @@ export default function RoomLobby({
   const [copied, setCopied] = useState(false);
 
   const players = roomState?.players || [];
-  const minPlayers = roomState?.minPlayers || 4;
+  const minPlayers = roomState?.minPlayers || 2;
   const maxPlayers = roomState?.maxPlayers || 8;
   const maxHp = roomState?.settings?.maxHp ?? roomState?.maxHp ?? DEFAULT_MAX_HP;
   const maxHandCards = roomState?.settings?.maxHandCards ?? roomState?.maxHandCards ?? DEFAULT_HAND_CARDS;

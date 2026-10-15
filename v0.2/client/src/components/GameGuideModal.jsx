@@ -177,7 +177,7 @@ function TabTheGame() {
           <Skull size={18} /> O OBJETIVO DOS CONDENADOS
         </div>
         <p className="text-parchment-light">
-          Você e outros <strong>4 a 8 jogadores</strong> estão trancados em uma mesa cerimonial octogonal. Cada jogador
+          Você e outros participantes (de <strong>2 a 8 jogadores</strong> na mesa) estão trancados em uma mesa cerimonial. Cada jogador
           inicia com uma reserva de vidas (de <strong>2 a 5 Vidas</strong>, configurada pelo anfitrião da sala, sendo 3 o
           padrão). Seu objetivo é impiedoso e direto: <strong>ser o último sobrevivente de pé</strong> na mesa.
         </p>
