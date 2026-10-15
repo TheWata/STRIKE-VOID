@@ -2,9 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '../lib/cn';
 
-function calcTime(lives, aliveCount, s) {
+// Mesma normalização do servidor: o dano é ponderado pela proporção em relação ao maxHp (curva calibrada para 3 vidas)
+function calcTime(lives, aliveCount, s, maxHp = 3) {
   if (s.useFixedTime) return s.baseTestTime;
-  const factor = Math.pow(1 - s.damagePenalty, 3 - lives);
+  const scaledDamage = (maxHp - lives) * (3 / maxHp);
+  const factor = Math.pow(1 - s.damagePenalty, scaledDamage);
   return Number((s.baseTestTime + aliveCount * s.secondsPerPlayer * factor).toFixed(1));
 }
 
@@ -22,7 +24,7 @@ function Slider({ label, value, min, max, step, onChange, display }) {
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="w-full"
+        className="w-full h-7 sm:h-auto"
       />
     </label>
   );
@@ -37,12 +39,14 @@ export default function SettingsModal({ open, settings, aliveCount, onClose, onS
 
   const set = (patch) => setLocal((s) => ({ ...s, ...patch }));
   const n = Math.max(2, aliveCount || 2);
+  const maxHp = settings?.maxHp ?? 3;
+  const hpLevels = Array.from({ length: maxHp }, (_, i) => maxHp - i);
 
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80"
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 p-2 sm:p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -54,13 +58,13 @@ export default function SettingsModal({ open, settings, aliveCount, onClose, onS
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-[min(460px,92vw)] rounded-md border-4 border-stone-900 bg-[#cbb892] text-stone-900 p-5 shadow-[inset_0_0_40px_rgba(44,29,18,0.7),0_20px_60px_#000]"
+            className="w-full max-w-[460px] max-h-[94dvh] overflow-y-auto rounded-md border-4 border-stone-900 bg-[#cbb892] text-stone-900 p-3 sm:p-5 shadow-[inset_0_0_40px_rgba(44,29,18,0.7),0_20px_60px_#000]"
           >
-            <h2 className="font-grimoire font-extrabold text-xl tracking-widest text-center border-b-2 border-stone-900 pb-2 mb-4">
+            <h2 className="font-grimoire font-extrabold text-base sm:text-xl tracking-widest text-center border-b-2 border-stone-900 pb-2 mb-3 sm:mb-4">
               ⚙️ REGRAS DO TEMPO
             </h2>
 
-            <label className="flex items-center gap-2 mb-4 font-typewriter text-sm cursor-pointer">
+            <label className="flex items-center gap-2 mb-3 sm:mb-4 min-h-[40px] font-typewriter text-xs sm:text-sm cursor-pointer">
               <input
                 id="chk-fixed-time"
                 type="checkbox"
@@ -108,12 +112,19 @@ export default function SettingsModal({ open, settings, aliveCount, onClose, onS
               onChange={(v) => set({ analysisDuration: v })}
             />
 
-            <div className="rounded border-2 border-stone-900 bg-stone-900/90 text-parchment font-mono text-[11px] text-center py-2 px-1 mb-4">
-              <div className="text-parchment-dark mb-1">Prévia ({n} vivos)</div>
-              <div>
-                3 Vidas: <b className="text-gold-aged">{calcTime(3, n, local).toFixed(1)}s</b> | 2 Vidas:{' '}
-                <b className="text-gold-aged">{calcTime(2, n, local).toFixed(1)}s</b> | 1 Vida:{' '}
-                <b className="text-blood-bright">{calcTime(1, n, local).toFixed(1)}s</b>
+            <div className="rounded border-2 border-stone-900 bg-stone-900/90 text-parchment font-mono text-[10px] sm:text-[11px] text-center py-2 px-1 mb-3 sm:mb-4">
+              <div className="text-parchment-dark mb-1">
+                Prévia ({n} vivos · {maxHp} vidas iniciais)
+              </div>
+              <div className="flex flex-wrap justify-center gap-x-3 gap-y-0.5">
+                {hpLevels.map((hp) => (
+                  <span key={hp}>
+                    {hp} {hp === 1 ? 'Vida' : 'Vidas'}:{' '}
+                    <b className={hp === 1 ? 'text-blood-bright' : 'text-gold-aged'}>
+                      {calcTime(hp, n, local, maxHp).toFixed(1)}s
+                    </b>
+                  </span>
+                ))}
               </div>
             </div>
 
@@ -121,17 +132,20 @@ export default function SettingsModal({ open, settings, aliveCount, onClose, onS
               <button
                 id="btn-settings-cancel"
                 onClick={onClose}
-                className={cn('flex-1 py-2 rounded border-2 border-stone-900 font-grimoire font-bold text-sm', 'hover:bg-stone-900/20')}
+                className={cn('flex-1 min-h-[44px] py-2 rounded border-2 border-stone-900 font-grimoire font-bold text-xs sm:text-sm', 'hover:bg-stone-900/20')}
               >
                 FECHAR
               </button>
               <button
                 id="btn-settings-save"
                 onClick={() => {
-                  onSave(local);
+                  // A vida inicial é controlada pelo seletor do Lobby; não é reenviada daqui
+                  const payload = { ...local };
+                  delete payload.maxHp;
+                  onSave(payload);
                   onClose();
                 }}
-                className="flex-[2] py-2 rounded border-2 border-stone-900 bg-stone-900 text-gold-aged font-grimoire font-bold text-sm hover:bg-wood-mid"
+                className="flex-[2] min-h-[44px] py-2 rounded border-2 border-stone-900 bg-stone-900 text-gold-aged font-grimoire font-bold text-xs sm:text-sm hover:bg-wood-mid"
               >
                 Salvar e Aplicar na Mesa
               </button>

@@ -1,6 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
+  // No touch não existe hover: aplica as variantes hover: somente em dispositivos que realmente suportam hover
+  future: { hoverOnlyWhenSupported: true },
   theme: {
     extend: {
       fontFamily: {

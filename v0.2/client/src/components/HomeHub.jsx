@@ -37,23 +37,23 @@ export default function HomeHub({
   };
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4 overflow-y-auto">
+    <div className="flex-1 min-h-0 flex overflow-y-auto overflow-x-hidden p-3 sm:p-4">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
-        className="w-full max-w-4xl space-y-6 my-auto"
+        className="w-full max-w-4xl space-y-4 sm:space-y-6 m-auto"
       >
         {/* Título Principal */}
         <div className="text-center space-y-1">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gold-aged/40 bg-black/60 text-gold-aged text-[11px] font-mono tracking-widest uppercase mb-2 shadow-[0_0_15px_rgba(212,175,55,0.2)]">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-gold-aged/40 bg-black/60 text-gold-aged text-[10px] sm:text-[11px] font-mono tracking-wider sm:tracking-widest uppercase mb-2 shadow-[0_0_15px_rgba(212,175,55,0.2)]">
             <Sparkles size={13} className="text-gold-aged animate-spin" style={{ animationDuration: '8s' }} />
             MULTIJOGADOR TÁTICO EM TEMPO REAL
           </div>
-          <h1 className="font-grimoire font-extrabold text-4xl sm:text-5xl tracking-[0.25em] text-parchment drop-shadow-[0_0_20px_rgba(220,38,38,0.7)]">
+          <h1 className="font-grimoire font-extrabold text-3xl sm:text-5xl tracking-[0.15em] sm:tracking-[0.25em] text-parchment drop-shadow-[0_0_20px_rgba(220,38,38,0.7)]">
             STRIKE<span className="text-blood-bright">/</span>VOID
           </h1>
-          <p className="font-typewriter text-parchment-dark text-xs sm:text-sm tracking-widest max-w-lg mx-auto">
+          <p className="font-typewriter text-parchment-dark text-[11px] sm:text-sm tracking-wider sm:tracking-widest max-w-lg mx-auto">
             ROLETA SIMULTÂNEA · FACAS · PAREDES · REVERSOS
           </p>
         </div>
@@ -71,7 +71,7 @@ export default function HomeHub({
               onChange={(e) => setNickname(e.target.value)}
               maxLength={16}
               placeholder="Digite seu nome..."
-              className="flex-1 bg-black/70 border-2 border-iron/80 rounded px-3 py-2 font-typewriter text-parchment text-sm outline-none focus:border-gold-aged transition-colors"
+              className="flex-1 min-h-[44px] bg-black/70 border-2 border-iron/80 rounded px-3 py-2 font-typewriter text-parchment text-base sm:text-sm outline-none focus:border-gold-aged transition-colors"
             />
           </div>
         </div>
@@ -79,7 +79,7 @@ export default function HomeHub({
         {/* Grid de Ações: Entrar com Código & Criar Sala */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Card: Entrar com Código */}
-          <div className="rounded-lg border-2 border-stone-800 bg-gradient-to-b from-wood-mid to-wood-dark p-5 shadow-2xl flex flex-col justify-between">
+          <div className="rounded-lg border-2 border-stone-800 bg-gradient-to-b from-wood-mid to-wood-dark p-4 sm:p-5 shadow-2xl flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-2 rounded bg-black/60 border border-gold-aged/50 text-gold-aged">
@@ -118,7 +118,7 @@ export default function HomeHub({
           </div>
 
           {/* Card: Criar Sala */}
-          <div className="rounded-lg border-2 border-stone-800 bg-gradient-to-b from-wood-mid to-wood-dark p-5 shadow-2xl flex flex-col justify-between">
+          <div className="rounded-lg border-2 border-stone-800 bg-gradient-to-b from-wood-mid to-wood-dark p-4 sm:p-5 shadow-2xl flex flex-col justify-between">
             <div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="p-2 rounded bg-black/60 border border-gold-aged/50 text-gold-aged">
@@ -141,7 +141,7 @@ export default function HomeHub({
                   onChange={(e) => setCreateRoomName(e.target.value)}
                   maxLength={24}
                   placeholder="Nome da sua mesa..."
-                  className="w-full bg-black/80 border-2 border-iron rounded-md px-3 py-2 font-typewriter text-parchment text-sm outline-none focus:border-gold-aged placeholder:text-stone-700"
+                  className="w-full min-h-[44px] bg-black/80 border-2 border-iron rounded-md px-3 py-2 font-typewriter text-parchment text-base sm:text-sm outline-none focus:border-gold-aged placeholder:text-stone-700"
                 />
 
                 {/* Seletor Pública / Privada */}
@@ -149,7 +149,7 @@ export default function HomeHub({
                   <button
                     type="button"
                     onClick={() => setIsPublic(true)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-mono font-bold transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 rounded text-xs font-mono font-bold transition-all ${
                       isPublic
                         ? 'bg-gold-aged/20 text-gold-aged border border-gold-aged/60 shadow-[0_0_10px_rgba(212,175,55,0.25)]'
                         : 'text-parchment-dark hover:text-parchment'
@@ -160,7 +160,7 @@ export default function HomeHub({
                   <button
                     type="button"
                     onClick={() => setIsPublic(false)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded text-xs font-mono font-bold transition-all ${
+                    className={`flex-1 flex items-center justify-center gap-1.5 min-h-[44px] py-2 rounded text-xs font-mono font-bold transition-all ${
                       !isPublic
                         ? 'bg-blood/30 text-blood-bright border border-blood-bright/60 shadow-[0_0_10px_rgba(220,38,38,0.25)]'
                         : 'text-parchment-dark hover:text-parchment'
@@ -231,7 +231,7 @@ export default function HomeHub({
                   </div>
                   <button
                     onClick={() => onJoinRoom(r.code)}
-                    className="shrink-0 px-3 py-1.5 rounded border border-gold-aged bg-blood/70 group-hover:bg-blood text-parchment font-grimoire font-bold text-xs tracking-wider transition-colors"
+                    className="shrink-0 min-h-[44px] sm:min-h-0 px-3 py-2 sm:py-1.5 rounded border border-gold-aged bg-blood/70 group-hover:bg-blood text-parchment font-grimoire font-bold text-xs tracking-wider transition-colors"
                   >
                     ENTRAR
                   </button>

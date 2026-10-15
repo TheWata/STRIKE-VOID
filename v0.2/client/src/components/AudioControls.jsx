@@ -26,21 +26,22 @@ export default function AudioControls() {
       <button
         id="btn-audio"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded border border-iron/70 text-[11px] font-mono text-parchment-dark hover:text-gold-aged hover:border-gold-aged/70"
+        className="flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-2.5 sm:py-1 rounded border border-iron/70 text-[11px] font-mono text-parchment-dark hover:text-gold-aged hover:border-gold-aged/70"
         title="Configurações de Áudio"
+        aria-label="Configurações de Áudio"
       >
-        {prefs.muted ? <VolumeX size={14} /> : <Volume2 size={14} />} SOM
+        {prefs.muted ? <VolumeX size={16} /> : <Volume2 size={16} />} <span className="hidden sm:inline">SOM</span>
       </button>
 
       {open && (
         <div
           id="audio-panel"
-          className="absolute right-0 top-full mt-2 w-64 z-[250] rounded border-2 border-stone-900 bg-stone-950/95 p-3.5 shadow-[0_10px_35px_#000] font-mono text-[11px] text-parchment"
+          className="fixed left-2 right-2 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64 z-[250] rounded border-2 border-stone-900 bg-stone-950/95 p-3.5 shadow-[0_10px_35px_#000] font-mono text-[11px] text-parchment"
         >
           <button
             id="btn-mute"
             onClick={toggleMute}
-            className="w-full mb-3 py-1.5 rounded border border-gold-aged/70 text-gold-aged hover:bg-gold-aged/10 font-bold tracking-wider"
+            className="w-full mb-3 min-h-[44px] py-1.5 rounded border border-gold-aged/70 text-gold-aged hover:bg-gold-aged/10 font-bold tracking-wider"
           >
             {prefs.muted ? '🔇 SOM MUTADO — ATIVAR' : '🔊 SOM ATIVO — MUTAR'}
           </button>

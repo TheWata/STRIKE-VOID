@@ -116,8 +116,12 @@ const META = {
   REVERSO: { name: 'REVERSO', foot: 'REVERTE / ROUBA PAREDE', Art: ReverseArt },
 };
 
-function InscryptionCardBase({ card, isSelected, onClick, onDragStart, onDragEnd, disabled, faceDown, small }) {
-  const size = small ? 'w-[64px] h-[92px]' : 'w-[118px] h-[168px]';
+function InscryptionCardBase({ card, isSelected, onClick, onDragStart, onDragEnd, disabled, faceDown, small, compact }) {
+  const size = small
+    ? 'w-[64px] h-[92px]'
+    : compact
+      ? 'w-[clamp(72px,min(26vw,24dvh),112px)] aspect-[118/168]'
+      : 'w-[118px] h-[168px]';
 
   if (faceDown) {
     return (
@@ -138,26 +142,35 @@ function InscryptionCardBase({ card, isSelected, onClick, onDragStart, onDragEnd
   const meta = META[card?.type];
   if (!meta) return null;
   const { Art } = meta;
+  const interactive = !disabled && !!onClick;
 
   return (
     <div
+      role={onClick ? 'button' : undefined}
+      aria-pressed={onClick ? !!isSelected : undefined}
+      aria-disabled={onClick ? !!disabled : undefined}
       draggable={!disabled && !!onDragStart}
       onDragStart={(e) => onDragStart && onDragStart(e, card)}
       onDragEnd={onDragEnd}
       onClick={() => !disabled && onClick && onClick(card)}
       className={cn(
-        'relative flex flex-col rounded-md bg-[#cbb892] border-4 border-stone-900',
+        'relative flex flex-col rounded-md bg-[#cbb892] border-stone-900',
+        compact ? 'border-[3px] touch-manipulation' : 'border-4',
         'shadow-[inset_0_0_20px_rgba(44,29,18,0.6)] transition-transform duration-200',
         size,
-        !disabled && onClick && 'cursor-pointer hover:-translate-y-3 hover:shadow-[0_0_18px_rgba(212,175,55,0.5)]',
+        interactive && 'cursor-pointer hover:-translate-y-3 hover:shadow-[0_0_18px_rgba(212,175,55,0.5)]',
+        interactive && compact && 'active:scale-95',
         disabled && 'opacity-60 saturate-50',
-        isSelected && '-translate-y-6 ring-2 ring-gold-aged shadow-[0_0_24px_rgba(212,175,55,0.8)]'
+        isSelected &&
+          (compact
+            ? '-translate-y-3 scale-105 ring-4 ring-gold-aged shadow-[0_0_26px_rgba(212,175,55,0.9)]'
+            : '-translate-y-6 ring-2 ring-gold-aged shadow-[0_0_24px_rgba(212,175,55,0.8)]')
       )}
     >
       <div
         className={cn(
           'font-grimoire font-extrabold tracking-widest text-stone-900 border-b-2 border-stone-900 text-center leading-tight',
-          small ? 'text-[8px] py-[1px]' : 'text-[13px] py-[2px]'
+          small ? 'text-[8px] py-[1px]' : compact ? 'text-[11px] py-[1px]' : 'text-[13px] py-[2px]'
         )}
       >
         {meta.name}
@@ -168,7 +181,7 @@ function InscryptionCardBase({ card, isSelected, onClick, onDragStart, onDragEnd
       <div
         className={cn(
           'font-typewriter text-stone-900 text-center border-t-2 border-stone-900 leading-tight',
-          small ? 'text-[5px] py-[1px]' : 'text-[8.5px] py-[2px]'
+          small ? 'text-[5px] py-[1px]' : compact ? 'text-[6.5px] py-[1px]' : 'text-[8.5px] py-[2px]'
         )}
       >
         {meta.foot}

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useAnimationControls, useReducedMotion } from 'framer-motion';
 import {
   Settings,
   Skull as SkullIcon,
@@ -11,177 +11,28 @@ import {
   Copy,
   Check,
   LogOut,
+  ScrollText,
 } from 'lucide-react';
 import { socket } from './lib/socket';
 import { cn } from './lib/cn';
+import { PHASE_LABELS, DEFAULT_MAX_HP } from './lib/constants';
+import { useCompactLayout } from './lib/useMediaQuery';
 import InscryptionCard from './components/InscryptionCard';
 import PlayerSeat from './components/PlayerSeat';
+import CompactSeat from './components/CompactSeat';
 import TargetArrowsSVG from './components/TargetArrowsSVG';
 import SettingsModal from './components/SettingsModal';
 import AudioControls from './components/AudioControls';
+import CentralClock from './components/CentralClock';
+import LogPanel, { LogDrawer } from './components/LogPanel';
+import DamageOverlay from './components/DamageOverlay';
 import HomeHub from './components/HomeHub';
 import RoomLobby from './components/RoomLobby';
 import { audio } from './lib/audio';
 
-const PHASE_LABELS = {
-  LOBBY: 'LOBBY',
-  DEALING: 'EMBARALHANDO...',
-  PLANNING: 'PLANEJAMENTO',
-  REVEAL_REVERSO: 'FASE 1 · REVERSOS',
-  REVEAL_PAREDE: 'FASE 2 · PAREDES',
-  REVEAL_FACA: 'FASE 3 · FACAS',
-  ANALYSIS: 'ANÁLISE',
-  GAME_OVER: 'FIM DE JOGO',
-};
-
-const LOG_STYLES = {
-  VACUUM: 'text-fuchsia-400',
-  REFLECT: 'text-gold-aged',
-  STEAL: 'text-amber-300 font-bold',
-  WALL: 'text-[#7fa3c0]',
-  BREAK: 'text-orange-400',
-  DAMAGE: 'text-red-500',
-  DEATH: 'text-red-700 font-bold',
-  SYSTEM: 'text-parchment-dark',
-};
-
-/* ------------------------------------------------------------------ */
-/* Relógio isolado: só ele escuta timer_tick (não re-renderiza a mesa) */
-/* ------------------------------------------------------------------ */
-const CentralClock = React.memo(function CentralClock({ socket, myAllowedTime, phase, locked }) {
-  const [elapsed, setElapsed] = useState(0);
-  const [analysis, setAnalysis] = useState({ remainingSec: 0, paused: false });
-
-  useEffect(() => {
-    const onTick = ({ elapsedSec }) => setElapsed(elapsedSec);
-    const onAnalysis = (data) => setAnalysis(data);
-    socket.on('timer_tick', onTick);
-    socket.on('analysis_tick', onAnalysis);
-    return () => {
-      socket.off('timer_tick', onTick);
-      socket.off('analysis_tick', onAnalysis);
-    };
-  }, [socket]);
-
-  useEffect(() => {
-    setElapsed(0);
-  }, [phase]);
-
-  const allowed = myAllowedTime || 0;
-  const remaining = Math.max(0, Number((allowed - elapsed).toFixed(1)));
-  const secsLeft = Math.ceil(remaining);
-  const ticking = phase === 'PLANNING' && !locked && allowed > 0 && secsLeft > 0 && secsLeft <= 5;
-
-  // Tique-taque nos últimos 5s (mais grave e urgente nos últimos 3s) + tensão do ambiente
-  useEffect(() => {
-    if (!ticking) return;
-    audio.play(secsLeft <= 3 ? 'tickUrgent' : 'tick');
-  }, [ticking, secsLeft]);
-
-  useEffect(() => {
-    audio.setClockTension(ticking ? (secsLeft <= 3 ? 1 : 0.5) : 0);
-  }, [ticking, secsLeft]);
-
-  useEffect(() => () => audio.setClockTension(0), []);
-
-  if (phase === 'ANALYSIS') {
-    return (
-      <div className="flex flex-col items-center">
-        <div className="w-14 h-14 rounded-full border-4 border-gold-aged/70 bg-wood-dark flex items-center justify-center font-mono font-bold text-gold-aged text-lg shadow-[0_0_14px_rgba(212,175,55,0.4)]">
-          {analysis.remainingSec.toFixed(0)}
-        </div>
-        <span className="text-[9px] font-mono text-parchment-dark mt-1 tracking-widest">
-          {analysis.paused ? 'PAUSADO' : 'LEITURA'}
-        </span>
-      </div>
-    );
-  }
-
-  const frac = allowed > 0 ? Math.min(1, remaining / allowed) : 0;
-  const urgent = phase === 'PLANNING' && !locked && remaining <= 3 && allowed > 0;
-  const R = 44;
-
-  return (
-    <div id="central-clock" className="relative w-[clamp(96px,10vw,128px)] aspect-square">
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
-        <circle cx="50" cy="50" r="48" fill="#1a110b" stroke="#d4af37" strokeWidth="2" opacity="0.9" />
-        {Array.from({ length: 12 }).map((_, i) => (
-          <line
-            key={i}
-            x1="50"
-            y1="4"
-            x2="50"
-            y2={i % 3 === 0 ? 12 : 9}
-            stroke="#9e8a63"
-            strokeWidth="1.5"
-            transform={`rotate(${i * 30} 50 50)`}
-          />
-        ))}
-        <circle cx="50" cy="50" r={R - 6} fill="#0d0906" stroke="#2c1d12" strokeWidth="2" />
-        <circle
-          cx="50"
-          cy="50"
-          r={R - 6}
-          fill="none"
-          stroke={urgent ? '#dc2626' : locked ? '#4a5568' : '#d4af37'}
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeDasharray={2 * Math.PI * (R - 6)}
-          strokeDashoffset={2 * Math.PI * (R - 6) * (1 - (phase === 'PLANNING' ? frac : 0))}
-          transform="rotate(-90 50 50)"
-          style={{ transition: 'stroke-dashoffset 0.1s linear' }}
-        />
-      </svg>
-      <div className={cn('absolute inset-0 flex flex-col items-center justify-center', urgent && 'animate-pulse')}>
-        {phase === 'PLANNING' ? (
-          <>
-            <span
-              className={cn(
-                'font-mono font-bold text-2xl leading-none',
-                urgent ? 'text-blood-bright' : locked ? 'text-iron' : 'text-parchment'
-              )}
-            >
-              {remaining.toFixed(1)}
-            </span>
-            <span className="text-[8px] font-mono text-parchment-dark mt-1 tracking-widest">
-              {locked ? 'TRAVADO' : 'SEGUNDOS'}
-            </span>
-          </>
-        ) : (
-          <span className="text-[9px] font-grimoire font-bold text-center text-parchment-dark leading-tight px-3 tracking-wider">
-            {PHASE_LABELS[phase] || phase}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-});
-
-/* ------------------------------------------------------------------ */
-/* Painel de logs                                                      */
-/* ------------------------------------------------------------------ */
-function LogPanel({ logs }) {
-  const ref = useRef(null);
-  useEffect(() => {
-    if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
-  }, [logs.length]);
-
-  return (
-    <div className="absolute bottom-3 left-3 z-40 w-[min(22rem,26vw)] min-w-[220px] h-[190px] flex flex-col rounded border-2 border-iron/70 bg-black/70 backdrop-blur-sm">
-      <div className="px-2 py-1 border-b border-iron/60 font-grimoire font-extrabold text-[11px] tracking-widest text-gold-aged">
-        CRÔNICA DA MESA (LOGS)
-      </div>
-      <div ref={ref} id="log-panel" className="flex-1 overflow-y-auto px-2 py-1 font-mono text-[10.5px] leading-snug space-y-0.5">
-        {logs.map((l) => (
-          <div key={l.id} className={cn(LOG_STYLES[l.type] || 'text-parchment')}>
-            <span className="opacity-50">R{l.round} </span>
-            {l.text}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+/* Botão quadrado de ícone do cabeçalho (alvo de toque de 40px no mobile) */
+const HEADER_ICON_BTN =
+  'flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-3 sm:py-1 rounded border text-[11px] font-mono transition-colors';
 
 /* ------------------------------------------------------------------ */
 /* App Principal                                                       */
@@ -191,11 +42,18 @@ export default function App() {
   const [publicRooms, setPublicRooms] = useState([]);
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showLogs, setShowLogs] = useState(false);
   const [toast, setToast] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [, setConnected] = useState(socket.connected);
+  const [hitKey, setHitKey] = useState(0);
   const dragCardRef = useRef(null);
   const toastTimer = useRef(null);
+  const prevHpRef = useRef(null);
+
+  const compact = useCompactLayout();
+  const reduceMotion = useReducedMotion();
+  const shakeControls = useAnimationControls();
 
   // Nickname persistido no localStorage
   const [nickname, setNickname] = useState(() => {
@@ -280,16 +138,41 @@ export default function App() {
   const localIndex = Math.max(0, players.findIndex((p) => p.id === gameState?.you));
   const aliveCount = players.filter((p) => p.isAlive).length;
 
+  // Vida do jogador local (hp/maxHp vindos do servidor; lives/maxLives mantidos por compatibilidade)
+  const myHp = me ? (me.hp ?? me.lives) : null;
+  const myMaxHp = me ? (me.maxHp ?? me.maxLives ?? gameState?.maxHp ?? DEFAULT_MAX_HP) : DEFAULT_MAX_HP;
+
   // Limpa seleção quando a jogada foi travada ou a fase mudou
   useEffect(() => {
     if (phase !== 'PLANNING' || me?.lockedIn) setSelectedCardId(null);
   }, [phase, me?.lockedIn]);
+
+  /* ---------------- FEEDBACK DE DANO (Hit Flash + Screen Shake) ---------------- */
+  useEffect(() => {
+    if (myHp == null) {
+      prevHpRef.current = null;
+      return;
+    }
+    const inMatch = phase !== 'LOBBY';
+    if (inMatch && prevHpRef.current != null && myHp < prevHpRef.current) {
+      setHitKey((k) => k + 1);
+      if (!reduceMotion) {
+        shakeControls.start({
+          x: [0, -8, 8, -6, 6, 0],
+          y: [0, 4, -4, 2, -2, 0],
+          transition: { duration: 0.3, ease: 'easeInOut' },
+        });
+      }
+    }
+    prevHpRef.current = myHp;
+  }, [myHp, phase, reduceMotion, shakeControls]);
 
   /* ---------------- ÁUDIO ---------------- */
   const stateRef = useRef(null);
   stateRef.current = gameState;
   const audioPrev = useRef({ alive: 0, lockedOthers: 0 });
 
+  // SFX por fase (os efeitos visuais chegam no mesmo game_state da troca de fase)
   useEffect(() => {
     const s = stateRef.current;
     if (!s) return;
@@ -342,16 +225,19 @@ export default function App() {
     audioPrev.current.lockedOthers = 0;
   }, [gameState?.phase, gameState?.round]);
 
+  // Minha jogada travada
   useEffect(() => {
     if (phase === 'PLANNING' && me?.lockedIn) audio.play('lock');
   }, [me?.lockedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Outros jogadores travando a jogada
   const lockedOthers = players.filter((p) => p.id !== me?.id && p.isAlive && p.lockedIn).length;
   useEffect(() => {
     if (phase === 'PLANNING' && lockedOthers > audioPrev.current.lockedOthers) audio.play('lockOther');
     audioPrev.current.lockedOthers = lockedOthers;
   }, [lockedOthers]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Música dinâmica por vidas e som ambiente exclusivo para espectadores
   useEffect(() => {
     const inMatch = roomStatus === 'IN_GAME' && phase !== 'LOBBY' && phase !== 'GAME_OVER';
     audio.setPlayerState({
@@ -362,6 +248,7 @@ export default function App() {
     });
   }, [roomStatus, phase, me?.lives, me?.isAlive]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Som de clique em qualquer botão
   useEffect(() => {
     const onClick = (e) => {
       const btn = e.target.closest && e.target.closest('button');
@@ -418,6 +305,14 @@ export default function App() {
 
   const logs = useMemo(() => gameState?.logs || [], [gameState?.logs]);
 
+  const nameOf = useCallback(
+    (id) => {
+      const p = players.find((x) => x.id === id);
+      return p ? p.name : '?';
+    },
+    [players]
+  );
+
   /* Handlers para o Hub e Lobby */
   const handleJoinRoom = (roomCode) => {
     const cleanPlayer = nickname.trim() || 'CONDENADO';
@@ -432,35 +327,20 @@ export default function App() {
   const handleLeaveRoom = () => {
     socket.emit('leave_room');
     setGameState(null);
+    setShowLogs(false);
   };
 
-  const handleTogglePrivacy = () => {
-    socket.emit('toggle_room_privacy');
-  };
-
-  const handleAddBot = () => {
-    socket.emit('add_bot');
-  };
-
-  const handleRemoveBot = (botId) => {
-    socket.emit('remove_bot', botId);
-  };
-
-  const handleKickPlayer = (targetId) => {
-    socket.emit('kick_player', { targetId });
-  };
-
-  const handleStartGame = () => {
-    socket.emit('start_game');
-  };
-
-  const handleRestartGame = () => {
-    socket.emit('restart_game');
-  };
+  const handleTogglePrivacy = () => socket.emit('toggle_room_privacy');
+  const handleAddBot = () => socket.emit('add_bot');
+  const handleRemoveBot = (botId) => socket.emit('remove_bot', botId);
+  const handleKickPlayer = (targetId) => socket.emit('kick_player', { targetId });
+  const handleSetMaxHp = (maxHp) => socket.emit('set_max_hp', { maxHp });
+  const handleStartGame = () => socket.emit('start_game');
+  const handleRestartGame = () => socket.emit('restart_game');
 
   const handleCopyHeaderCode = () => {
     if (gameState?.roomCode) {
-      navigator.clipboard.writeText(gameState.roomCode);
+      navigator.clipboard?.writeText(gameState.roomCode);
       setCopiedCode(true);
       showToast(`Código ${gameState.roomCode} copiado!`, 'success');
       setTimeout(() => setCopiedCode(false), 2000);
@@ -471,293 +351,476 @@ export default function App() {
   const inAnyRoom = Boolean(gameState?.roomCode);
   const inGame = inAnyRoom && (roomStatus === 'IN_GAME' || phase !== 'LOBBY');
 
-  return (
-    <div className="h-full flex flex-col relative overflow-hidden bg-void-bg text-parchment">
-      {/* Brilho de velas */}
-      <div className="candle pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
+  // Vinheta de sangramento só durante a partida e apenas para quem está sentado à mesa
+  const overlayActive = inAnyRoom && !!me && phase !== 'LOBBY' && phase !== 'GAME_OVER';
 
-      {/* Barra superior */}
-      <header className="relative z-40 flex items-center justify-between px-4 py-2 border-b border-iron/40 bg-black/50 backdrop-blur-sm">
-        <div className="flex items-center gap-3">
-          <div className="font-grimoire font-extrabold tracking-[0.25em] text-parchment text-sm">
-            STRIKE<span className="text-blood-bright">/</span>VOID
-          </div>
+  /* ---------------- LAYOUT COMPACTO (mobile) ---------------- */
+  const opponents = players.filter((p) => p.id !== me?.id);
+  const gridCols = Math.min(4, Math.max(1, opponents.length));
+  const hintText = canAct
+    ? selectedCard
+      ? 'Toque em um oponente (ou em você) para escolher o alvo'
+      : 'Toque numa carta e depois no alvo'
+    : phase === 'PLANNING' && me?.isAlive
+      ? 'Jogada travada. Aguardando mesa...'
+      : '';
 
-          {inAnyRoom && (
-            <button
-              onClick={handleCopyHeaderCode}
-              className="hidden sm:flex items-center gap-1.5 px-2.5 py-0.5 rounded border border-gold-aged/50 bg-black/60 font-mono text-[11px] text-gold-aged hover:bg-gold-aged/20 transition-colors shadow-sm"
-              title="Clique para copiar código da sala"
-            >
-              <span>SALA: <strong className="tracking-wider">{gameState.roomCode}</strong></span>
-              {copiedCode ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
-            </button>
-          )}
+  const compactTable = (
+    <main className="relative flex-1 min-h-0 flex flex-col landscape:flex-row">
+      {/* Tabuleiro: oponentes em grid + relógio central */}
+      <section className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-2 pt-2 pb-1 flex flex-col gap-2">
+        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
+          {opponents.map((p) => (
+            <CompactSeat
+              key={p.id}
+              player={p}
+              isMe={false}
+              phase={phase}
+              targetable={isTargetable(p)}
+              dimmed={canAct && !!selectedCard && !isTargetable(p)}
+              onSeatClick={onSeatClick}
+              nameOf={nameOf}
+            />
+          ))}
         </div>
 
-        <div className="font-mono text-[11px] text-parchment-dark tracking-widest flex items-center gap-3">
-          {inGame && <span className="text-parchment">ROUND {gameState.round}</span>}
-          {inAnyRoom && <span className="text-gold-aged">{PHASE_LABELS[phase]}</span>}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <AudioControls />
-          {inAnyRoom && (
-            <button
-              id="btn-settings"
-              onClick={() => setShowSettings(true)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded border border-gold-aged/70 text-[11px] font-mono text-gold-aged hover:bg-gold-aged/10 transition-colors"
-            >
-              <Settings size={13} /> <span className="hidden sm:inline">REGRAS</span>
-            </button>
-          )}
-          {inAnyRoom && (
-            <button
-              onClick={handleLeaveRoom}
-              className="flex items-center gap-1 px-2.5 py-1 rounded border border-iron text-[11px] font-mono text-parchment-dark hover:text-white hover:bg-blood/40 hover:border-blood-bright transition-colors"
-              title="Sair da sala"
-            >
-              <LogOut size={12} /> <span className="hidden sm:inline">SAIR</span>
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* Roteamento de Tela */}
-      {!inAnyRoom ? (
-        /* 1. Hub Inicial estilo jklm.fun */
-        <HomeHub
-          nickname={nickname}
-          setNickname={setNickname}
-          publicRooms={publicRooms}
-          onJoinRoom={handleJoinRoom}
-          onCreateRoom={handleCreateRoom}
-          onRefreshRooms={() => socket.emit('get_public_rooms')}
-        />
-      ) : !inGame ? (
-        /* 2. Sala de Espera / Lobby da Sala */
-        <RoomLobby
-          roomState={gameState}
-          me={me}
-          isHost={isHost}
-          onLeaveRoom={handleLeaveRoom}
-          onTogglePrivacy={handleTogglePrivacy}
-          onAddBot={handleAddBot}
-          onRemoveBot={handleRemoveBot}
-          onKickPlayer={handleKickPlayer}
-          onStartGame={handleStartGame}
-          onOpenSettings={() => setShowSettings(true)}
-          onCopyCode={(code) => showToast(`Código ${code} copiado!`, 'success')}
-        />
-      ) : (
-        /* 3. Mesa de Partida em Andamento */
-        <>
-          <main className="relative flex-1 min-h-0 flex items-center justify-center">
-            <div className="relative" style={{ width: 'min(100%, calc(100vh - 300px))', aspectRatio: '1 / 1' }}>
-              <div className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.9)]" />
-              <div className="table-octagon table-felt absolute inset-[3.5%]" />
-
-              <TargetArrowsSVG players={players} localIndex={localIndex} />
-
-              {players.map((p, i) => (
-                <PlayerSeat
-                  key={p.id}
-                  player={p}
-                  index={i}
-                  localIndex={localIndex}
-                  totalPlayers={players.length}
-                  isMe={p.id === me?.id}
-                  phase={phase}
-                  targetable={isTargetable(p)}
-                  dimmed={canAct && !!selectedCard && !isTargetable(p)}
-                  onSeatClick={onSeatClick}
-                  onDropCard={onDropCard}
-                />
-              ))}
-
-              {/* Centro da mesa: relógio + controles de análise */}
-              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1.5">
-                <CentralClock socket={socket} myAllowedTime={me?.allowedTime} phase={phase} locked={!!me?.lockedIn || !me?.isAlive} />
-                {phase === 'ANALYSIS' && (
-                  <div className="flex flex-col gap-1.5">
-                    <button
-                      id="btn-pause"
-                      onClick={() => socket.emit('toggle_pause')}
-                      className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/80 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20"
-                    >
-                      <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR LEITURA' : '⏸️ PAUSAR LOGS'}
-                    </button>
-                    <button
-                      id="btn-skip"
-                      onClick={() => socket.emit('skip_analysis')}
-                      className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/80 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30"
-                    >
-                      <SkipForward size={11} /> ⏭️ PRÓXIMO ROUND
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {/* Aviso de parede */}
-              {walled && canAct && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [1, 0.6, 1] }}
-                  transition={{ duration: 1.2, repeat: Infinity }}
-                  className="absolute left-1/2 -translate-x-1/2 bottom-[2%] z-50 px-3 py-1 rounded border-2 border-blood-bright bg-black/90 text-blood-bright text-[10px] font-mono font-bold text-center max-w-[80%]"
-                >
-                  🔒 VOCÊ ESTÁ EMPAREDADO: SÓ PODE USAR CARTAS EM SI MESMO OU PASSAR A VEZ
-                </motion.div>
-              )}
+        <div className="flex items-center justify-center gap-3 py-1">
+          <CentralClock socket={socket} myAllowedTime={me?.allowedTime} phase={phase} locked={!!me?.lockedIn || !me?.isAlive} compact />
+          {phase === 'ANALYSIS' && (
+            <div className="flex flex-col gap-1.5">
+              <button
+                id="btn-pause"
+                onClick={() => socket.emit('toggle_pause')}
+                className="flex items-center justify-center gap-1 min-h-[44px] px-3 rounded border border-gold-aged bg-black/80 text-gold-aged text-[11px] font-mono font-bold active:bg-gold-aged/20"
+              >
+                <Pause size={13} /> {gameState.isPaused ? 'CONTINUAR' : 'PAUSAR LOGS'}
+              </button>
+              <button
+                id="btn-skip"
+                onClick={() => socket.emit('skip_analysis')}
+                className="flex items-center justify-center gap-1 min-h-[44px] px-3 rounded border border-blood-bright bg-black/80 text-blood-bright text-[11px] font-mono font-bold active:bg-blood/30"
+              >
+                <SkipForward size={13} /> PRÓXIMO ROUND
+              </button>
             </div>
-          </main>
+          )}
+        </div>
 
-          {/* Mão de cartas */}
-          <footer className="relative z-40 h-[200px] flex items-end justify-center pb-3">
-            {me && me.isAlive ? (
-              <div className="flex items-end gap-4">
-                <AnimatePresence>
-                  {me.hand.map((card, i) => (
-                    <motion.div
-                      key={card.id}
-                      initial={{ y: -420, opacity: 0, rotate: -12 }}
-                      animate={{ y: 0, opacity: 1, rotate: 0 }}
-                      exit={{ y: -60, opacity: 0 }}
-                      transition={{ delay: i * 0.18, type: 'spring', stiffness: 120, damping: 16 }}
-                    >
-                      <InscryptionCard
-                        card={card}
-                        isSelected={card.id === selectedCardId}
-                        onClick={onCardClick}
-                        onDragStart={onCardDragStart}
-                        onDragEnd={() => (dragCardRef.current = null)}
-                        disabled={!canAct}
-                      />
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <div className="font-grimoire text-parchment-dark tracking-widest text-sm pb-8">
-                {me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}
-              </div>
-            )}
-          </footer>
+        {walled && canAct && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [1, 0.6, 1] }}
+            transition={{ duration: 1.2, repeat: Infinity }}
+            className="mx-auto px-3 py-1 rounded border-2 border-blood-bright bg-black/90 text-blood-bright text-[10px] font-mono font-bold text-center"
+          >
+            🔒 EMPAREDADO: SÓ PODE USAR CARTAS EM SI MESMO OU PASSAR A VEZ
+          </motion.div>
+        )}
+      </section>
 
-          {/* Controles à direita */}
-          {me && me.isAlive && (
-            <div className="absolute bottom-3 right-3 z-40 flex flex-col gap-2 w-[200px]">
-              {canAct && selectedCard && (
-                <button
-                  id="btn-self-target"
-                  onClick={() => sendAction(selectedCard.id, me.id)}
-                  className="flex items-center justify-center gap-1.5 py-2 rounded border-2 border-gold-aged bg-black/80 text-gold-aged font-grimoire font-bold text-xs hover:bg-gold-aged/20"
-                >
-                  <Crosshair size={14} /> MIRAR EM MIM MESMO
-                </button>
-              )}
+      {/* Mão + controles (acima da vinheta de sangramento: z-[45]) */}
+      <section className="relative z-[45] shrink-0 flex flex-col gap-1.5 px-2 pt-2 pb-safe border-t border-iron/40 bg-black/50 landscape:w-[48%] landscape:border-t-0 landscape:border-l landscape:justify-center">
+        {me && (
+          <div className="flex items-stretch gap-2">
+            <div className="flex-1 min-w-0">
+              <CompactSeat
+                player={me}
+                isMe
+                phase={phase}
+                targetable={isTargetable(me)}
+                dimmed={false}
+                onSeatClick={onSeatClick}
+                nameOf={nameOf}
+              />
+            </div>
+            {me.isAlive && (
               <button
                 id="btn-pass"
                 disabled={!canAct}
                 onClick={() => socket.emit('pass_turn')}
-                className="flex items-center justify-center gap-1.5 py-2 rounded border-2 border-iron bg-black/80 text-parchment-dark font-grimoire font-bold text-xs hover:border-parchment disabled:opacity-30"
+                className="shrink-0 w-[34%] max-w-[130px] flex flex-col items-center justify-center gap-0.5 min-h-[56px] rounded border-2 border-iron bg-black/80 text-parchment-dark font-grimoire font-bold text-[11px] active:border-parchment disabled:opacity-30"
               >
-                <Hand size={14} /> PASSAR A VEZ
+                <Hand size={16} /> PASSAR A VEZ
               </button>
-              <div className="text-[10px] font-mono text-parchment-dark text-center leading-tight">
-                {canAct
-                  ? selectedCard
-                    ? 'Clique num assento piscando ou arraste a carta'
-                    : 'Clique OU arraste uma carta até um assento'
-                  : phase === 'PLANNING'
-                    ? 'Jogada travada. Aguardando mesa...'
-                    : ''}
-              </div>
-            </div>
-          )}
+            )}
+          </div>
+        )}
 
-          <LogPanel logs={logs} />
-        </>
-      )}
-
-      {/* Modal de Configurações */}
-      {gameState?.settings && (
-        <SettingsModal
-          open={showSettings}
-          settings={gameState.settings}
-          aliveCount={aliveCount || players.length}
-          onClose={() => setShowSettings(false)}
-          onSave={(s) => socket.emit('update_settings', s)}
-        />
-      )}
-
-      {/* Fim de jogo */}
-      <AnimatePresence>
-        {phase === 'GAME_OVER' && (
-          <motion.div
-            key="gameover"
-            className="absolute inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
-            <motion.div
-              initial={{ scale: 0.7 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring' }}
-              className="rounded-lg border-4 border-gold-aged bg-wood-dark px-10 py-8 text-center shadow-[0_0_80px_rgba(212,175,55,0.4)] max-w-md w-full mx-4"
-            >
-              {gameState?.winner ? (
-                <Trophy className="mx-auto text-gold-aged mb-2" size={48} />
+        {me && me.isAlive ? (
+          <>
+            <div className="min-h-[44px] flex items-center justify-center">
+              {canAct && selectedCard ? (
+                <button
+                  id="btn-self-target"
+                  onClick={() => sendAction(selectedCard.id, me.id)}
+                  className="w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded border-2 border-gold-aged bg-black/80 text-gold-aged font-grimoire font-bold text-xs active:bg-gold-aged/20"
+                >
+                  <Crosshair size={15} /> MIRAR EM MIM MESMO
+                </button>
               ) : (
-                <SkullIcon className="mx-auto text-blood-bright mb-2" size={48} />
+                <div className="text-[10px] font-mono text-parchment-dark text-center leading-tight px-2">{hintText}</div>
               )}
-              <div className="font-grimoire font-extrabold text-3xl tracking-widest text-parchment">
-                {gameState?.winner ? gameState.winner.name : 'NINGUÉM'}
-              </div>
-              <div className="font-typewriter text-parchment-dark mt-1 mb-6">
-                {gameState?.winner ? 'sobreviveu ao Void.' : 'foi engolido pelo Void. Empate.'}
-              </div>
+            </div>
 
-              <div className="flex flex-col gap-2">
+            <div className="flex items-end justify-center gap-2 pt-3 pb-1">
+              <AnimatePresence>
+                {me.hand.map((card, i) => (
+                  <motion.div
+                    key={card.id}
+                    className="shrink-0"
+                    initial={{ y: -240, opacity: 0, rotate: -10 }}
+                    animate={{ y: 0, opacity: 1, rotate: 0 }}
+                    exit={{ y: -40, opacity: 0 }}
+                    transition={{ delay: i * 0.14, type: 'spring', stiffness: 130, damping: 16 }}
+                  >
+                    <InscryptionCard
+                      compact
+                      card={card}
+                      isSelected={card.id === selectedCardId}
+                      onClick={onCardClick}
+                      disabled={!canAct}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          </>
+        ) : (
+          <div className="font-grimoire text-parchment-dark tracking-widest text-xs text-center py-6">
+            {me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}
+          </div>
+        )}
+      </section>
+    </main>
+  );
+
+  /* ---------------- LAYOUT DESKTOP / TABLET (mesa octogonal) ---------------- */
+  const desktopTable = (
+    <>
+      <main className="relative flex-1 min-h-0 flex items-center justify-center">
+        <div className="relative" style={{ width: 'min(100%, calc(100dvh - 300px))', aspectRatio: '1 / 1' }}>
+          <div className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.9)]" />
+          <div className="table-octagon table-felt absolute inset-[3.5%]" />
+
+          <TargetArrowsSVG players={players} localIndex={localIndex} />
+
+          {players.map((p, i) => (
+            <PlayerSeat
+              key={p.id}
+              player={p}
+              index={i}
+              localIndex={localIndex}
+              totalPlayers={players.length}
+              isMe={p.id === me?.id}
+              phase={phase}
+              targetable={isTargetable(p)}
+              dimmed={canAct && !!selectedCard && !isTargetable(p)}
+              onSeatClick={onSeatClick}
+              onDropCard={onDropCard}
+            />
+          ))}
+
+          {/* Centro da mesa: relógio + controles de análise */}
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1.5">
+            <CentralClock socket={socket} myAllowedTime={me?.allowedTime} phase={phase} locked={!!me?.lockedIn || !me?.isAlive} />
+            {phase === 'ANALYSIS' && (
+              <div className="flex flex-col gap-1.5">
                 <button
-                  id="btn-restart"
-                  onClick={handleRestartGame}
-                  className="w-full py-2.5 rounded border-2 border-gold-aged bg-blood/80 hover:bg-blood text-parchment font-grimoire font-bold tracking-wider transition-colors shadow-[0_0_15px_rgba(139,0,0,0.5)]"
+                  id="btn-pause"
+                  onClick={() => socket.emit('toggle_pause')}
+                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/80 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20"
                 >
-                  VOLTAR AO LOBBY DA SALA
+                  <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR LEITURA' : '⏸️ PAUSAR LOGS'}
                 </button>
                 <button
-                  onClick={handleLeaveRoom}
-                  className="w-full py-2 rounded border border-iron/80 bg-black/60 hover:bg-black text-parchment-dark hover:text-white font-mono text-xs transition-colors"
+                  id="btn-skip"
+                  onClick={() => socket.emit('skip_analysis')}
+                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/80 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30"
                 >
-                  SAIR PARA O MENU PRINCIPAL
+                  <SkipForward size={11} /> ⏭️ PRÓXIMO ROUND
                 </button>
               </div>
+            )}
+          </div>
+
+          {/* Aviso de parede */}
+          {walled && canAct && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: [1, 0.6, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+              className="absolute left-1/2 -translate-x-1/2 bottom-[2%] z-50 px-3 py-1 rounded border-2 border-blood-bright bg-black/90 text-blood-bright text-[10px] font-mono font-bold text-center max-w-[80%]"
+            >
+              🔒 VOCÊ ESTÁ EMPAREDADO: SÓ PODE USAR CARTAS EM SI MESMO OU PASSAR A VEZ
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          )}
+        </div>
+      </main>
 
-      {/* Toast de notificações / erros */}
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key="toast"
-            initial={{ y: -40, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -40, opacity: 0 }}
-            className={`absolute top-14 left-1/2 -translate-x-1/2 z-[300] px-4 py-2 rounded border-2 font-mono text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 ${
-              toast.type === 'success'
-                ? 'border-emerald-500 bg-black/95 text-emerald-400'
-                : toast.type === 'info'
-                  ? 'border-gold-aged bg-black/95 text-gold-aged'
-                  : 'border-blood-bright bg-black/95 text-blood-bright'
-            }`}
-          >
-            {toast.text}
-          </motion.div>
+      {/* Mão de cartas (acima da vinheta de sangramento: z-[45]) */}
+      <footer className="relative z-[45] h-[200px] flex items-end justify-center pb-3">
+        {me && me.isAlive ? (
+          <div className="flex items-end gap-4">
+            <AnimatePresence>
+              {me.hand.map((card, i) => (
+                <motion.div
+                  key={card.id}
+                  initial={{ y: -420, opacity: 0, rotate: -12 }}
+                  animate={{ y: 0, opacity: 1, rotate: 0 }}
+                  exit={{ y: -60, opacity: 0 }}
+                  transition={{ delay: i * 0.18, type: 'spring', stiffness: 120, damping: 16 }}
+                >
+                  <InscryptionCard
+                    card={card}
+                    isSelected={card.id === selectedCardId}
+                    onClick={onCardClick}
+                    onDragStart={onCardDragStart}
+                    onDragEnd={() => (dragCardRef.current = null)}
+                    disabled={!canAct}
+                  />
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          <div className="font-grimoire text-parchment-dark tracking-widest text-sm pb-8">
+            {me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}
+          </div>
         )}
-      </AnimatePresence>
-    </div>
+      </footer>
+
+      {/* Controles à direita */}
+      {me && me.isAlive && (
+        <div className="absolute bottom-3 right-3 z-[45] flex flex-col gap-2 w-[200px]">
+          {canAct && selectedCard && (
+            <button
+              id="btn-self-target"
+              onClick={() => sendAction(selectedCard.id, me.id)}
+              className="flex items-center justify-center gap-1.5 py-2 rounded border-2 border-gold-aged bg-black/80 text-gold-aged font-grimoire font-bold text-xs hover:bg-gold-aged/20"
+            >
+              <Crosshair size={14} /> MIRAR EM MIM MESMO
+            </button>
+          )}
+          <button
+            id="btn-pass"
+            disabled={!canAct}
+            onClick={() => socket.emit('pass_turn')}
+            className="flex items-center justify-center gap-1.5 py-2 rounded border-2 border-iron bg-black/80 text-parchment-dark font-grimoire font-bold text-xs hover:border-parchment disabled:opacity-30"
+          >
+            <Hand size={14} /> PASSAR A VEZ
+          </button>
+          <div className="text-[10px] font-mono text-parchment-dark text-center leading-tight">
+            {canAct
+              ? selectedCard
+                ? 'Clique num assento piscando ou arraste a carta'
+                : 'Clique OU arraste uma carta até um assento'
+              : phase === 'PLANNING'
+                ? 'Jogada travada. Aguardando mesa...'
+                : ''}
+          </div>
+        </div>
+      )}
+
+      <LogPanel logs={logs} />
+    </>
+  );
+
+  return (
+    <>
+      {/* Container do jogo: recebe o Screen Shake (os overlays ficam FORA dele para não tremerem junto) */}
+      <motion.div
+        animate={shakeControls}
+        className="h-full flex flex-col relative overflow-hidden overflow-x-hidden bg-void-bg text-parchment"
+      >
+        {/* Brilho de velas */}
+        <div className="candle pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
+
+        {/* Barra superior (sem backdrop-filter: o painel de áudio usa position: fixed no mobile) */}
+        <header className="relative z-40 flex items-center justify-between gap-2 px-2 sm:px-4 py-1.5 sm:py-2 border-b border-iron/40 bg-black/60">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="font-grimoire font-extrabold tracking-[0.15em] sm:tracking-[0.25em] text-parchment text-xs sm:text-sm whitespace-nowrap">
+              STRIKE<span className="text-blood-bright">/</span>VOID
+            </div>
+
+            {inAnyRoom && (
+              <button
+                onClick={handleCopyHeaderCode}
+                className="flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded border border-gold-aged/50 bg-black/60 font-mono text-[10px] sm:text-[11px] text-gold-aged hover:bg-gold-aged/20 transition-colors shadow-sm"
+                title="Clique para copiar código da sala"
+              >
+                <strong className="tracking-wider">{gameState.roomCode}</strong>
+                {copiedCode ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+              </button>
+            )}
+          </div>
+
+          <div className="hidden sm:flex font-mono text-[11px] text-parchment-dark tracking-widest items-center gap-3">
+            {inGame && <span className="text-parchment">ROUND {gameState.round}</span>}
+            {inAnyRoom && <span className="text-gold-aged">{PHASE_LABELS[phase]}</span>}
+          </div>
+
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <AudioControls />
+            {inGame && compact && (
+              <button
+                onClick={() => setShowLogs(true)}
+                className={cn(HEADER_ICON_BTN, 'border-iron/70 text-parchment-dark active:text-gold-aged')}
+                aria-label="Abrir logs da rodada"
+              >
+                <ScrollText size={16} />
+              </button>
+            )}
+            {inAnyRoom && (
+              <button
+                id="btn-settings"
+                onClick={() => setShowSettings(true)}
+                className={cn(HEADER_ICON_BTN, 'border-gold-aged/70 text-gold-aged hover:bg-gold-aged/10')}
+                aria-label="Regras"
+              >
+                <Settings size={16} /> <span className="hidden sm:inline">REGRAS</span>
+              </button>
+            )}
+            {inAnyRoom && (
+              <button
+                onClick={handleLeaveRoom}
+                className={cn(HEADER_ICON_BTN, 'border-iron text-parchment-dark hover:text-white hover:bg-blood/40 hover:border-blood-bright')}
+                title="Sair da sala"
+                aria-label="Sair da sala"
+              >
+                <LogOut size={16} /> <span className="hidden sm:inline">SAIR</span>
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* Faixa de fase/round no mobile (o cabeçalho já está cheio) */}
+        {inGame && (
+          <div className="sm:hidden relative z-30 flex items-center justify-center gap-3 px-2 py-0.5 border-b border-iron/30 bg-black/40 font-mono text-[10px] tracking-widest">
+            <span className="text-parchment">ROUND {gameState.round}</span>
+            <span className="text-gold-aged">{PHASE_LABELS[phase]}</span>
+          </div>
+        )}
+
+        {/* Roteamento de Tela */}
+        {!inAnyRoom ? (
+          /* 1. Hub Inicial estilo jklm.fun */
+          <HomeHub
+            nickname={nickname}
+            setNickname={setNickname}
+            publicRooms={publicRooms}
+            onJoinRoom={handleJoinRoom}
+            onCreateRoom={handleCreateRoom}
+            onRefreshRooms={() => socket.emit('get_public_rooms')}
+          />
+        ) : !inGame ? (
+          /* 2. Sala de Espera / Lobby da Sala */
+          <RoomLobby
+            roomState={gameState}
+            me={me}
+            isHost={isHost}
+            onLeaveRoom={handleLeaveRoom}
+            onTogglePrivacy={handleTogglePrivacy}
+            onAddBot={handleAddBot}
+            onRemoveBot={handleRemoveBot}
+            onKickPlayer={handleKickPlayer}
+            onStartGame={handleStartGame}
+            onOpenSettings={() => setShowSettings(true)}
+            onCopyCode={(code) => showToast(`Código ${code} copiado!`, 'success')}
+            onSetMaxHp={handleSetMaxHp}
+          />
+        ) : compact ? (
+          /* 3a. Mesa compacta (smartphones) */
+          compactTable
+        ) : (
+          /* 3b. Mesa octogonal (desktop/tablet) */
+          desktopTable
+        )}
+
+        {/* Logs em gaveta (mobile) */}
+        {compact && <LogDrawer open={showLogs} onClose={() => setShowLogs(false)} logs={logs} />}
+
+        {/* Modal de Configurações */}
+        {gameState?.settings && (
+          <SettingsModal
+            open={showSettings}
+            settings={gameState.settings}
+            aliveCount={aliveCount || players.length}
+            onClose={() => setShowSettings(false)}
+            onSave={(s) => socket.emit('update_settings', s)}
+          />
+        )}
+
+        {/* Fim de jogo */}
+        <AnimatePresence>
+          {phase === 'GAME_OVER' && (
+            <motion.div
+              key="gameover"
+              className="absolute inset-0 z-[150] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              <motion.div
+                initial={{ scale: 0.7 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring' }}
+                className="rounded-lg border-4 border-gold-aged bg-wood-dark px-5 sm:px-10 py-6 sm:py-8 text-center shadow-[0_0_80px_rgba(212,175,55,0.4)] max-w-md w-full"
+              >
+                {gameState?.winner ? (
+                  <Trophy className="mx-auto text-gold-aged mb-2" size={48} />
+                ) : (
+                  <SkullIcon className="mx-auto text-blood-bright mb-2" size={48} />
+                )}
+                <div className="font-grimoire font-extrabold text-2xl sm:text-3xl tracking-widest text-parchment break-words">
+                  {gameState?.winner ? gameState.winner.name : 'NINGUÉM'}
+                </div>
+                <div className="font-typewriter text-sm sm:text-base text-parchment-dark mt-1 mb-6">
+                  {gameState?.winner ? 'sobreviveu ao Void.' : 'foi engolido pelo Void. Empate.'}
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <button
+                    id="btn-restart"
+                    onClick={handleRestartGame}
+                    className="w-full min-h-[48px] py-2.5 rounded border-2 border-gold-aged bg-blood/80 hover:bg-blood text-parchment font-grimoire font-bold tracking-wider text-sm transition-colors shadow-[0_0_15px_rgba(139,0,0,0.5)]"
+                  >
+                    VOLTAR AO LOBBY DA SALA
+                  </button>
+                  <button
+                    onClick={handleLeaveRoom}
+                    className="w-full min-h-[44px] py-2 rounded border border-iron/80 bg-black/60 hover:bg-black text-parchment-dark hover:text-white font-mono text-xs transition-colors"
+                  >
+                    SAIR PARA O MENU PRINCIPAL
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Toast de notificações / erros */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              key="toast"
+              initial={{ y: -40, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -40, opacity: 0 }}
+              className={`absolute top-14 left-1/2 -translate-x-1/2 z-[300] max-w-[92vw] text-center px-4 py-2 rounded border-2 font-mono text-xs font-bold shadow-2xl backdrop-blur-md flex items-center gap-2 ${
+                toast.type === 'success'
+                  ? 'border-emerald-500 bg-black/95 text-emerald-400'
+                  : toast.type === 'info'
+                    ? 'border-gold-aged bg-black/95 text-gold-aged'
+                    : 'border-blood-bright bg-black/95 text-blood-bright'
+              }`}
+            >
+              {toast.text}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Feedback de dano estilo FPS: Hit Flash (z-50) + Vinheta de sangramento (z-40). Fora do container que treme. */}
+      <DamageOverlay hp={myHp} maxHp={myMaxHp} active={overlayActive} hitKey={hitKey} />
+    </>
   );
 }

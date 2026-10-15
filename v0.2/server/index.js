@@ -70,6 +70,29 @@ function getPublicRoomsList() {
   return list;
 }
 
+/* Vida inicial configurável por sala (mín 2, máx 5, padrão 3) */
+const MIN_MAX_HP = 2;
+const MAX_MAX_HP = 5;
+const DEFAULT_MAX_HP = 3;
+const BASELINE_HP = 3; // a curva de tempo por dano foi calibrada originalmente para 3 vidas
+
+function clampMaxHp(value, fallback = DEFAULT_MAX_HP) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(MAX_MAX_HP, Math.max(MIN_MAX_HP, n));
+}
+
+/** Aplica um novo maxHp à sala e reinicializa a vida de todos (humanos e bots). Só no LOBBY. */
+function applyMaxHp(room, value) {
+  const hp = clampMaxHp(value, room.gameState.settings.maxHp);
+  room.gameState.settings.maxHp = hp;
+  room.players.forEach((p) => {
+    p.lives = hp;
+    p.maxLives = hp;
+  });
+  return hp;
+}
+
 function createRoom({ code, name, hostId, isPublic }) {
   return {
     code,
@@ -90,6 +113,7 @@ function createRoom({ code, name, hostId, isPublic }) {
         secondsPerPlayer: 2.0,
         damagePenalty: 0.33,
         analysisDuration: 8.0,
+        maxHp: DEFAULT_MAX_HP,
       },
       deck: [],
       discardPile: [],
@@ -114,13 +138,13 @@ const connectedHumans = (room) => room.players.filter((p) => !p.isBot && io.sock
 /* ------------------------------------------------------------------ */
 /* 2. JOGADOR                                                         */
 /* ------------------------------------------------------------------ */
-function createPlayer(id, name, isBot) {
+function createPlayer(id, name, isBot, maxHp = DEFAULT_MAX_HP) {
   return {
     id,
     name,
     isBot,
-    lives: 3,
-    maxLives: 3,
+    lives: maxHp,
+    maxLives: maxHp,
     isAlive: true,
     isWalled: false,
     isReflecting: false,
@@ -167,7 +191,10 @@ function calculatePlayerTime(player, aliveCount, settings) {
   if (!player.isAlive) return 0;
   if (settings.useFixedTime === true) return settings.baseTestTime;
   const damageTaken = player.maxLives - player.lives;
-  const factor = Math.pow(1 - settings.damagePenalty, damageTaken);
+  // Dano normalizado pela proporção em relação ao maxHp: com 3 vidas o comportamento é idêntico ao original;
+  // com 5 vidas cada ponto perdido pesa menos (3/5), com 2 vidas pesa mais (3/2).
+  const scaledDamage = damageTaken * (BASELINE_HP / (player.maxLives || BASELINE_HP));
+  const factor = Math.pow(1 - settings.damagePenalty, scaledDamage);
   const dynamicTime = aliveCount * settings.secondsPerPlayer * factor;
   return Number((settings.baseTestTime + dynamicTime).toFixed(1));
 }
@@ -210,6 +237,7 @@ function sanitizeStateForClients(room, viewerId) {
     round: room.gameState.round,
     isPaused: room.gameState.isPaused,
     settings: room.gameState.settings,
+    maxHp: room.gameState.settings.maxHp,
     logs: room.gameState.logs.slice(-120),
     winner: room.gameState.winner,
     deckCount: room.gameState.deck ? room.gameState.deck.length : 0,
@@ -232,6 +260,8 @@ function sanitizeStateForClients(room, viewerId) {
         isBot: p.isBot,
         lives: p.lives,
         maxLives: p.maxLives,
+        hp: p.lives,
+        maxHp: p.maxLives,
         isAlive: p.isAlive,
         isWalled: p.isWalled,
         isReflecting: p.isReflecting,
@@ -664,8 +694,8 @@ function resetToLobby(room) {
   // Manter apenas jogadores conectados ou bots
   room.players = room.players.filter((p) => p.isBot || io.sockets.sockets.has(p.id));
   room.players.forEach((p) => {
-    p.lives = 3;
-    p.maxLives = 3;
+    p.lives = room.gameState.settings.maxHp;
+    p.maxLives = room.gameState.settings.maxHp;
     p.isAlive = true;
     p.isWalled = false;
     p.isReflecting = false;
@@ -688,8 +718,8 @@ function startGame(room) {
   room.gameState.winner = null;
   room.gameState.round = 0;
   room.players.forEach((p) => {
-    p.lives = 3;
-    p.maxLives = 3;
+    p.lives = room.gameState.settings.maxHp;
+    p.maxLives = room.gameState.settings.maxHp;
     p.isAlive = true;
     p.isWalled = false;
     p.isReflecting = false;
@@ -792,7 +822,7 @@ io.on('connection', (socket) => {
       isPublic: isPublic !== false, // Padrão pública se não especificado
     });
 
-    const hostPlayer = createPlayer(socket.id, cleanPlayer, false);
+    const hostPlayer = createPlayer(socket.id, cleanPlayer, false, room.gameState.settings.maxHp);
     room.players.push(hostPlayer);
     rooms.set(code, room);
 
@@ -838,7 +868,7 @@ io.on('connection', (socket) => {
     // Evita duplicar se já estiver na lista
     let player = getPlayer(room, socket.id);
     if (!player) {
-      player = createPlayer(socket.id, cleanPlayer, false);
+      player = createPlayer(socket.id, cleanPlayer, false, room.gameState.settings.maxHp);
       room.players.push(player);
     } else {
       player.name = cleanPlayer;
@@ -878,7 +908,7 @@ io.on('connection', (socket) => {
     }
     const used = room.players.filter((p) => p.isBot).map((p) => p.name);
     const name = BOT_NAMES.find((n) => !used.includes(n)) || 'BOT_' + uuid().slice(0, 4);
-    room.players.push(createPlayer('bot-' + uuid(), name, true));
+    room.players.push(createPlayer('bot-' + uuid(), name, true, room.gameState.settings.maxHp));
     emitRoomState(room);
     io.emit('public_rooms_updated', getPublicRoomsList());
   });
@@ -934,6 +964,22 @@ io.on('connection', (socket) => {
     s.secondsPerPlayer = num(newSettings.secondsPerPlayer, 1, 5, s.secondsPerPlayer);
     s.damagePenalty = num(newSettings.damagePenalty, 0, 0.5, s.damagePenalty);
     s.analysisDuration = num(newSettings.analysisDuration, 3, 20, s.analysisDuration);
+    // A vida inicial só pode mudar no Lobby (nunca no meio de uma partida)
+    if (room.status === 'LOBBY' && newSettings.maxHp !== undefined) applyMaxHp(room, newSettings.maxHp);
+    emitRoomState(room);
+  });
+
+  // Host define a Quantidade de Vida Inicial (2 a 5) no Lobby; sincroniza em tempo real com toda a sala
+  socket.on('set_max_hp', ({ maxHp } = {}) => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id) return;
+    if (room.status !== 'LOBBY') return toast(socket.id, 'A vida inicial só pode ser alterada no Lobby.');
+    const n = Math.round(Number(maxHp));
+    if (!Number.isFinite(n) || n < MIN_MAX_HP || n > MAX_MAX_HP) {
+      return toast(socket.id, `A vida inicial deve estar entre ${MIN_MAX_HP} e ${MAX_MAX_HP}.`);
+    }
+    applyMaxHp(room, n);
     emitRoomState(room);
   });
 

@@ -13,9 +13,15 @@ export function seatPosition(index, localIndex, totalPlayers, rx = 38, ry = 36) 
   return { x: 50 + rx * Math.cos(angle), y: 50 + ry * Math.sin(angle), angle };
 }
 
-function Skull({ alive }) {
+/** Tamanho das caveiras conforme a vida máxima (2 a 5) para caber na placa do assento sem quebrar o layout. */
+export function skullSizeClass(maxLives, compact = false) {
+  if (compact) return maxLives >= 5 ? 'w-3 h-3' : maxLives === 4 ? 'w-3.5 h-3.5' : 'w-4 h-4';
+  return maxLives >= 5 ? 'w-[15px] h-[15px]' : maxLives === 4 ? 'w-[17px] h-[17px]' : 'w-6 h-6';
+}
+
+export function Skull({ alive, className = 'w-6 h-6' }) {
   return (
-    <svg viewBox="0 0 24 24" className="w-6 h-6" aria-hidden>
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
       <path
         d="M12 2C7 2 4 5.5 4 10c0 2.6 1.2 4.4 3 5.5V20h10v-4.5c1.8-1.1 3-2.9 3-5.5 0-4.5-3-8-8-8z"
         fill={alive ? '#e2d5b5' : '#3a0a0a'}
@@ -258,9 +264,9 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
           </div>
 
           {/* Caveiras */}
-          <div className="flex justify-center gap-1">
+          <div className={cn('flex flex-wrap justify-center', player.maxLives >= 5 ? 'gap-0.5' : 'gap-1')}>
             {Array.from({ length: player.maxLives }).map((_, i) => (
-              <Skull key={i} alive={i < player.lives} />
+              <Skull key={i} alive={i < player.lives} className={skullSizeClass(player.maxLives)} />
             ))}
           </div>
 
