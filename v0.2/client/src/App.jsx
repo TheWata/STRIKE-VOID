@@ -35,7 +35,7 @@ import { audio } from './lib/audio';
 
 /* Botão quadrado de ícone do cabeçalho (alvo de toque de 40px no mobile) */
 const HEADER_ICON_BTN =
-  'flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-3 sm:py-1 rounded border text-[11px] font-mono transition-colors';
+  'flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 rounded-md border text-[11px] font-mono font-medium transition-all shadow-sm active:scale-95';
 
 /* ------------------------------------------------------------------ */
 /* App Principal                                                       */
@@ -639,28 +639,37 @@ export default function App() {
         {/* Brilho de velas */}
         <div className="candle pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
 
-        {/* Barra superior (sem backdrop-filter: o painel de áudio usa position: fixed no mobile) */}
-        <header className="relative z-40 flex items-center justify-between gap-2 px-2 sm:px-4 py-1.5 sm:py-2 border-b border-iron/40 bg-black/60">
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="font-grimoire font-extrabold tracking-[0.15em] sm:tracking-[0.25em] text-parchment text-xs sm:text-sm whitespace-nowrap">
-              STRIKE<span className="text-blood-bright">/</span>VOID
+        {/* Barra superior com iluminação suave e contraste enriquecido */}
+        <header className="relative z-40 flex items-center justify-between gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 border-b-2 border-stone-700/80 bg-gradient-to-r from-[#2c1d12] via-[#241710] to-[#1e130c] shadow-[0_4px_25px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(212,175,55,0.22)]">
+          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+            <div className="font-grimoire font-extrabold tracking-[0.18em] sm:tracking-[0.25em] text-amber-100 text-sm sm:text-base whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center">
+              STRIKE<span className="text-blood-bright font-black mx-0.5 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]">/</span>VOID
             </div>
 
             {inAnyRoom && (
               <button
                 onClick={handleCopyHeaderCode}
-                className="flex items-center gap-1.5 px-2 sm:px-2.5 py-0.5 rounded border border-gold-aged/50 bg-black/60 font-mono text-[10px] sm:text-[11px] text-gold-aged hover:bg-gold-aged/20 transition-colors shadow-sm"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md border border-gold-aged/80 bg-[#160e08]/90 font-mono text-[11px] sm:text-xs text-amber-300 font-bold hover:bg-gold-aged/25 hover:border-gold-aged transition-all shadow-[0_0_12px_rgba(212,175,55,0.25)]"
                 title="Clique para copiar código da sala"
               >
                 <strong className="tracking-wider">{gameState.roomCode}</strong>
-                {copiedCode ? <Check size={12} className="text-green-400" /> : <Copy size={12} />}
+                {copiedCode ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
               </button>
             )}
           </div>
 
-          <div className="hidden sm:flex font-mono text-[11px] text-parchment-dark tracking-widest items-center gap-3">
-            {inGame && <span className="text-parchment">ROUND {gameState.round}</span>}
-            {inAnyRoom && <span className="text-gold-aged">{PHASE_LABELS[phase]}</span>}
+          <div className="hidden sm:flex font-mono text-xs tracking-wider items-center gap-3">
+            {inGame && (
+              <span className="text-amber-100 bg-stone-900/90 border border-stone-700 px-2.5 py-0.5 rounded shadow-inner font-bold">
+                ROUND {gameState.round}
+              </span>
+            )}
+            {inAnyRoom && (
+              <span className="text-amber-300 bg-gold-aged/20 border border-gold-aged/60 px-2.5 py-0.5 rounded shadow-sm font-bold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-gold-aged animate-pulse" />
+                {PHASE_LABELS[phase]}
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -673,18 +682,18 @@ export default function App() {
               }}
               className={cn(
                 HEADER_ICON_BTN,
-                'border-blood-bright/70 bg-blood/20 text-parchment hover:border-blood-bright hover:bg-blood/40 hover:text-white shadow-[0_0_12px_rgba(220,38,38,0.35)] active:scale-95'
+                'border-blood-bright bg-blood/60 text-white hover:bg-blood hover:border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.45)]'
               )}
               aria-label="Como Jogar / Guia de Regras"
               title="Como Jogar / Guia de Regras"
             >
-              <HelpCircle size={16} className="text-blood-bright shrink-0" />
+              <HelpCircle size={16} className="text-red-300 shrink-0" />
               <span className="hidden sm:inline font-bold">GUIA</span>
             </button>
             {inGame && compact && (
               <button
                 onClick={() => setShowLogs(true)}
-                className={cn(HEADER_ICON_BTN, 'border-iron/70 text-parchment-dark active:text-gold-aged')}
+                className={cn(HEADER_ICON_BTN, 'border-stone-600 bg-stone-900/90 text-amber-100 hover:text-gold-aged hover:border-gold-aged')}
                 aria-label="Abrir logs da rodada"
               >
                 <ScrollText size={16} />
@@ -694,7 +703,7 @@ export default function App() {
               <button
                 id="btn-settings"
                 onClick={() => setShowSettings(true)}
-                className={cn(HEADER_ICON_BTN, 'border-gold-aged/70 text-gold-aged hover:bg-gold-aged/10')}
+                className={cn(HEADER_ICON_BTN, 'border-gold-aged/80 bg-gold-aged/20 text-amber-300 hover:bg-gold-aged/35 hover:text-white shadow-[0_0_12px_rgba(212,175,55,0.25)]')}
                 aria-label="Ajustar tempos da partida"
                 title="Ajustar tempos da partida"
               >
@@ -704,7 +713,7 @@ export default function App() {
             {inAnyRoom && (
               <button
                 onClick={handleLeaveRoom}
-                className={cn(HEADER_ICON_BTN, 'border-iron text-parchment-dark hover:text-white hover:bg-blood/40 hover:border-blood-bright')}
+                className={cn(HEADER_ICON_BTN, 'border-stone-600 bg-stone-900/90 text-stone-200 hover:text-white hover:bg-blood/70 hover:border-blood-bright')}
                 title="Sair da sala"
                 aria-label="Sair da sala"
               >
@@ -716,9 +725,13 @@ export default function App() {
 
         {/* Faixa de fase/round no mobile (o cabeçalho já está cheio) */}
         {inGame && (
-          <div className="sm:hidden relative z-30 flex items-center justify-center gap-3 px-2 py-0.5 border-b border-iron/30 bg-black/40 font-mono text-[10px] tracking-widest">
-            <span className="text-parchment">ROUND {gameState.round}</span>
-            <span className="text-gold-aged">{PHASE_LABELS[phase]}</span>
+          <div className="sm:hidden relative z-30 flex items-center justify-center gap-3 px-2 py-1 border-b border-stone-700/80 bg-gradient-to-r from-[#22150e] via-[#2c1b12] to-[#22150e] font-mono text-[11px] tracking-wider text-amber-100 shadow-sm">
+            <span className="font-bold text-amber-200">ROUND {gameState.round}</span>
+            <span className="text-stone-500">·</span>
+            <span className="text-amber-400 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-gold-aged animate-pulse" />
+              {PHASE_LABELS[phase]}
+            </span>
           </div>
         )}
 

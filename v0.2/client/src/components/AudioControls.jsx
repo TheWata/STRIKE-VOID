@@ -26,11 +26,11 @@ export default function AudioControls() {
       <button
         id="btn-audio"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-2.5 sm:py-1 rounded border border-iron/70 text-[11px] font-mono text-parchment-dark hover:text-gold-aged hover:border-gold-aged/70"
+        className="flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 rounded-md border border-stone-600 bg-stone-900/90 text-[11px] font-mono font-medium text-amber-100 hover:text-gold-aged hover:border-gold-aged hover:bg-stone-800 transition-all shadow-sm active:scale-95"
         title="Configurações de Áudio"
         aria-label="Configurações de Áudio"
       >
-        {prefs.muted ? <VolumeX size={16} /> : <Volume2 size={16} />} <span className="hidden sm:inline">SOM</span>
+        {prefs.muted ? <VolumeX size={16} className="text-red-400" /> : <Volume2 size={16} className="text-amber-300" />} <span className="hidden sm:inline">SOM</span>
       </button>
 
       {open && (

@@ -70,23 +70,23 @@ export default function GameGuideModal({ open, onClose }) {
             onClick={(e) => e.stopPropagation()}
             className="w-full max-w-3xl max-h-[85dvh] flex flex-col rounded-xl border-4 border-stone-900 bg-gradient-to-b from-[#241710] via-wood-dark to-[#0f0906] text-parchment shadow-[0_0_60px_rgba(0,0,0,0.95),inset_0_0_40px_rgba(44,29,18,0.7)] overflow-hidden"
           >
-            {/* Header com Título e Fechar */}
-            <div className="relative px-3 sm:px-6 pt-3 sm:pt-4 pb-3 border-b-2 border-iron/60 bg-black/50 flex items-center justify-between gap-2 shrink-0">
+            {/* Header com Título e Fechar com visual iluminado e claro */}
+            <div className="relative px-3 sm:px-6 pt-3.5 sm:pt-4 pb-3.5 border-b-2 border-stone-700/80 bg-gradient-to-r from-[#332115] via-[#3d2719] to-[#2a1b11] shadow-[0_2px_15px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(212,175,55,0.25)] flex items-center justify-between gap-2 shrink-0">
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="p-1.5 sm:p-2 rounded bg-blood/30 border border-blood-bright/60 text-blood-bright shadow-[0_0_12px_rgba(220,38,38,0.4)] shrink-0">
-                  <BookOpen size={18} className="sm:w-5 sm:h-5" />
+                <div className="p-1.5 sm:p-2 rounded-md bg-blood/40 border border-blood-bright text-white shadow-[0_0_14px_rgba(220,38,38,0.5)] shrink-0">
+                  <BookOpen size={18} className="sm:w-5 sm:h-5 text-red-200" />
                 </div>
                 <div>
                   <h2
                     id="guide-title"
-                    className="font-grimoire font-extrabold text-sm sm:text-lg tracking-wider text-parchment flex items-center gap-1.5"
+                    className="font-grimoire font-extrabold text-sm sm:text-lg tracking-wider text-amber-100 flex items-center gap-2 drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
                   >
                     MANUAL DO CONDENADO
-                    <span className="text-[10px] font-mono text-gold-aged bg-gold-aged/10 border border-gold-aged/40 px-1.5 py-0.2 rounded hidden sm:inline-block">
+                    <span className="text-[10px] font-mono font-bold text-amber-300 bg-gold-aged/20 border border-gold-aged/50 px-1.5 py-0.2 rounded hidden sm:inline-block shadow-sm">
                       v0.2
                     </span>
                   </h2>
-                  <p className="text-[10px] sm:text-xs font-mono text-parchment-dark tracking-wide">
+                  <p className="text-[10px] sm:text-xs font-mono text-amber-200/80 tracking-wide">
                     Regras, blefes e sobrevivência no STRIKE / VOID
                   </p>
                 </div>
@@ -98,7 +98,7 @@ export default function GameGuideModal({ open, onClose }) {
                   audio.play('click');
                   onClose();
                 }}
-                className="h-10 w-10 min-h-[40px] min-w-[40px] flex items-center justify-center rounded border border-iron/80 bg-black/60 hover:bg-blood/40 hover:border-blood-bright text-parchment-dark hover:text-white transition-colors shrink-0"
+                className="h-10 w-10 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-md border border-stone-600 bg-stone-900/90 hover:bg-blood/60 hover:border-red-500 text-stone-200 hover:text-white transition-all shadow-sm active:scale-95 shrink-0"
                 aria-label="Fechar guia"
               >
                 <X size={18} />
@@ -106,7 +106,7 @@ export default function GameGuideModal({ open, onClose }) {
             </div>
 
             {/* Seletor de Abas (Tabs) */}
-            <div className="px-3 sm:px-6 pt-2.5 pb-2 bg-black/60 border-b border-iron/40 flex gap-2 shrink-0">
+            <div className="px-3 sm:px-6 pt-2.5 pb-2.5 bg-black/40 border-b border-stone-800/80 flex gap-2 shrink-0">
               <button
                 id="tab-guide-game"
                 onClick={() => handleTabChange('game')}
