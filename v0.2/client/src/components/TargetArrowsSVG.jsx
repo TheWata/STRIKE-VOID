@@ -25,19 +25,20 @@ function TargetArrowsSVGBase({ players, localIndex }) {
     if (!a.targetId || !pos[a.targetId]) return;
 
     const reflected = a.status === 'REFLECTED';
-    // Se foi refletida / roubada:
-    // Para parede roubada, a ação original era em si mesmo (ou outro) e agora mira no ladrão em dourado.
     const fromId = p.id;
-    const toId = a.targetId;
-    if (!pos[fromId] || !pos[toId]) return;
+    if (!pos[fromId]) return;
 
-    arrows.push({
-      key: p.id,
-      from: pos[fromId],
-      to: pos[toId],
-      reflected,
-      self: fromId === toId,
-      type: a.cardType,
+    const allTargets = [a.targetId, ...(a.additionalTargets || [])].filter((tid) => Boolean(tid && pos[tid]));
+
+    allTargets.forEach((toId, idx) => {
+      arrows.push({
+        key: `${p.id}-${toId}-${idx}`,
+        from: pos[fromId],
+        to: pos[toId],
+        reflected,
+        self: fromId === toId,
+        type: a.cardType,
+      });
     });
   });
 

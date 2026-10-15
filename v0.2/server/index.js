@@ -407,74 +407,129 @@ async function runGame(room, token) {
     for (const p of room.players) p.visualEffect = null;
     const revUsers = alive().filter((p) => actionOf(p).cardType === 'REVERSO');
 
+    // Mapeia os alvos que receberam a carta Reverso nesta rodada:
+    // targetId -> Array de jogadores que usaram Reverso nesse alvo
+    const reversosByTarget = new Map();
     for (const revPlayer of revUsers) {
       const revAction = revPlayer.selectedAction;
-      const targetId = revAction.targetId;
+      const targetId = revAction.targetId || revPlayer.id;
+      const target = getPlayer(room, targetId);
+      if (!target || !target.isAlive) {
+        revAction.status = 'MISFIRE';
+        continue;
+      }
+      if (!reversosByTarget.has(targetId)) {
+        reversosByTarget.set(targetId, []);
+      }
+      reversosByTarget.get(targetId).push(revPlayer);
+    }
 
-      if (targetId === revPlayer.id) {
-        // CASO 1: Usou em si mesmo (Escudo Reativo)
-        const attackers = alive().filter((o) => {
-          const a = actionOf(o);
-          return o.id !== revPlayer.id && (a.cardType === 'FACA' || a.cardType === 'PAREDE') && a.targetId === revPlayer.id;
-        });
+    // Processa a inversão de vetores para cada alvo que recebeu Reverso
+    for (const [targetId, reversores] of reversosByTarget.entries()) {
+      const target = getPlayer(room, targetId);
+      if (!target || !target.isAlive) continue;
 
-        if (attackers.length === 0) {
-          revPlayer.lives = Math.max(0, revPlayer.lives - 1);
-          revPlayer.visualEffect = 'VACUUM';
-          revAction.status = 'MISFIRE';
-          addLog(room, 'VACUUM', '[VÁCUO] ' + revPlayer.name + ' usou Reverso em si mesmo no vazio e perdeu 1 Vida!');
+      const reversorNames = reversores.map((r) => r.name).join(' e ');
+
+      // (1) Ações EXTERNAS de outros jogadores contra o Alvo (Atacante !== Alvo)
+      const externalActions = alive().filter((p) => {
+        if (p.id === target.id) return false;
+        const a = actionOf(p);
+        return (a.cardType === 'FACA' || a.cardType === 'PAREDE') && a.targetId === target.id;
+      });
+
+      // (2) Ação INTERNA do próprio Alvo (Auto-alvo: Alvo mirando em si mesmo)
+      const targetAction = actionOf(target);
+      const hasSelfAction =
+        (targetAction.cardType === 'FACA' || targetAction.cardType === 'PAREDE') &&
+        targetAction.targetId === target.id;
+
+      let targetHadInteraction = false;
+
+      // REGRA 2: Ataques/Ações Externas contra o Alvo (Atacante -> Faca/Parede -> Alvo, onde Atacante !== Alvo)
+      // Como o Alvo está sob efeito de Reverso, a ação é refletida de volta para o próprio Atacante (novoAlvo = Atacante)
+      for (const attacker of externalActions) {
+        const a = attacker.selectedAction;
+        a.targetId = attacker.id;
+        a.status = 'REFLECTED';
+        targetHadInteraction = true;
+
+        if (a.cardType === 'PAREDE') {
+          addLog(
+            room,
+            'REFLECT',
+            `[PAREDE REFLETIDA] ${target.name} estava sob efeito de Reverso (${reversorNames})! A Parede de ${attacker.name} foi refletida de volta para ${attacker.name}!`
+          );
         } else {
-          revPlayer.isReflecting = true;
-          revPlayer.visualEffect = 'REFLECT';
-          revAction.status = 'RESOLVED';
-          for (const attacker of attackers) {
-            attacker.selectedAction.targetId = attacker.id;
-            attacker.selectedAction.status = 'REFLECTED';
-            if (attacker.selectedAction.cardType === 'PAREDE') {
-              addLog(room, 'REFLECT', '[PAREDE REFLETIDA] ' + revPlayer.name + ' refletiu a Parede de volta para ' + attacker.name + '!');
-            } else {
-              addLog(room, 'REFLECT', '[REVERSO] ' + revPlayer.name + ' refletiu a Faca de ' + attacker.name + ' de volta para ' + attacker.name + '!');
-            }
+          addLog(
+            room,
+            'REFLECT',
+            `[REVERSO REFLETIDO] ${target.name} estava sob efeito de Reverso (${reversorNames})! A Faca de ${attacker.name} foi refletida de volta para ${attacker.name}!`
+          );
+        }
+      }
+
+      // REGRA 3: Auto-Ataque no Alvo Revertido (Alvo -> Faca/Parede -> Alvo, onde Atacante === Alvo)
+      // Se o jogador que recebeu o Reverso se esfaquear, o Reverso inverte a direção para quem jogou Reverso nele (novoAlvo = Reversor(es)).
+      if (hasSelfAction) {
+        targetHadInteraction = true;
+        // Filtrar apenas reversores externos (reverter a si mesmo não inverte auto-ataque para outro)
+        const externalReversores = reversores.filter((r) => r.id !== target.id);
+
+        if (externalReversores.length > 0) {
+          targetAction.targetId = externalReversores[0].id;
+          if (externalReversores.length > 1) {
+            targetAction.additionalTargets = externalReversores.slice(1).map((r) => r.id);
+          }
+          targetAction.status = 'REFLECTED';
+
+          const extNames = externalReversores.map((r) => r.name).join(' e ');
+          if (targetAction.cardType === 'PAREDE') {
+            addLog(
+              room,
+              'STEAL',
+              `🛡️ [ROUBO DE PAREDE] ${target.name} tentou erguer uma Parede em si mesmo, mas o Reverso de ${extNames} roubou a Parede para ${extNames}!`
+            );
+          } else {
+            addLog(
+              room,
+              'REFLECT',
+              `[AUTO-GOLPE INVERTIDO] ${target.name} tentou se esfaquear, mas o Reverso de ${extNames} inverteu o golpe contra ${extNames}!`
+            );
           }
         }
-      } else {
-        // CASO 2: Usou em OUTRA pessoa (Reverso Ofensivo / Intervenção)
+      }
+
+      // Se houve interação revertida/refletida:
+      if (targetHadInteraction) {
+        target.isReflecting = true;
+        target.visualEffect = 'REFLECT';
+        for (const revPlayer of reversores) {
+          revPlayer.isReflecting = true;
+          revPlayer.visualEffect = 'REFLECT';
+          revPlayer.selectedAction.status = 'RESOLVED';
+        }
+      }
+    }
+
+    // REGRA DE VÁCUO: Qualquer Reverso que não inverteu nenhuma ação nesta rodada sofre VÁCUO (-1 Vida)
+    for (const revPlayer of revUsers) {
+      const revAction = revPlayer.selectedAction;
+      if (revAction.status !== 'RESOLVED') {
+        revPlayer.lives = Math.max(0, revPlayer.lives - 1);
+        revPlayer.visualEffect = 'VACUUM';
+        revAction.status = 'MISFIRE';
+
+        const targetId = revAction.targetId || revPlayer.id;
         const target = getPlayer(room, targetId);
-        const tAction = target ? target.selectedAction : null;
-
-        if (!target || !target.isAlive || !tAction || tAction.cardType === 'NONE' || tAction.cardType === 'REVERSO') {
-          revPlayer.lives = Math.max(0, revPlayer.lives - 1);
-          revPlayer.visualEffect = 'VACUUM';
-          revAction.status = 'MISFIRE';
-          addLog(room, 'VACUUM', '[VÁCUO] ' + revPlayer.name + ' tentou reverter ' + (target ? target.name : 'o vazio') + ', mas não havia ação reversível (-1 Vida)!');
-        } else if (tAction.cardType === 'PAREDE') {
-          revPlayer.isReflecting = true;
-          revPlayer.visualEffect = 'REFLECT';
-          revAction.status = 'RESOLVED';
-
-          if (tAction.targetId === target.id) {
-            tAction.targetId = revPlayer.id;
-            tAction.status = 'REFLECTED';
-            addLog(room, 'STEAL', '🛡️ [ROUBO DE PAREDE] ' + revPlayer.name + ' reverteu a Parede de ' + target.name + ' e ROUBOU para si!');
-          } else {
-            tAction.targetId = target.id;
-            tAction.status = 'REFLECTED';
-            addLog(room, 'REFLECT', '[PAREDE REFLETIDA] ' + revPlayer.name + ' reverteu a Parede de ' + target.name + ' de volta para ' + target.name + '!');
-          }
-        } else if (tAction.cardType === 'FACA') {
-          revPlayer.isReflecting = true;
-          revPlayer.visualEffect = 'REFLECT';
-          revAction.status = 'RESOLVED';
-
-          if (tAction.targetId === target.id) {
-            tAction.targetId = revPlayer.id;
-            tAction.status = 'REFLECTED';
-            addLog(room, 'REFLECT', '[REVERSO] ' + revPlayer.name + ' reverteu o golpe interno de ' + target.name + ' para si!');
-          } else {
-            tAction.targetId = target.id;
-            tAction.status = 'REFLECTED';
-            addLog(room, 'REFLECT', '[REVERSO] ' + revPlayer.name + ' reverteu a Faca de ' + target.name + ' de volta para ' + target.name + '!');
-          }
+        if (!target || target.id === revPlayer.id) {
+          addLog(room, 'VACUUM', `[VÁCUO] ${revPlayer.name} usou Reverso em si mesmo no vazio e perdeu 1 Vida!`);
+        } else {
+          addLog(
+            room,
+            'VACUUM',
+            `[VÁCUO] ${revPlayer.name} aplicou Reverso em ${target.name}, mas nenhuma ação atingiu o alvo (-1 Vida)!`
+          );
         }
       }
     }
@@ -487,18 +542,21 @@ async function runGame(room, token) {
     for (const p of room.players) p.visualEffect = null;
     for (const player of alive().filter((p) => actionOf(p).cardType === 'PAREDE')) {
       const action = player.selectedAction;
-      const target = getPlayer(room, action.targetId);
-      if (!target) continue;
-      target.isWalled = true;
-      target.visualEffect = 'WALLED';
-      if (action.status === 'REFLECTED') {
-        if (action.targetId === player.id) {
-          addLog(room, 'WALL', '[PAREDE REFLETIDA] ' + target.name + ' ficou preso na própria Parede!');
+      const targetIds = [action.targetId, ...(action.additionalTargets || [])].filter(Boolean);
+      for (const tid of targetIds) {
+        const target = getPlayer(room, tid);
+        if (!target) continue;
+        target.isWalled = true;
+        target.visualEffect = 'WALLED';
+        if (action.status === 'REFLECTED') {
+          if (tid === player.id) {
+            addLog(room, 'WALL', '[PAREDE REFLETIDA] ' + target.name + ' ficou preso na própria Parede!');
+          } else {
+            addLog(room, 'WALL', '🛡️ [PAREDE ROUBADA] ' + target.name + ' recebeu a Parede roubada de ' + player.name + '!');
+          }
         } else {
-          addLog(room, 'WALL', '🛡️ [PAREDE ROUBADA] ' + target.name + ' recebeu a Parede roubada de ' + player.name + '!');
+          addLog(room, 'WALL', '[PAREDE] ' + player.name + ' isolou ' + target.name + ' na Parede!');
         }
-      } else {
-        addLog(room, 'WALL', '[PAREDE] ' + player.name + ' isolou ' + target.name + ' na Parede!');
       }
     }
     emitRoomState(room);
@@ -528,20 +586,33 @@ async function runGame(room, token) {
       }
     }
 
-    // 3B: Facas externas e refletidas
+    // 3B: Facas externas e refletidas/invertidas
     for (const player of knives) {
       const action = player.selectedAction;
       if (action.processed) continue;
-      const target = getPlayer(room, action.targetId);
-      if (!target) continue;
-      if (target.isWalled) {
-        target.isWalled = false;
-        target.visualEffect = 'WALL_BROKEN';
-        addLog(room, 'BREAK', '[ESTILHAÇO] A Faca de ' + player.name + ' destruiu a Parede de ' + target.name + ' (0 Dano)!');
-      } else {
-        target.lives = Math.max(0, target.lives - 1);
-        target.visualEffect = 'DAMAGE';
-        addLog(room, 'DAMAGE', '[SANGUE] Faca atingiu ' + target.name + ' em cheio (-1 Vida)!');
+      const targetIds = [action.targetId, ...(action.additionalTargets || [])].filter(Boolean);
+      for (const tid of targetIds) {
+        const target = getPlayer(room, tid);
+        if (!target || !target.isAlive) continue;
+        if (target.isWalled) {
+          target.isWalled = false;
+          target.visualEffect = 'WALL_BROKEN';
+          addLog(room, 'BREAK', '[ESTILHAÇO] A Faca de ' + player.name + ' destruiu a Parede de ' + target.name + ' (0 Dano)!');
+        } else {
+          target.lives = Math.max(0, target.lives - 1);
+          target.visualEffect = 'DAMAGE';
+          if (action.status === 'REFLECTED') {
+            if (action.originalTargetId === player.id) {
+              addLog(room, 'DAMAGE', '🩸 [GOLPE REVERTIDO] O golpe de ' + player.name + ' foi invertido e atingiu ' + target.name + ' (-1 Vida)!');
+            } else if (tid === player.id) {
+              addLog(room, 'DAMAGE', '🩸 [FACA REFLETIDA] ' + player.name + ' foi atingido pela própria Faca refletida (-1 Vida)!');
+            } else {
+              addLog(room, 'DAMAGE', '🩸 [SANGUE] Faca refletida de ' + player.name + ' atingiu ' + target.name + ' (-1 Vida)!');
+            }
+          } else {
+            addLog(room, 'DAMAGE', '🩸 [SANGUE] Faca atingiu ' + target.name + ' em cheio (-1 Vida)!');
+          }
+        }
       }
       action.processed = true;
     }
