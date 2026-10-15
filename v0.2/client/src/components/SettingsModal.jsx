@@ -273,7 +273,7 @@ export default function SettingsModal({
                   <p className="text-[10px] font-mono text-stone-700 mt-1 italic">
                     {(local.discardLimit ?? 2) === 0
                       ? 'ℹ️ Com 0, a função clássica de PASSAR A VEZ é mantida sem descarte de cartas.'
-                      : `ℹ️ Jogadores podem selecionar até ${local.discardLimit ?? 2} cartas para descartar na rodada e renovar a mão no round seguinte.`}
+                      : `ℹ️ Jogadores podem descartar até ${local.discardLimit ?? 2} cartas na rodada. A cada novo round compra-se APENAS 1 carta (mesmo descartando 2).`}
                   </p>
                 </div>
               </div>

@@ -502,15 +502,23 @@ async function runGame(room, token) {
       p.lockedIn = false;
     }
     const aliveCount = alivePlayers(room).length;
-    const targetHandSize =
-      room.gameState.round === 1
-        ? (room.gameState.settings.initialHandCards || DEFAULT_INITIAL_HAND_CARDS)
-        : (room.gameState.settings.maxHandCards || DEFAULT_HAND_CARDS);
+    const initialHandSize = room.gameState.settings.initialHandCards || DEFAULT_INITIAL_HAND_CARDS;
+    const maxHandSize = room.gameState.settings.maxHandCards || DEFAULT_HAND_CARDS;
+
     for (const p of alivePlayers(room)) {
-      while (p.hand.length < targetHandSize) {
-        const card = drawCardForPlayer(room, p);
-        if (!card) break;
-        p.hand.push(card);
+      if (room.gameState.round === 1) {
+        // Round 1: entrega a quantidade de cartas iniciais configurada
+        while (p.hand.length < initialHandSize) {
+          const card = drawCardForPlayer(room, p);
+          if (!card) break;
+          p.hand.push(card);
+        }
+      } else {
+        // Demais rounds: compra APENAS UMA carta por rodada (respeitando o limite máximo)
+        if (p.hand.length < maxHandSize) {
+          const card = drawCardForPlayer(room, p);
+          if (card) p.hand.push(card);
+        }
       }
       p.allowedTime = calculatePlayerTime(p, aliveCount, room.gameState.settings);
     }

@@ -204,8 +204,9 @@ function TabTheGame() {
             <Layers size={16} /> MÃO DE CARTAS & REGRA ANTITRINCA
           </div>
           <p className="text-[11px] sm:text-xs text-parchment-dark">
-            O limite da mão é configurável pelo líder (de <strong>3 a 5 cartas</strong>, padrão 3). A cada round, você
-            reabastece a mão a partir do baralho compartilhado de 96 cartas (32 Facas, 32 Paredes, 32 Reversos).
+            O limite da mão e cartas iniciais são configuráveis pelo líder (de <strong>1 a 5 cartas</strong>, padrão 3).
+            No início do jogo você recebe suas cartas iniciais e, <strong>a cada novo round, compra APENAS 1 carta</strong> do baralho compartilhado
+            (mesmo se tiver descartado duas), até o limite máximo da sua mão.
           </p>
           <div className="mt-2 pt-1.5 border-t border-iron/40 text-[10.5px] font-mono text-amber-200">
             <strong>⚖️ Proibido 3 Cartas Iguais:</strong> O sistema impede qualquer jogador de acumular uma trinca na mão
