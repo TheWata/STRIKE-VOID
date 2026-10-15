@@ -14,6 +14,7 @@ import {
   ScrollText,
   HelpCircle,
   BookOpen,
+  Trash2,
 } from 'lucide-react';
 import { socket } from './lib/socket';
 import { cn } from './lib/cn';
@@ -21,7 +22,6 @@ import { PHASE_LABELS, DEFAULT_MAX_HP } from './lib/constants';
 import { useCompactLayout } from './lib/useMediaQuery';
 import InscryptionCard from './components/InscryptionCard';
 import PlayerSeat from './components/PlayerSeat';
-import CompactSeat from './components/CompactSeat';
 import TargetArrowsSVG from './components/TargetArrowsSVG';
 import SettingsModal from './components/SettingsModal';
 import AudioControls from './components/AudioControls';
@@ -43,7 +43,7 @@ const HEADER_ICON_BTN =
 export default function App() {
   const [gameState, setGameState] = useState(null);
   const [publicRooms, setPublicRooms] = useState([]);
-  const [selectedCardId, setSelectedCardId] = useState(null);
+  const [selectedCardIds, setSelectedCardIds] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
@@ -148,7 +148,7 @@ export default function App() {
 
   // Limpa seleção quando a jogada foi travada ou a fase mudou
   useEffect(() => {
-    if (phase !== 'PLANNING' || me?.lockedIn) setSelectedCardId(null);
+    if (phase !== 'PLANNING' || me?.lockedIn) setSelectedCardIds([]);
   }, [phase, me?.lockedIn]);
 
   /* ---------------- FEEDBACK DE DANO (Hit Flash + Screen Shake) ---------------- */
@@ -262,7 +262,8 @@ export default function App() {
     return () => document.removeEventListener('click', onClick);
   }, []);
 
-  const selectedCard = me?.hand?.find((c) => c.id === selectedCardId) || null;
+  const discardLimit = gameState?.settings?.discardLimit ?? 2;
+  const selectedCard = selectedCardIds.length === 1 ? me?.hand?.find((c) => c.id === selectedCardIds[0]) || null : null;
   const canAct = phase === 'PLANNING' && !!me?.isAlive && !me?.lockedIn;
   const walled = !!me?.isWalled;
 
@@ -276,7 +277,7 @@ export default function App() {
     (cardId, targetId) => {
       if (!cardId) return;
       socket.emit('select_action', { cardId, targetId });
-      setSelectedCardId(null);
+      setSelectedCardIds([]);
     },
     []
   );
@@ -290,7 +291,7 @@ export default function App() {
     dragCardRef.current = null;
     if (!canAct || !cardId) return;
     if (walled && p.id !== me.id) {
-      showToast('Você está EMPAREDADO! Só pode usar cartas em si mesmo ou passar a vez.');
+      showToast('Você está EMPAREDADO! Só pode usar cartas em si mesmo ou passar/descartar.');
       return;
     }
     sendAction(cardId, p.id);
@@ -298,13 +299,43 @@ export default function App() {
 
   const onCardClick = useCallback((card) => {
     audio.play('select');
-    setSelectedCardId((cur) => (cur === card.id ? null : card.id));
-  }, []);
+    const limit = gameState?.settings?.discardLimit ?? 2;
+    setSelectedCardIds((cur) => {
+      if (cur.includes(card.id)) {
+        return cur.filter((id) => id !== card.id);
+      }
+      if (limit <= 0) {
+        return [card.id];
+      }
+      if (cur.length >= limit) {
+        return limit === 1 ? [card.id] : [cur[1], card.id];
+      }
+      return [...cur, card.id];
+    });
+  }, [gameState?.settings?.discardLimit]);
 
   const onCardDragStart = useCallback((e, card) => {
     e.dataTransfer.setData('text/plain', card.id);
     e.dataTransfer.effectAllowed = 'move';
     dragCardRef.current = card.id;
+    setSelectedCardIds([card.id]);
+  }, []);
+
+  const handleDiscard = useCallback(() => {
+    if (selectedCardIds.length === 0) {
+      audio.play('lock');
+      socket.emit('pass_turn');
+    } else {
+      audio.play('lock');
+      socket.emit('discard_cards', { cardIds: selectedCardIds });
+    }
+    setSelectedCardIds([]);
+  }, [selectedCardIds]);
+
+  const handlePassTurn = useCallback(() => {
+    audio.play('lock');
+    socket.emit('pass_turn');
+    setSelectedCardIds([]);
   }, []);
 
   const logs = useMemo(() => gameState?.logs || [], [gameState?.logs]);
@@ -323,9 +354,9 @@ export default function App() {
     socket.emit('join_room', { playerName: cleanPlayer, roomCode });
   };
 
-  const handleCreateRoom = ({ roomName, isPublic }) => {
+  const handleCreateRoom = ({ roomName, isPublic, initialHandCards }) => {
     const cleanPlayer = nickname.trim() || 'CONDENADO';
-    socket.emit('create_room', { playerName: cleanPlayer, roomName, isPublic });
+    socket.emit('create_room', { playerName: cleanPlayer, roomName, isPublic, initialHandCards });
   };
 
   const handleLeaveRoom = () => {
@@ -366,171 +397,20 @@ export default function App() {
   // Vinheta de sangramento só durante a partida e apenas para quem está sentado à mesa
   const overlayActive = inAnyRoom && !!me && phase !== 'LOBBY' && phase !== 'GAME_OVER';
 
-  /* ---------------- LAYOUT COMPACTO (mobile) ---------------- */
-  const opponents = players.filter((p) => p.id !== me?.id);
-  const gridCols = Math.min(4, Math.max(1, opponents.length));
-  const hintText = canAct
-    ? selectedCard
-      ? 'Toque em um oponente (ou em você) para escolher o alvo'
-      : 'Toque numa carta e depois no alvo'
-    : phase === 'PLANNING' && me?.isAlive
-      ? 'Jogada travada. Aguardando mesa...'
-      : '';
 
-  const compactTable = (
-    <main className="relative flex-1 min-h-0 flex flex-col landscape:flex-row">
-      {/* Tabuleiro: oponentes em grid + relógio central */}
-      <section className="flex-1 min-h-0 min-w-0 overflow-y-auto overflow-x-hidden px-2 pt-2 pb-1 flex flex-col gap-2">
-        <div className="grid gap-1.5" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
-          {opponents.map((p) => (
-            <CompactSeat
-              key={p.id}
-              player={p}
-              isMe={false}
-              phase={phase}
-              targetable={isTargetable(p)}
-              dimmed={canAct && !!selectedCard && !isTargetable(p)}
-              onSeatClick={onSeatClick}
-              nameOf={nameOf}
-            />
-          ))}
-        </div>
 
-        <div className="flex items-center justify-center gap-3 py-1">
-          <CentralClock socket={socket} myAllowedTime={me?.allowedTime} phase={phase} locked={!!me?.lockedIn || !me?.isAlive} compact />
-          {phase === 'ANALYSIS' && (
-            <div className="flex flex-col gap-1.5">
-              <button
-                id="btn-pause"
-                onClick={() => socket.emit('toggle_pause')}
-                className="flex items-center justify-center gap-1 min-h-[44px] px-3 rounded border border-gold-aged bg-black/80 text-gold-aged text-[11px] font-mono font-bold active:bg-gold-aged/20"
-              >
-                <Pause size={13} /> {gameState.isPaused ? 'CONTINUAR' : 'PAUSAR LOGS'}
-              </button>
-              <button
-                id="btn-skip"
-                onClick={() => socket.emit('skip_analysis')}
-                className="flex items-center justify-center gap-1 min-h-[44px] px-3 rounded border border-blood-bright bg-black/80 text-blood-bright text-[11px] font-mono font-bold active:bg-blood/30"
-              >
-                <SkipForward size={13} /> PRÓXIMO ROUND
-              </button>
-            </div>
-          )}
-        </div>
-
-        {walled && canAct && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [1, 0.6, 1] }}
-            transition={{ duration: 1.2, repeat: Infinity }}
-            className="mx-auto px-3 py-1 rounded border-2 border-blood-bright bg-black/90 text-blood-bright text-[10px] font-mono font-bold text-center"
-          >
-            🔒 EMPAREDADO: SÓ PODE USAR CARTAS EM SI MESMO OU PASSAR A VEZ
-          </motion.div>
-        )}
-      </section>
-
-      {/* Mão + controles (acima da vinheta de sangramento: z-[45]) */}
-      <section className="relative z-[45] shrink-0 flex flex-col gap-1.5 px-2 pt-2 pb-safe border-t border-iron/40 bg-black/50 landscape:w-[48%] landscape:border-t-0 landscape:border-l landscape:justify-center">
-        {me && (
-          <div className="flex items-stretch gap-2">
-            <div className="flex-1 min-w-0">
-              <CompactSeat
-                player={me}
-                isMe
-                phase={phase}
-                targetable={isTargetable(me)}
-                dimmed={false}
-                onSeatClick={onSeatClick}
-                nameOf={nameOf}
-              />
-            </div>
-            {me.isAlive && (
-              <button
-                id="btn-pass"
-                disabled={!canAct}
-                onClick={() => socket.emit('pass_turn')}
-                className="shrink-0 w-[34%] max-w-[130px] flex flex-col items-center justify-center gap-0.5 min-h-[56px] rounded border-2 border-iron bg-black/80 text-parchment-dark font-grimoire font-bold text-[11px] active:border-parchment disabled:opacity-30"
-              >
-                <Hand size={16} /> PASSAR A VEZ
-              </button>
-            )}
-          </div>
-        )}
-
-        {me && me.isAlive ? (
-          <>
-            <div className="min-h-[44px] flex items-center justify-center">
-              {canAct && selectedCard ? (
-                <button
-                  id="btn-self-target"
-                  onClick={() => sendAction(selectedCard.id, me.id)}
-                  className="w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded border-2 border-gold-aged bg-black/80 text-gold-aged font-grimoire font-bold text-xs active:bg-gold-aged/20"
-                >
-                  <Crosshair size={15} /> MIRAR EM MIM MESMO
-                </button>
-              ) : (
-                <div className="text-[10px] font-mono text-parchment-dark text-center leading-tight px-2">{hintText}</div>
-              )}
-            </div>
-
-            <div className="flex items-end justify-center gap-2 pt-3 pb-1">
-              <AnimatePresence>
-                {me.hand.map((card, i) => (
-                  <motion.div
-                    key={card.id}
-                    className="shrink-0"
-                    initial={{ y: -240, opacity: 0, rotate: -10 }}
-                    animate={{ y: 0, opacity: 1, rotate: 0 }}
-                    exit={{ y: -40, opacity: 0 }}
-                    transition={{ delay: i * 0.14, type: 'spring', stiffness: 130, damping: 16 }}
-                  >
-                    <InscryptionCard
-                      compact
-                      card={card}
-                      isSelected={card.id === selectedCardId}
-                      onClick={onCardClick}
-                      disabled={!canAct}
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
-          </>
-        ) : (
-          <div className="font-grimoire text-parchment-dark tracking-widest text-xs text-center py-6">
-            {me ? (
-              <div className="space-y-2">
-                <div>💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO</div>
-                <button
-                  onClick={() => setShowLogs(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-purple-500/70 bg-purple-950/60 text-purple-200 text-xs font-mono font-bold hover:bg-purple-900 transition-all shadow-[0_0_12px_rgba(168,85,247,0.3)] active:scale-95"
-                >
-                  💬 Abrir Chat & Crônica (Falar do Além)
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div>👁 ESPECTADOR</div>
-                <button
-                  onClick={() => setShowLogs(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-stone-700 bg-black/60 text-parchment text-xs font-mono active:scale-95"
-                >
-                  💬 Abrir Chat & Crônica
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </section>
-    </main>
-  );
-
-  /* ---------------- LAYOUT DESKTOP / TABLET (mesa octogonal) ---------------- */
-  const desktopTable = (
+  /* ---------------- MESA CERIMONIAL (Única e responsiva para Mobile, Tablet e Desktop) ---------------- */
+  const gameTable = (
     <>
-      <main className="relative flex-1 min-h-0 flex items-center justify-center">
-        <div className="relative" style={{ width: 'min(100%, calc(100dvh - 300px))', aspectRatio: '1 / 1' }}>
+      <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 sm:p-2">
+        <div
+          className="relative"
+          style={{
+            width: 'min(98vw, calc(100dvh - 215px))',
+            maxHeight: 'calc(100dvh - 215px)',
+            aspectRatio: '1 / 1',
+          }}
+        >
           <div className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.9)]" />
           <div className="table-octagon table-felt absolute inset-[3.5%]" />
 
@@ -553,23 +433,23 @@ export default function App() {
           ))}
 
           {/* Centro da mesa: relógio + controles de análise */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1.5">
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 sm:gap-1.5">
             <CentralClock socket={socket} myAllowedTime={me?.allowedTime} phase={phase} locked={!!me?.lockedIn || !me?.isAlive} />
             {phase === 'ANALYSIS' && (
-              <div className="flex flex-col gap-1.5">
+              <div className="flex flex-col gap-1 sm:gap-1.5">
                 <button
                   id="btn-pause"
                   onClick={() => socket.emit('toggle_pause')}
-                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/80 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20"
+                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/85 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20"
                 >
-                  <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR LEITURA' : '⏸️ PAUSAR LOGS'}
+                  <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR' : '⏸️ PAUSAR'}
                 </button>
                 <button
                   id="btn-skip"
                   onClick={() => socket.emit('skip_analysis')}
-                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/80 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30"
+                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/85 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30"
                 >
-                  <SkipForward size={11} /> ⏭️ PRÓXIMO ROUND
+                  <SkipForward size={11} /> ⏭️ PRÓXIMO
                 </button>
               </div>
             )}
@@ -581,81 +461,114 @@ export default function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: [1, 0.6, 1] }}
               transition={{ duration: 1.2, repeat: Infinity }}
-              className="absolute left-1/2 -translate-x-1/2 bottom-[2%] z-50 px-3 py-1 rounded border-2 border-blood-bright bg-black/90 text-blood-bright text-[10px] font-mono font-bold text-center max-w-[80%]"
+              className="absolute left-1/2 -translate-x-1/2 bottom-[2%] z-50 px-3 py-1 rounded border-2 border-blood-bright bg-black/95 text-blood-bright text-[10px] sm:text-[11px] font-mono font-bold text-center max-w-[85%]"
             >
-              🔒 VOCÊ ESTÁ EMPAREDADO: SÓ PODE USAR CARTAS EM SI MESMO OU PASSAR A VEZ
+              🔒 EMPAREDADO: USE CARTAS EM SI MESMO OU PASSE/DESCARTE
             </motion.div>
           )}
         </div>
       </main>
 
       {/* Mão de cartas (acima da vinheta de sangramento: z-[45]) */}
-      <footer className="relative z-[45] h-[200px] flex items-end justify-center pb-3">
+      <footer className="relative z-[45] h-[155px] sm:h-[195px] flex items-end justify-center pb-2 sm:pb-3 px-1">
         {me && me.isAlive ? (
-          <div className="flex items-end gap-4">
+          <div className="flex items-end justify-center gap-1.5 sm:gap-3 max-w-full overflow-x-auto pb-0.5">
             <AnimatePresence>
               {me.hand.map((card, i) => (
                 <motion.div
                   key={card.id}
-                  initial={{ y: -420, opacity: 0, rotate: -12 }}
+                  initial={{ y: -300, opacity: 0, rotate: -8 }}
                   animate={{ y: 0, opacity: 1, rotate: 0 }}
                   exit={{ y: -60, opacity: 0 }}
-                  transition={{ delay: i * 0.18, type: 'spring', stiffness: 120, damping: 16 }}
+                  transition={{ delay: i * 0.1, type: 'spring', stiffness: 130, damping: 16 }}
                 >
                   <InscryptionCard
                     card={card}
-                    isSelected={card.id === selectedCardId}
+                    isSelected={selectedCardIds.includes(card.id)}
                     onClick={onCardClick}
                     onDragStart={onCardDragStart}
                     onDragEnd={() => (dragCardRef.current = null)}
                     disabled={!canAct}
+                    compact={compact}
                   />
                 </motion.div>
               ))}
             </AnimatePresence>
           </div>
         ) : (
-          <div className="font-grimoire text-parchment-dark tracking-widest text-sm pb-8 text-center space-y-1.5">
+          <div className="font-grimoire text-parchment-dark tracking-widest text-xs sm:text-sm pb-4 sm:pb-8 text-center space-y-1">
             <div>{me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}</div>
-            <div className="font-mono text-xs text-purple-300">
-              Você ainda pode conversar com a mesa no Chat da Crônica abaixo! ⬇
-            </div>
+            <button
+              onClick={() => setShowLogs(true)}
+              className="font-mono text-xs text-purple-300 hover:text-purple-200 underline"
+            >
+              Abrir Chat & Crônica da Mesa 💬
+            </button>
           </div>
         )}
       </footer>
 
-      {/* Controles à direita */}
+      {/* Painel de ações do jogador: Mirar em mim mesmo e Passar a vez / Descarte */}
       {me && me.isAlive && (
-        <div className="absolute bottom-3 right-3 z-[45] flex flex-col gap-2 w-[200px]">
+        <div className="absolute right-2 bottom-[158px] sm:bottom-3 sm:right-3 z-[45] flex flex-col gap-1.5 w-[140px] sm:w-[190px]">
           {canAct && selectedCard && (
             <button
               id="btn-self-target"
-              onClick={() => sendAction(selectedCard.id, me.id)}
-              className="flex items-center justify-center gap-1.5 py-2 rounded border-2 border-gold-aged bg-black/80 text-gold-aged font-grimoire font-bold text-xs hover:bg-gold-aged/20"
+              onClick={() => {
+                sendAction(selectedCard.id, me.id);
+                setSelectedCardIds([]);
+              }}
+              className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-gold-aged bg-black/85 text-gold-aged font-grimoire font-bold text-[10px] sm:text-xs hover:bg-gold-aged/20 shadow-md active:scale-95"
             >
-              <Crosshair size={14} /> MIRAR EM MIM MESMO
+              <Crosshair size={13} /> MIRAR EM MIM
             </button>
           )}
-          <button
-            id="btn-pass"
-            disabled={!canAct}
-            onClick={() => socket.emit('pass_turn')}
-            className="flex items-center justify-center gap-1.5 py-2 rounded border-2 border-iron bg-black/80 text-parchment-dark font-grimoire font-bold text-xs hover:border-parchment disabled:opacity-30"
-          >
-            <Hand size={14} /> PASSAR A VEZ
-          </button>
-          <div className="text-[10px] font-mono text-parchment-dark text-center leading-tight">
+
+          {canAct && (discardLimit > 0 ? (
+            selectedCardIds.length > 0 ? (
+              <button
+                id="btn-discard"
+                onClick={handleDiscard}
+                className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-amber-500 bg-amber-950/85 text-amber-200 font-grimoire font-bold text-[10px] sm:text-xs hover:bg-amber-900 shadow-md active:scale-95"
+              >
+                <Trash2 size={13} className="text-amber-400" /> DESCARTAR ({selectedCardIds.length})
+              </button>
+            ) : (
+              <button
+                id="btn-pass"
+                onClick={handlePassTurn}
+                className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-iron bg-black/85 text-parchment-dark font-grimoire font-bold text-[10px] sm:text-xs hover:border-parchment shadow-md active:scale-95"
+              >
+                <Hand size={13} /> PASSAR A VEZ
+              </button>
+            )
+          ) : (
+            <button
+              id="btn-pass"
+              onClick={handlePassTurn}
+              className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-iron bg-black/85 text-parchment-dark font-grimoire font-bold text-[10px] sm:text-xs hover:border-parchment shadow-md active:scale-95"
+            >
+              <Hand size={13} /> PASSAR A VEZ
+            </button>
+          ))}
+
+          <div className="text-[9px] sm:text-[10px] font-mono text-parchment-dark text-center leading-tight">
             {canAct
               ? selectedCard
-                ? 'Clique num assento piscando ou arraste a carta'
-                : 'Clique OU arraste uma carta até um assento'
+                ? 'Clique num assento para atacar'
+                : selectedCardIds.length > 0
+                  ? `${selectedCardIds.length} selecionada(s) p/ descarte`
+                  : discardLimit > 0
+                    ? 'Selecione carta(s) ou passe a vez'
+                    : 'Clique numa carta para agir'
               : phase === 'PLANNING'
-                ? 'Jogada travada. Aguardando mesa...'
+                ? 'Jogada travada. Aguardando...'
                 : ''}
           </div>
         </div>
       )}
 
+      {/* Crônica e Chat Desktop */}
       <LogPanel logs={logs} onSendChat={handleSendChat} isDead={isDead} />
     </>
   );
@@ -793,15 +706,11 @@ export default function App() {
             onOpenSettings={() => setShowSettings(true)}
             onOpenGuide={() => setShowGuide(true)}
             onCopyCode={(code) => showToast(`Código ${code} copiado!`, 'success')}
-            onSetMaxHp={handleSetMaxHp}
-            onSetMaxHandCards={handleSetMaxHandCards}
+            onSendChat={handleSendChat}
           />
-        ) : compact ? (
-          /* 3a. Mesa compacta (smartphones) */
-          compactTable
         ) : (
-          /* 3b. Mesa octogonal (desktop/tablet) */
-          desktopTable
+          /* 3. Mesa Cerimonial única e responsiva (Mobile, Tablet e Desktop) */
+          gameTable
         )}
 
         {/* Logs em gaveta (mobile) com chat e suporte para mortos */}
@@ -824,8 +733,13 @@ export default function App() {
             open={showSettings}
             settings={gameState.settings}
             aliveCount={aliveCount || players.length}
+            isHost={isHost}
+            isLobby={roomStatus === 'LOBBY' || phase === 'LOBBY'}
             onClose={() => setShowSettings(false)}
-            onSave={(s) => socket.emit('update_settings', s)}
+            onSave={(s) => {
+              socket.emit('update_settings', s);
+              showToast('Configurações salvas e aplicadas à mesa!', 'success');
+            }}
           />
         )}
 

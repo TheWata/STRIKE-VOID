@@ -93,8 +93,8 @@ function applyMaxHp(room, value) {
   return hp;
 }
 
-/* Limite máximo de cartas na mão configurável por sala (mín 3, máx 5, padrão 3) */
-const MIN_HAND_CARDS = 3;
+/* Limite máximo de cartas na mão configurável por sala (mín 1, máx 5, padrão 3) */
+const MIN_HAND_CARDS = 1;
 const MAX_HAND_CARDS = 5;
 const DEFAULT_HAND_CARDS = 3;
 
@@ -110,7 +110,31 @@ function applyMaxHandCards(room, value) {
   return cards;
 }
 
-function createRoom({ code, name, hostId, isPublic }) {
+/* Cartas iniciais na mão (mín 1, máx 5, padrão 3) */
+const MIN_INITIAL_HAND_CARDS = 1;
+const MAX_INITIAL_HAND_CARDS = 5;
+const DEFAULT_INITIAL_HAND_CARDS = 3;
+
+function clampInitialHandCards(value, fallback = DEFAULT_INITIAL_HAND_CARDS) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(MAX_INITIAL_HAND_CARDS, Math.max(MIN_INITIAL_HAND_CARDS, n));
+}
+
+/* Limite de descarte por round (0 a 2, padrão 2: 0 = descarte desativado / passar a vez clássico) */
+const MIN_DISCARD_LIMIT = 0;
+const MAX_DISCARD_LIMIT = 2;
+const DEFAULT_DISCARD_LIMIT = 2;
+
+function clampDiscardLimit(value, fallback = DEFAULT_DISCARD_LIMIT) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(MAX_DISCARD_LIMIT, Math.max(MIN_DISCARD_LIMIT, n));
+}
+
+function createRoom({ code, name, hostId, isPublic, initialHandCards }) {
+  const initCards = clampInitialHandCards(initialHandCards, DEFAULT_INITIAL_HAND_CARDS);
+  const maxCards = Math.max(initCards, DEFAULT_HAND_CARDS);
   return {
     code,
     name: name || `Sala ${code}`,
@@ -131,7 +155,9 @@ function createRoom({ code, name, hostId, isPublic }) {
         damagePenalty: 0.33,
         analysisDuration: 8.0,
         maxHp: DEFAULT_MAX_HP,
-        maxHandCards: DEFAULT_HAND_CARDS,
+        maxHandCards: maxCards,
+        initialHandCards: initCards,
+        discardLimit: DEFAULT_DISCARD_LIMIT,
       },
       deck: [],
       discardPile: [],
@@ -407,8 +433,25 @@ function scheduleBot(room, bot, token, round) {
     if (!bot.isAlive || bot.lockedIn) return;
     if (bot.isWalled) {
       const knife = bot.hand.find((c) => c.type === 'FACA');
-      if (knife) applyAction(room, bot, knife.id, bot.id);
-      else passAction(bot);
+      if (knife) {
+        applyAction(room, bot, knife.id, bot.id);
+      } else if (room.gameState.settings.discardLimit > 0 && bot.hand.length > 0) {
+        const toDiscard = bot.hand.slice(0, room.gameState.settings.discardLimit);
+        for (const c of toDiscard) {
+          const idx = bot.hand.findIndex((h) => h.id === c.id);
+          if (idx !== -1) room.gameState.discardPile.push(bot.hand.splice(idx, 1)[0]);
+        }
+        bot.selectedAction = {
+          cardType: 'DISCARD',
+          discardedCount: toDiscard.length,
+          targetId: null,
+          originalTargetId: null,
+          status: 'PENDING',
+        };
+        bot.lockedIn = true;
+      } else {
+        passAction(bot);
+      }
     } else {
       const card = bot.hand[Math.floor(Math.random() * bot.hand.length)];
       if (!card) {
@@ -459,7 +502,10 @@ async function runGame(room, token) {
       p.lockedIn = false;
     }
     const aliveCount = alivePlayers(room).length;
-    const targetHandSize = room.gameState.settings.maxHandCards || DEFAULT_HAND_CARDS;
+    const targetHandSize =
+      room.gameState.round === 1
+        ? (room.gameState.settings.initialHandCards || DEFAULT_INITIAL_HAND_CARDS)
+        : (room.gameState.settings.maxHandCards || DEFAULT_HAND_CARDS);
     for (const p of alivePlayers(room)) {
       while (p.hand.length < targetHandSize) {
         const card = drawCardForPlayer(room, p);
@@ -886,7 +932,7 @@ io.on('connection', (socket) => {
     socket.emit('public_rooms_updated', getPublicRoomsList());
   });
 
-  socket.on('create_room', ({ playerName, roomName, isPublic } = {}) => {
+  socket.on('create_room', ({ playerName, roomName, isPublic, initialHandCards } = {}) => {
     // Se o socket já estava em uma sala, sai dela primeiro
     if (socket.data?.roomCode) {
       handlePlayerLeave(socket);
@@ -901,6 +947,7 @@ io.on('connection', (socket) => {
       name: cleanRoom,
       hostId: socket.id,
       isPublic: isPublic !== false, // Padrão pública se não especificado
+      initialHandCards,
     });
 
     const hostPlayer = createPlayer(socket.id, cleanPlayer, false, room.gameState.settings.maxHp);
@@ -1045,10 +1092,21 @@ io.on('connection', (socket) => {
     s.secondsPerPlayer = num(newSettings.secondsPerPlayer, 1, 5, s.secondsPerPlayer);
     s.damagePenalty = num(newSettings.damagePenalty, 0, 0.5, s.damagePenalty);
     s.analysisDuration = num(newSettings.analysisDuration, 3, 20, s.analysisDuration);
-    // A vida inicial e o limite de cartas só podem mudar no Lobby (nunca no meio de uma partida)
+    // A vida inicial e regras de cartas/descarte só podem mudar no Lobby (nunca no meio de uma partida)
     if (room.status === 'LOBBY') {
       if (newSettings.maxHp !== undefined) applyMaxHp(room, newSettings.maxHp);
-      if (newSettings.maxHandCards !== undefined) applyMaxHandCards(room, newSettings.maxHandCards);
+      if (newSettings.initialHandCards !== undefined) {
+        s.initialHandCards = clampInitialHandCards(newSettings.initialHandCards);
+      }
+      if (newSettings.maxHandCards !== undefined) {
+        applyMaxHandCards(room, newSettings.maxHandCards);
+      }
+      if (s.maxHandCards < s.initialHandCards) {
+        s.maxHandCards = s.initialHandCards;
+      }
+      if (newSettings.discardLimit !== undefined) {
+        s.discardLimit = clampDiscardLimit(newSettings.discardLimit);
+      }
     }
     emitRoomState(room);
   });
@@ -1067,7 +1125,7 @@ io.on('connection', (socket) => {
     emitRoomState(room);
   });
 
-  // Host define o Máximo de Cartas na Mão (3 a 5) no Lobby; sincroniza em tempo real com toda a sala
+  // Host define o Máximo de Cartas na Mão (1 a 5) no Lobby; sincroniza em tempo real com toda a sala
   socket.on('set_max_hand_cards', ({ maxHandCards } = {}) => {
     const roomCode = socket.data?.roomCode;
     const room = rooms.get(roomCode);
@@ -1119,6 +1177,46 @@ io.on('connection', (socket) => {
     if (!player || !player.isAlive || player.lockedIn) return;
 
     passAction(player);
+    emitRoomState(room);
+  });
+
+  /* Descarte de até N cartas (configurável de 0 a 2: se 0, desativado) */
+  socket.on('discard_cards', ({ cardIds = [] } = {}) => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.gameState.phase !== 'PLANNING') return;
+    const player = getPlayer(room, socket.id);
+    if (!player || !player.isAlive || player.lockedIn) return;
+
+    const limit = room.gameState.settings.discardLimit ?? DEFAULT_DISCARD_LIMIT;
+    const ids = Array.isArray(cardIds) ? cardIds : [];
+
+    if (limit === 0 && ids.length > 0) {
+      return toast(socket.id, 'O descarte de cartas está desativado nesta sala.');
+    }
+
+    if (ids.length > limit) {
+      return toast(socket.id, `Você só pode descartar até ${limit} carta(s) por rodada.`);
+    }
+
+    const removedCards = [];
+    for (const cid of ids) {
+      const idx = player.hand.findIndex((c) => c.id === cid);
+      if (idx !== -1) {
+        const [card] = player.hand.splice(idx, 1);
+        room.gameState.discardPile.push(card);
+        removedCards.push(card);
+      }
+    }
+
+    player.selectedAction = {
+      cardType: removedCards.length > 0 ? 'DISCARD' : 'NONE',
+      discardedCount: removedCards.length,
+      targetId: null,
+      originalTargetId: null,
+      status: 'PENDING',
+    };
+    player.lockedIn = true;
     emitRoomState(room);
   });
 

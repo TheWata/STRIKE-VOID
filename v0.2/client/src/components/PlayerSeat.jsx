@@ -242,7 +242,7 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
           animate={shake ? { x: [0, -12, 12, -8, 8, 0] } : { x: 0 }}
           transition={{ duration: 0.6 }}
           className={cn(
-            'relative w-[clamp(100px,11.5vw,142px)] rounded-md border-2 px-2 pt-1.5 pb-2 bg-gradient-to-b from-wood-mid to-wood-dark shadow-[0_8px_18px_rgba(0,0,0,0.85)] transition-opacity',
+            'relative w-[clamp(74px,11vw,142px)] rounded-md border-2 px-1.5 sm:px-2 pt-1 sm:pt-1.5 pb-1.5 sm:pb-2 bg-gradient-to-b from-wood-mid to-wood-dark shadow-[0_8px_18px_rgba(0,0,0,0.85)] transition-opacity',
             isMe ? 'border-gold-aged' : 'border-iron/70',
             targetable && 'aim-blink cursor-crosshair border-blood-bright',
             over && 'scale-110 border-blood-bright',
@@ -251,11 +251,11 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
           )}
         >
           {/* Placa de identificação enferrujada */}
-          <div className="flex items-center justify-between gap-1 rounded-sm px-1.5 py-[2px] mb-1 bg-gradient-to-r from-[#5a3b27] via-[#8a5a36] to-[#5a3b27] border border-[#2a1810] shadow-inner">
-            <span className="font-typewriter text-[11px] text-[#f1e2bd] truncate max-w-[75%]">{player.name}</span>
+          <div className="flex items-center justify-between gap-0.5 sm:gap-1 rounded-sm px-1 sm:px-1.5 py-[1px] sm:py-[2px] mb-0.5 sm:mb-1 bg-gradient-to-r from-[#5a3b27] via-[#8a5a36] to-[#5a3b27] border border-[#2a1810] shadow-inner">
+            <span className="font-typewriter text-[9px] sm:text-[11px] text-[#f1e2bd] truncate max-w-[75%]">{player.name}</span>
             <span
               className={cn(
-                'text-[8px] font-mono font-bold px-1 rounded-sm',
+                'text-[7px] sm:text-[8px] font-mono font-bold px-0.5 sm:px-1 rounded-sm',
                 isMe ? 'bg-gold-aged text-black' : player.isBot ? 'bg-iron text-white' : 'bg-parchment-dark text-black'
               )}
             >
@@ -264,14 +264,18 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
           </div>
 
           {/* Caveiras */}
-          <div className={cn('flex flex-wrap justify-center', player.maxLives >= 5 ? 'gap-0.5' : 'gap-1')}>
+          <div className={cn('flex flex-wrap justify-center', player.maxLives >= 5 ? 'gap-0.5' : 'gap-0.5 sm:gap-1')}>
             {Array.from({ length: player.maxLives }).map((_, i) => (
-              <Skull key={i} alive={i < player.lives} className={skullSizeClass(player.maxLives)} />
+              <Skull
+                key={i}
+                alive={i < player.lives}
+                className={cn('w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5')}
+              />
             ))}
           </div>
 
           {!player.isAlive && (
-            <div className="text-center text-[9px] font-mono text-blood-bright font-bold mt-0.5">ELIMINADO</div>
+            <div className="text-center text-[8px] sm:text-[9px] font-mono text-blood-bright font-bold mt-0.5">ELIMINADO</div>
           )}
 
           {/* Mira vermelha quando é alvo válido */}

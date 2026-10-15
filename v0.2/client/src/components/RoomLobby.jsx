@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import {
   Copy,
@@ -17,121 +17,13 @@ import {
   LogOut,
   Users,
   ShieldAlert,
-  Heart,
   BookOpen,
-  Layers,
+  Send,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
-import { MIN_MAX_HP, MAX_MAX_HP, DEFAULT_MAX_HP, MIN_HAND_CARDS, MAX_HAND_CARDS, DEFAULT_HAND_CARDS } from '../lib/constants';
-
-const HP_OPTIONS = Array.from({ length: MAX_MAX_HP - MIN_MAX_HP + 1 }, (_, i) => MIN_MAX_HP + i);
-const HAND_OPTIONS = Array.from({ length: MAX_HAND_CARDS - MIN_HAND_CARDS + 1 }, (_, i) => MIN_HAND_CARDS + i);
-
-/** Seletor da Quantidade de Vida Inicial: editável só pelo Host, somente leitura para os demais. */
-function HpSelector({ value, isHost, onChange }) {
-  return (
-    <div id="hp-selector" className="rounded-lg border border-iron/60 bg-black/50 p-3 flex flex-col justify-between">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="flex items-center gap-1.5 font-grimoire font-bold text-xs sm:text-sm tracking-wider text-parchment">
-          <Heart size={15} className="text-blood-bright fill-blood-bright" />
-          VIDA INICIAL
-        </span>
-        <span className="font-mono text-[10px] text-parchment-dark">
-          {isHost ? '2 a 5 Vidas' : 'Líder define'}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <div className="flex flex-1 gap-1.5" role="radiogroup" aria-label="Quantidade de vida inicial">
-          {HP_OPTIONS.map((n) => {
-            const selected = n === value;
-            return (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                disabled={!isHost}
-                onClick={() => isHost && onChange(n)}
-                className={cn(
-                  'flex-1 min-h-[44px] rounded border-2 font-mono font-extrabold text-base transition-all touch-manipulation',
-                  'flex items-center justify-center gap-1',
-                  selected
-                    ? 'border-blood-bright bg-blood/60 text-white shadow-[0_0_14px_rgba(220,38,38,0.55)]'
-                    : 'border-iron/70 bg-black/60 text-parchment-dark',
-                  isHost && !selected && 'hover:border-gold-aged hover:text-gold-aged active:bg-blood/30',
-                  !isHost && 'cursor-default'
-                )}
-              >
-                {n}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Prévia de corações com a quantidade escolhida */}
-        <div className="hidden min-[400px]:flex items-center gap-0.5 shrink-0" aria-hidden>
-          {Array.from({ length: value }).map((_, i) => (
-            <Heart key={i} size={value >= 5 ? 12 : 14} className="text-blood-bright fill-blood-bright" />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Seletor do Máximo de Cartas na Mão (mín 3, máx 5, padrão 3) */
-function HandCardsSelector({ value, isHost, onChange }) {
-  return (
-    <div id="hand-cards-selector" className="rounded-lg border border-iron/60 bg-black/50 p-3 flex flex-col justify-between">
-      <div className="flex items-center justify-between gap-2 mb-2">
-        <span className="flex items-center gap-1.5 font-grimoire font-bold text-xs sm:text-sm tracking-wider text-parchment">
-          <Layers size={15} className="text-gold-aged" />
-          MÁXIMO DE CARTAS
-        </span>
-        <span className="font-mono text-[10px] text-parchment-dark">
-          {isHost ? '3 a 5 na mão' : 'Líder define'}
-        </span>
-      </div>
-
-      <div className="flex items-center gap-2">
-        <div className="flex flex-1 gap-1.5" role="radiogroup" aria-label="Quantidade máxima de cartas na mão">
-          {HAND_OPTIONS.map((n) => {
-            const selected = n === value;
-            return (
-              <button
-                key={n}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                disabled={!isHost}
-                onClick={() => isHost && onChange(n)}
-                className={cn(
-                  'flex-1 min-h-[44px] rounded border-2 font-mono font-extrabold text-base transition-all touch-manipulation',
-                  'flex items-center justify-center gap-1',
-                  selected
-                    ? 'border-gold-aged bg-gold-aged/30 text-amber-200 shadow-[0_0_14px_rgba(212,175,55,0.55)]'
-                    : 'border-iron/70 bg-black/60 text-parchment-dark',
-                  isHost && !selected && 'hover:border-gold-aged hover:text-gold-aged active:bg-gold-aged/20',
-                  !isHost && 'cursor-default'
-                )}
-              >
-                {n}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Prévia de cartas com a quantidade escolhida */}
-        <div className="hidden min-[400px]:flex items-center gap-0.5 shrink-0 text-gold-aged" aria-hidden>
-          {Array.from({ length: value }).map((_, i) => (
-            <Layers key={i} size={value >= 5 ? 12 : 14} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
+import { LOG_STYLES } from '../lib/constants';
+import { audio } from '../lib/audio';
 
 export default function RoomLobby({
   roomState,
@@ -146,18 +38,26 @@ export default function RoomLobby({
   onOpenSettings,
   onOpenGuide,
   onCopyCode,
-  onSetMaxHp,
-  onSetMaxHandCards,
+  onSendChat,
 }) {
   const [hideCode, setHideCode] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [chatText, setChatText] = useState('');
+  const chatBottomRef = useRef(null);
 
   const players = roomState?.players || [];
   const minPlayers = roomState?.minPlayers || 2;
   const maxPlayers = roomState?.maxPlayers || 8;
-  const maxHp = roomState?.settings?.maxHp ?? roomState?.maxHp ?? DEFAULT_MAX_HP;
-  const maxHandCards = roomState?.settings?.maxHandCards ?? roomState?.maxHandCards ?? DEFAULT_HAND_CARDS;
   const canStart = isHost && players.length >= minPlayers && players.length <= maxPlayers;
+
+  const logs = roomState?.logs || [];
+  const chatLogs = logs.filter((l) => l.type === 'CHAT' || l.type === 'SYSTEM');
+
+  useEffect(() => {
+    if (chatBottomRef.current) {
+      chatBottomRef.current.scrollTop = chatBottomRef.current.scrollHeight;
+    }
+  }, [chatLogs.length]);
 
   const handleCopy = () => {
     if (roomState?.roomCode) {
@@ -168,262 +68,283 @@ export default function RoomLobby({
     }
   };
 
+  const handleSend = (e) => {
+    e?.preventDefault();
+    const clean = chatText.trim();
+    if (!clean) return;
+    onSendChat?.(clean);
+    setChatText('');
+  };
+
   return (
     <div className="flex-1 min-h-0 flex overflow-y-auto overflow-x-hidden p-2 sm:p-4">
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.3 }}
-        className="m-auto w-full max-w-[640px] rounded-xl border-4 border-stone-900 bg-gradient-to-b from-wood-mid to-wood-dark p-3 sm:p-6 shadow-[0_0_70px_rgba(139,0,0,0.4),inset_0_0_50px_rgba(0,0,0,0.8)] relative"
+        className="m-auto w-full max-w-5xl rounded-xl border-4 border-stone-900 bg-gradient-to-b from-wood-mid via-[#1e130c] to-wood-dark p-3 sm:p-6 shadow-[0_0_80px_rgba(139,0,0,0.5),inset_0_0_50px_rgba(0,0,0,0.85)] relative flex flex-col gap-4"
       >
-        {/* Barra Superior da Sala: Nome, Privacidade e Sair */}
-        <div className="flex items-start justify-between gap-2 border-b border-iron/40 pb-3 mb-3 sm:mb-4">
+        {/* 1. TOPO: Nome da Sala, Código, Privacidade e Sair */}
+        <div className="flex items-start justify-between gap-3 border-b border-iron/40 pb-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-grimoire font-extrabold text-base sm:text-lg text-parchment truncate max-w-full">
+              <span className="font-grimoire font-extrabold text-base sm:text-xl text-parchment truncate max-w-full">
                 {roomState?.roomName || 'SALA'}
               </span>
-              <span
-                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider ${
-                  roomState?.isPublic
-                    ? 'bg-gold-aged/20 text-gold-aged border border-gold-aged/50'
-                    : 'bg-blood/30 text-blood-bright border border-blood-bright/50'
-                }`}
-              >
-                {roomState?.isPublic ? <Globe size={11} /> : <Lock size={11} />}
-                {roomState?.isPublic ? 'PÚBLICA' : 'PRIVADA'}
-              </span>
-            </div>
-            <p className="text-[10px] sm:text-[11px] font-mono text-parchment-dark mt-0.5">
-              {players.length}/{maxPlayers} na mesa (mínimo: {minPlayers})
-            </p>
-          </div>
-
-          <button
-            onClick={onLeaveRoom}
-            className="shrink-0 flex items-center justify-center gap-1.5 min-h-[40px] min-w-[40px] px-2.5 sm:px-3 rounded border border-iron/80 bg-black/50 hover:bg-blood/40 hover:border-blood-bright text-parchment-dark hover:text-white text-xs font-mono transition-colors"
-            title="Sair desta sala e voltar ao menu"
-          >
-            <LogOut size={14} /> <span className="hidden sm:inline">Sair</span>
-          </button>
-        </div>
-
-        {/* Banner com Código de Convite da Sala */}
-        <div className="rounded-lg border-2 border-gold-aged/50 bg-black/70 p-3 sm:p-4 mb-3 sm:mb-5 text-center shadow-[0_0_25px_rgba(212,175,55,0.15)]">
-          <span className="text-[10px] font-mono text-parchment-dark tracking-widest uppercase block mb-1">
-            CÓDIGO DE ACESSO DA SALA
-          </span>
-          <div className="flex items-center justify-center gap-2 sm:gap-3">
-            <span
-              id="room-code-display"
-              className="font-mono font-extrabold text-3xl sm:text-4xl tracking-[0.25em] sm:tracking-[0.3em] pl-[0.25em] text-gold-aged drop-shadow-[0_0_12px_rgba(212,175,55,0.5)] select-all"
-            >
-              {hideCode ? '••••' : roomState?.roomCode}
-            </span>
-
-            <div className="flex items-center gap-1">
-              <button
-                onClick={handleCopy}
-                className="h-11 w-11 flex items-center justify-center rounded border border-gold-aged/60 bg-gold-aged/10 hover:bg-gold-aged/30 text-gold-aged transition-colors"
-                title="Copiar código da sala"
-              >
-                {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
-              </button>
-              <button
-                onClick={() => setHideCode(!hideCode)}
-                className="h-11 w-11 flex items-center justify-center rounded border border-iron bg-black/60 hover:border-parchment-dark text-parchment-dark transition-colors"
-                title={hideCode ? 'Mostrar código' : 'Ocultar código (para live stream)'}
-              >
-                {hideCode ? <Eye size={16} /> : <EyeOff size={16} />}
-              </button>
-            </div>
-          </div>
-          <div className="text-[10px] font-mono text-stone-500 mt-1">
-            Compartilhe este código de 4 letras com quem deseja convidar.
-          </div>
-        </div>
-
-        {/* Configurações da Mesa: Vida Inicial (2 a 5) & Limite de Cartas (3 a 5) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-2 sm:mb-3">
-          <HpSelector value={maxHp} isHost={isHost} onChange={onSetMaxHp} />
-          <HandCardsSelector value={maxHandCards} isHost={isHost} onChange={onSetMaxHandCards} />
-        </div>
-
-        {/* Aviso de Regra Antitrinca */}
-        <div className="rounded border border-gold-aged/40 bg-black/60 px-3 py-1.5 mb-3 sm:mb-5 flex flex-wrap items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono text-parchment-dark shadow-sm">
-          <span className="flex items-center gap-1.5 text-gold-aged font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-gold-aged animate-pulse" />
-            REGRA ANTITRINCA ATIVA:
-          </span>
-          <span className="text-amber-200/90">Proibido possuir 3 cartas iguais na mão</span>
-        </div>
-
-        {/* Lista de Jogadores na Mesa */}
-        <div className="space-y-2 mb-3 sm:mb-5">
-          <div className="flex items-center justify-between text-[11px] sm:text-xs font-mono text-parchment-dark px-1">
-            <span className="flex items-center gap-1">
-              <Users size={13} /> CONDENADOS CONECTADOS
-            </span>
-            <span>
-              {players.length}/{maxPlayers}
-            </span>
-          </div>
-
-          <div className="space-y-1.5 max-h-[32dvh] sm:max-h-56 overflow-y-auto pr-1">
-            {players.map((p) => {
-              const isPlayerHost = p.id === roomState?.hostId;
-              const isMe = p.id === me?.id;
-              return (
-                <div
-                  key={p.id}
-                  className={`flex items-center justify-between gap-2 rounded border px-2 sm:px-3 py-1.5 sm:py-2 transition-all ${
-                    isMe
-                      ? 'border-gold-aged/80 bg-gold-aged/10 shadow-[0_0_12px_rgba(212,175,55,0.2)]'
-                      : 'border-iron/60 bg-black/60'
-                  }`}
-                >
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0">
-                    {p.isBot ? (
-                      <span className="p-1 rounded bg-stone-900 border border-iron text-stone-400">
-                        <Bot size={14} />
-                      </span>
-                    ) : (
-                      <span className="p-1 rounded bg-black border border-stone-700 text-parchment">
-                        <User size={14} />
-                      </span>
-                    )}
-
-                    <span className="font-typewriter text-xs sm:text-sm text-parchment truncate max-w-[40vw] sm:max-w-none">
-                      {p.name}
-                    </span>
-
-                    {isMe && (
-                      <span className="text-[10px] font-mono text-gold-aged bg-black/60 px-1.5 py-0.5 rounded border border-gold-aged/40">
-                        VOCÊ
-                      </span>
-                    )}
-
-                    {isPlayerHost && (
-                      <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-amber-400 bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-600/50">
-                        <Crown size={11} /> LÍDER
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Ações do Host para expulsar jogador humano ou remover bot */}
-                  {isHost && (
-                    <div className="flex items-center gap-1 shrink-0">
-                      {p.isBot ? (
-                        <button
-                          onClick={() => onRemoveBot(p.id)}
-                          className="h-10 w-10 flex items-center justify-center text-blood-bright hover:text-white hover:bg-blood/40 active:bg-blood/40 rounded transition-colors"
-                          title="Remover bot"
-                        >
-                          <X size={16} />
-                        </button>
-                      ) : (
-                        !isMe && (
-                          <button
-                            onClick={() => onKickPlayer(p.id)}
-                            className="h-10 w-10 flex items-center justify-center text-blood-bright hover:text-white hover:bg-blood/40 active:bg-blood/40 rounded transition-colors"
-                            title="Expulsar jogador da sala"
-                          >
-                            <X size={16} />
-                          </button>
-                        )
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Painel de Controles e Inicialização */}
-        {isHost ? (
-          <div className="space-y-3">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                id="btn-add-bot"
-                onClick={onAddBot}
-                disabled={players.length >= maxPlayers}
-                className="sm:flex-1 flex items-center justify-center gap-1.5 min-h-[44px] rounded border-2 border-iron hover:border-gold-aged font-grimoire font-bold text-xs text-parchment disabled:opacity-40 transition-colors"
-              >
-                <Plus size={14} /> ADICIONAR BOT
-              </button>
-
-              <div className="flex gap-2">
+              {isHost ? (
                 <button
                   onClick={onTogglePrivacy}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded border border-iron text-xs font-mono text-parchment-dark hover:text-gold-aged transition-colors"
-                  title="Mudar visibilidade da sala"
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded text-[11px] font-mono font-bold tracking-wider border transition-all ${
+                    roomState?.isPublic
+                      ? 'bg-gold-aged/20 text-gold-aged border-gold-aged/60 hover:bg-gold-aged/30'
+                      : 'bg-blood/30 text-blood-bright border-blood-bright/60 hover:bg-blood/50'
+                  }`}
+                  title="Alternar entre Pública e Privada"
                 >
-                  {roomState?.isPublic ? <Lock size={13} /> : <Globe size={13} />}
-                  <span className="whitespace-nowrap">{roomState?.isPublic ? 'TORNAR PRIVADA' : 'TORNAR PÚBLICA'}</span>
+                  {roomState?.isPublic ? <Globe size={12} /> : <Lock size={12} />}
+                  {roomState?.isPublic ? 'PÚBLICA (Mudar)' : 'PRIVADA (Mudar)'}
                 </button>
-
-                <button
-                  onClick={onOpenSettings}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded border border-iron text-xs font-mono text-parchment-dark hover:text-gold-aged transition-colors"
-                  title="Ajustar regras e tempos da partida"
+              ) : (
+                <span
+                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider ${
+                    roomState?.isPublic
+                      ? 'bg-gold-aged/20 text-gold-aged border border-gold-aged/50'
+                      : 'bg-blood/30 text-blood-bright border border-blood-bright/50'
+                  }`}
                 >
-                  <Settings size={13} /> TEMPOS
+                  {roomState?.isPublic ? <Globe size={11} /> : <Lock size={11} />}
+                  {roomState?.isPublic ? 'PÚBLICA' : 'PRIVADA'}
+                </span>
+              )}
+            </div>
+
+            {/* Código da sala */}
+            <div className="flex items-center gap-2 mt-2">
+              <div className="font-mono text-xs text-parchment-dark">CÓDIGO:</div>
+              <div className="flex items-center gap-1 bg-black/80 border border-gold-aged/60 px-3 py-1 rounded-md shadow-inner">
+                <span className="font-mono text-base sm:text-lg font-black tracking-widest text-gold-aged">
+                  {hideCode ? '••••' : roomState?.roomCode}
+                </span>
+                <button
+                  onClick={() => setHideCode(!hideCode)}
+                  className="p-1 text-parchment-dark hover:text-parchment transition-colors ml-1"
+                  title={hideCode ? 'Mostrar código' : 'Ocultar código'}
+                >
+                  {hideCode ? <Eye size={14} /> : <EyeOff size={14} />}
                 </button>
-
                 <button
-                  id="btn-lobby-guide"
-                  onClick={onOpenGuide}
-                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded border border-blood-bright/60 bg-blood/20 text-xs font-mono text-parchment hover:bg-blood/40 hover:text-white transition-colors"
-                  title="Consultar manual e regras do jogo"
+                  onClick={handleCopy}
+                  className="p-1 text-gold-aged hover:text-white transition-colors"
+                  title="Copiar código"
                 >
-                  <BookOpen size={13} className="text-blood-bright" /> GUIA
+                  {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
                 </button>
               </div>
             </div>
+          </div>
 
+          {/* Botões de topo à direita: Guia, Configurações e Sair */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
-              id="btn-start-game"
-              onClick={onStartGame}
-              disabled={!canStart}
-              className="w-full flex items-center justify-center gap-2 min-h-[48px] py-3 rounded border-2 border-gold-aged bg-blood/80 hover:bg-blood disabled:opacity-40 disabled:hover:bg-blood/80 text-parchment font-grimoire font-extrabold tracking-widest text-sm sm:text-base shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all"
+              onClick={onOpenGuide}
+              className="flex items-center gap-1.5 min-h-[40px] px-3 rounded border border-blood-bright/70 bg-blood/30 hover:bg-blood/60 text-parchment text-xs font-mono font-bold transition-all shadow-sm"
+              title="Abrir Guia do Jogo"
             >
-              <Play size={18} /> INICIAR PARTIDA
+              <BookOpen size={14} className="text-blood-bright" />
+              <span className="hidden sm:inline">GUIA</span>
             </button>
 
-            {!canStart && (
-              <div className="flex items-center justify-center gap-1.5 text-center text-[11px] font-mono text-amber-400/90 bg-black/40 py-1.5 px-3 rounded border border-amber-900/40">
-                <ShieldAlert size={13} className="shrink-0" />
-                Mínimo de {minPlayers} jogadores para iniciar. Adicione bots ou convide amigos!
+            <button
+              id="btn-lobby-settings"
+              onClick={onOpenSettings}
+              className="flex items-center gap-1.5 min-h-[40px] px-3 rounded border border-gold-aged/80 bg-gold-aged/20 hover:bg-gold-aged/35 text-amber-200 text-xs font-mono font-bold transition-all shadow-sm"
+              title="Abrir Configurações da Mesa"
+            >
+              <Settings size={14} className="text-gold-aged" />
+              <span>CONFIGURAÇÕES</span>
+            </button>
+
+            <button
+              onClick={onLeaveRoom}
+              className="flex items-center gap-1.5 min-h-[40px] px-3 rounded border border-iron/80 bg-black/60 hover:bg-blood/50 hover:border-blood-bright text-parchment-dark hover:text-white text-xs font-mono transition-colors"
+              title="Sair desta sala"
+            >
+              <LogOut size={14} />
+              <span className="hidden sm:inline">SAIR</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 2. CORPO DO LOBBY: CONECTADOS (ESQUERDA) + CHAT (DIREITA) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-4 min-h-[320px]">
+          {/* COLUNA ESQUERDA: LISTA DE JOGADORES CONECTADOS (7 cols) */}
+          <div className="lg:col-span-7 flex flex-col justify-between rounded-lg border-2 border-stone-800 bg-black/60 p-3 sm:p-4 space-y-3">
+            <div>
+              <div className="flex items-center justify-between border-b border-iron/40 pb-2 mb-2.5">
+                <div className="flex items-center gap-2">
+                  <Users size={16} className="text-gold-aged" />
+                  <span className="font-grimoire font-extrabold text-sm tracking-wider text-parchment">
+                    JOGADORES NA MESA
+                  </span>
+                  <span className="text-[11px] font-mono text-parchment-dark">
+                    ({players.length}/{maxPlayers} · mínimo: {minPlayers})
+                  </span>
+                </div>
+
+                {isHost && players.length < maxPlayers && (
+                  <button
+                    onClick={onAddBot}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-iron/80 bg-black/50 hover:bg-gold-aged/20 hover:border-gold-aged text-parchment hover:text-gold-aged text-[11px] font-mono font-bold transition-colors"
+                    title="Adicionar bot à sala"
+                  >
+                    <Plus size={12} /> Adicionar Bot
+                  </button>
+                )}
               </div>
-            )}
+
+              {/* Grid de assentos de jogadores conectados */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[260px] overflow-y-auto pr-1">
+                {players.map((p) => {
+                  const isPlayerHost = p.id === roomState.hostId;
+                  const isMe = p.id === me?.id;
+                  return (
+                    <div
+                      key={p.id}
+                      className={cn(
+                        'flex items-center justify-between p-2 rounded border transition-all',
+                        isMe
+                          ? 'border-gold-aged bg-gold-aged/10 text-parchment shadow-sm'
+                          : 'border-iron/60 bg-wood-dark/70 text-parchment-light'
+                      )}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 pr-1">
+                        <div
+                          className={cn(
+                            'w-7 h-7 rounded flex items-center justify-center shrink-0 border',
+                            p.isBot
+                              ? 'border-stone-700 bg-stone-900 text-stone-300'
+                              : isPlayerHost
+                                ? 'border-gold-aged/80 bg-gold-aged/20 text-amber-300'
+                                : 'border-iron bg-black/60 text-parchment'
+                          )}
+                        >
+                          {p.isBot ? <Bot size={15} /> : isPlayerHost ? <Crown size={15} /> : <User size={15} />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-typewriter text-xs font-bold truncate">{p.name}</div>
+                          <div className="flex items-center gap-1 font-mono text-[9px] text-parchment-dark">
+                            {isPlayerHost && <span className="text-amber-300 font-bold">LÍDER</span>}
+                            {isPlayerHost && (isMe || p.isBot) && <span>·</span>}
+                            {isMe && <span className="text-gold-aged font-bold">VOCÊ</span>}
+                            {p.isBot && <span className="text-stone-400">BOT</span>}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Botão de expulsar / remover bot (apenas host) */}
+                      {isHost && !isMe && (
+                        <button
+                          onClick={() => (p.isBot ? onRemoveBot(p.id) : onKickPlayer(p.id))}
+                          className="shrink-0 p-1 text-stone-500 hover:text-red-400 hover:bg-blood/20 rounded transition-colors"
+                          title={p.isBot ? 'Remover bot' : 'Expulsar jogador'}
+                        >
+                          <X size={15} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Botão INICIAR PARTIDA / Alerta */}
+            <div className="pt-2 border-t border-iron/40 space-y-2">
+              {isHost ? (
+                <>
+                  <button
+                    id="btn-start-game"
+                    onClick={onStartGame}
+                    disabled={!canStart}
+                    className="w-full flex items-center justify-center gap-2 min-h-[48px] py-2.5 rounded border-2 border-gold-aged bg-blood/80 hover:bg-blood disabled:opacity-40 disabled:hover:bg-blood/80 text-parchment font-grimoire font-extrabold tracking-widest text-sm sm:text-base shadow-[0_0_20px_rgba(220,38,38,0.5)] transition-all active:scale-[0.99]"
+                  >
+                    <Play size={18} /> INICIAR PARTIDA
+                  </button>
+                  {!canStart && (
+                    <div className="flex items-center justify-center gap-1.5 text-center text-[11px] font-mono text-amber-300 bg-black/60 py-1.5 px-3 rounded border border-amber-800/50">
+                      <ShieldAlert size={14} className="shrink-0 text-amber-400" />
+                      Mínimo de {minPlayers} jogadores para iniciar. Adicione bots ou convide amigos!
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="text-center py-2 px-3 rounded border border-iron/60 bg-black/60 font-mono text-xs text-parchment-dark flex items-center justify-center gap-2">
+                  <Crown size={14} className="text-amber-400 animate-pulse" />
+                  Aguardando o líder iniciar a partida...
+                </div>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="text-center p-3 sm:p-4 rounded border border-iron/60 bg-black/60 space-y-2">
-            <div className="font-grimoire text-xs sm:text-sm tracking-wider text-parchment animate-pulse flex items-center justify-center gap-2">
-              <Crown size={15} className="text-amber-400 shrink-0" />
-              Aguardando o líder da sala iniciar a partida...
+
+          {/* COLUNA DIREITA: CHAT DO LOBBY (5 cols) */}
+          <div className="lg:col-span-5 flex flex-col rounded-lg border-2 border-stone-800 bg-black/75 overflow-hidden">
+            <div className="px-3 py-2 border-b border-stone-800 bg-stone-900/60 flex items-center justify-between">
+              <span className="font-grimoire font-extrabold text-xs tracking-wider text-parchment flex items-center gap-1.5">
+                <MessageSquare size={13} className="text-emerald-400" /> CHAT DO LOBBY
+              </span>
+              <span className="text-[10px] font-mono text-stone-500">Ao vivo</span>
             </div>
-            <div className="text-[11px] font-mono text-parchment-dark">
-              O líder da sala pode adicionar bots ou mudar as regras antes de começar.
+
+            {/* Lista de mensagens do Chat */}
+            <div
+              ref={chatBottomRef}
+              className="flex-1 p-2.5 overflow-y-auto space-y-1.5 font-mono text-xs max-h-[260px] min-h-[160px] scrollbar-thin select-text"
+            >
+              {chatLogs.length === 0 ? (
+                <div className="text-center py-10 text-stone-500 text-[11px] italic font-mono">
+                  Nenhuma mensagem ainda no lobby. Converse com os outros jogadores!
+                </div>
+              ) : (
+                chatLogs.map((l) => (
+                  <div
+                    key={l.id}
+                    className={cn(
+                      'text-[11px] tracking-wide break-words py-0.5 transition-colors',
+                      LOG_STYLES[l.type] || 'text-parchment pl-2'
+                    )}
+                  >
+                    {l.text}
+                  </div>
+                ))
+              )}
             </div>
-            <div className="flex items-center justify-center gap-3 pt-1">
+
+            {/* Input de envio do Chat */}
+            <form onSubmit={handleSend} className="p-2 border-t border-stone-800 bg-stone-900/80 flex items-center gap-1.5">
+              <input
+                type="text"
+                value={chatText}
+                onChange={(e) => setChatText(e.target.value)}
+                maxLength={140}
+                placeholder="Falar no lobby..."
+                className="flex-1 min-h-[36px] bg-black/80 border border-stone-700 rounded px-2.5 py-1 font-typewriter text-xs text-parchment placeholder:text-stone-500 outline-none focus:border-gold-aged transition-colors"
+              />
               <button
-                onClick={onOpenGuide}
-                className="inline-flex items-center gap-1 min-h-[40px] text-[11px] font-mono text-blood-bright hover:underline"
+                type="submit"
+                disabled={!chatText.trim()}
+                onClick={() => audio.play('click')}
+                className={cn(
+                  'min-h-[36px] min-w-[36px] flex items-center justify-center rounded border font-mono text-xs transition-all active:scale-95',
+                  chatText.trim()
+                    ? 'border-gold-aged bg-blood/80 text-parchment hover:bg-blood shadow-[0_0_10px_rgba(220,38,38,0.4)]'
+                    : 'border-stone-800 bg-stone-900/40 text-stone-600 cursor-not-allowed'
+                )}
+                title="Enviar mensagem"
               >
-                <BookOpen size={12} /> Como Jogar
+                <Send size={14} />
               </button>
-              <span className="text-stone-600">·</span>
-              <button
-                onClick={onOpenSettings}
-                className="inline-flex items-center gap-1 min-h-[40px] text-[11px] font-mono text-gold-aged hover:underline"
-              >
-                <Settings size={12} /> Ver regras atuais
-              </button>
-            </div>
+            </form>
           </div>
-        )}
+        </div>
       </motion.div>
     </div>
   );
