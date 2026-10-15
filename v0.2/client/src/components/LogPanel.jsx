@@ -128,7 +128,7 @@ export default function LogPanel({ logs = [], onSendChat, isDead = false }) {
           audio.play('click');
           setMinimized(false);
         }}
-        className="absolute bottom-3 left-3 z-40 flex items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-stone-700 bg-gradient-to-r from-[#20140c] to-[#120a06] text-amber-200 text-xs font-mono font-bold shadow-[0_4px_15px_rgba(0,0,0,0.8)] hover:border-gold-aged transition-all active:scale-95"
+        className="hidden sm:inline-flex absolute bottom-3 left-3 z-40 items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-stone-700 bg-gradient-to-r from-[#20140c] to-[#120a06] text-amber-200 text-xs font-mono font-bold shadow-[0_4px_15px_rgba(0,0,0,0.8)] hover:border-gold-aged transition-all active:scale-95"
       >
         <ScrollText size={15} className="text-gold-aged" />
         <span>CRÔNICA & CHAT ({logs.length})</span>
@@ -138,7 +138,7 @@ export default function LogPanel({ logs = [], onSendChat, isDead = false }) {
   }
 
   return (
-    <div className="absolute bottom-3 left-3 z-40 w-[min(26rem,30vw)] min-w-[280px] h-[270px] flex flex-col rounded-lg border-2 border-stone-700/80 bg-gradient-to-b from-[#1c120b]/95 via-[#140c07]/95 to-[#0c0704]/98 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(212,175,55,0.15)] overflow-hidden">
+    <div className="hidden sm:flex absolute bottom-3 left-3 z-40 w-[min(26rem,30vw)] min-w-[280px] h-[270px] flex-col rounded-lg border-2 border-stone-700/80 bg-gradient-to-b from-[#1c120b]/95 via-[#140c07]/95 to-[#0c0704]/98 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(212,175,55,0.15)] overflow-hidden">
       {/* Header do Painel com Abas e Botão Minimizar */}
       <div className="px-2.5 py-1.5 border-b border-stone-800 bg-black/60 flex items-center justify-between gap-1.5 shrink-0">
         <div className="flex items-center gap-1">

@@ -426,7 +426,7 @@ export default function App() {
     <div
       ref={tableContainerRef}
       id="game-table-container"
-      className="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden scroll-smooth relative"
+      className="flex-1 min-h-0 flex flex-col overflow-y-auto sm:overflow-hidden overflow-x-hidden scroll-smooth relative"
     >
       {/* 1. MESA CERIMONIAL E MÃO DE CARTAS (Preenche a tela inicial no mobile) */}
       <div className="relative min-h-[calc(100dvh-54px)] sm:min-h-0 sm:flex-1 flex flex-col justify-between shrink-0 sm:shrink">
@@ -528,9 +528,9 @@ export default function App() {
               <div>{me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}</div>
               <button
                 onClick={scrollToUnderTable}
-                className="font-mono text-xs text-purple-300 hover:text-purple-200 underline"
+                className="sm:hidden font-mono text-xs text-purple-300 hover:text-purple-200 underline"
               >
-                Olhar Embaixo da Mesa (Chat & Crônica) ↓
+                Abrir Caderno sob a Mesa (Chat & Anotações) ↓
               </button>
             </div>
           )}
@@ -596,16 +596,16 @@ export default function App() {
           </div>
         )}
 
-        {/* Dica interativa para olhar embaixo da mesa (Mobile e telas menores) */}
-        <div className="w-full bg-gradient-to-r from-transparent via-[#25170e] to-transparent border-t border-stone-800/80 py-1.5 flex items-center justify-center shrink-0">
+        {/* Dica interativa para abrir o caderno embaixo da mesa (Exclusivo Celular) */}
+        <div className="sm:hidden w-full bg-gradient-to-r from-transparent via-[#25170e] to-transparent border-t border-stone-800/80 py-1.5 flex items-center justify-center shrink-0">
           <button
             id="btn-scroll-under-table"
             onClick={scrollToUnderTable}
             className="flex items-center gap-2 text-[11px] font-mono text-amber-300 hover:text-white transition-all py-1 px-4 rounded-full bg-black/75 border border-gold-aged/50 hover:border-gold-aged active:scale-95 shadow-sm"
-            title="Rolar para olhar embaixo da mesa (Chat & Registros)"
+            title="Rolar para abrir o caderno de anotações sob a mesa"
           >
             <ChevronDown size={14} className="animate-bounce text-gold-aged" />
-            <span className="font-bold tracking-wider">OLHAR EMBAIXO DA MESA (CHAT & CRÔNICA)</span>
+            <span className="font-bold tracking-wider">📓 ABRIR CADERNO SOB A MESA (CHAT & ANOTAÇÕES)</span>
             <ChevronDown size={14} className="animate-bounce text-gold-aged" />
           </button>
         </div>

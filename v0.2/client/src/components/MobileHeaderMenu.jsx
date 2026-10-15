@@ -144,10 +144,10 @@ export default function MobileHeaderMenu({
                   className="flex items-center justify-between px-3.5 py-2.5 rounded-lg border border-emerald-600/70 bg-emerald-950/40 text-emerald-300 hover:text-emerald-200 font-mono text-xs font-bold transition-all active:scale-98 shadow-sm"
                 >
                   <span className="flex items-center gap-2">
-                    <MessageSquare size={17} className="text-emerald-400" />
-                    <span>EMBAIXO DA MESA (CHAT & LOGS)</span>
+                    <BookOpen size={17} className="text-amber-400" />
+                    <span>CADERNO SOB A MESA (CHAT & NOTAS)</span>
                   </span>
-                  <span className="text-[10px] text-emerald-400 bg-black/40 px-2 py-0.5 rounded">ROLAR ↓</span>
+                  <span className="text-[10px] text-amber-300 bg-black/40 px-2 py-0.5 rounded">ABRIR ↓</span>
                 </button>
               )}
             </div>
