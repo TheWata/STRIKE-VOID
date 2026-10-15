@@ -58,8 +58,9 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
     bleed = (
       <motion.div
         key={`wounded-${cur}`}
-        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 overflow-hidden"
-        style={vignetteStyle('wounded', damageRatio)}
+        aria-hidden="true"
+        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-20 overflow-hidden"
+        style={{ ...vignetteStyle('wounded', damageRatio), pointerEvents: 'none' }}
         initial={{ opacity: 0 }}
         animate={reduceMotion ? { opacity: 0.9 } : { opacity: [0.65, 1, 0.65] }}
         transition={reduceMotion ? { duration: 0.6 } : { duration: 4, repeat: Infinity, ease: 'easeInOut' }}
@@ -70,8 +71,9 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
     bleed = (
       <motion.div
         key="critical"
-        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 overflow-hidden"
-        style={{ ...vignetteStyle('critical', damageRatio), transformOrigin: '50% 50%' }}
+        aria-hidden="true"
+        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-20 overflow-hidden"
+        style={{ ...vignetteStyle('critical', damageRatio), transformOrigin: '50% 50%', pointerEvents: 'none' }}
         initial={{ opacity: 0 }}
         animate={
           reduceMotion
@@ -86,35 +88,39 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
       />
     );
   } else if (mode === 'dead') {
+    // Vinheta espectral suave nas bordas para modo espectador do além (sem backdropFilter que bloqueava cliques e rolagem no navegador)
     bleed = (
       <motion.div
         key="dead"
-        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 overflow-hidden"
+        aria-hidden="true"
+        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-20 overflow-hidden"
         style={{
-          background: 'radial-gradient(ellipse 70% 85% at 50% 50%, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.78) 100%)',
-          backdropFilter: 'grayscale(1) brightness(0.62) contrast(1.1)',
-          WebkitBackdropFilter: 'grayscale(1) brightness(0.62) contrast(1.1)',
+          background:
+            'radial-gradient(ellipse 75% 85% at 50% 50%, transparent 0%, transparent 45%, rgba(28, 12, 40, 0.35) 75%, rgba(10, 4, 16, 0.68) 100%)',
+          boxShadow: 'inset 0 0 100px 28px rgba(8, 3, 14, 0.7)',
+          pointerEvents: 'none',
         }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ duration: 1.2 }}
+        transition={{ duration: 1.0 }}
       />
     );
   }
 
   return (
-    <>
+    <div className="pointer-events-none" style={{ pointerEvents: 'none' }} aria-hidden="true">
       {bleed}
       {hitKey > 0 && (
         <motion.div
           key={`flash-${hitKey}`}
-          aria-hidden
+          aria-hidden="true"
           className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 bg-red-600"
+          style={{ pointerEvents: 'none' }}
           initial={{ opacity: 0.65 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
         />
       )}
-    </>
+    </div>
   );
 }

@@ -121,24 +121,41 @@ export default function LogPanel({ logs = [], onSendChat, isDead = false }) {
   const [filter, setFilter] = useState('all'); // 'all' | 'chat' | 'combat'
   const [minimized, setMinimized] = useState(false);
 
+  // Se o jogador for eliminado, abre o chat no desktop automaticamente para poder interagir
+  useEffect(() => {
+    if (isDead) {
+      setMinimized(false);
+    }
+  }, [isDead]);
+
   if (minimized) {
     return (
       <button
+        id="btn-unminimize-log"
         onClick={() => {
           audio.play('click');
           setMinimized(false);
         }}
-        className="hidden sm:inline-flex absolute bottom-3 left-3 z-40 items-center gap-2 px-3 py-1.5 rounded-lg border-2 border-stone-700 bg-gradient-to-r from-[#20140c] to-[#120a06] text-amber-200 text-xs font-mono font-bold shadow-[0_4px_15px_rgba(0,0,0,0.8)] hover:border-gold-aged transition-all active:scale-95"
+        className={cn(
+          'hidden sm:inline-flex absolute bottom-3 left-3 z-50 items-center gap-2 px-3 py-1.5 rounded-lg border-2 shadow-[0_4px_15px_rgba(0,0,0,0.8)] transition-all active:scale-95',
+          isDead
+            ? 'border-purple-500 bg-gradient-to-r from-purple-950 to-[#140a1c] text-purple-200 hover:border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.35)]'
+            : 'border-stone-700 bg-gradient-to-r from-[#20140c] to-[#120a06] text-amber-200 hover:border-gold-aged'
+        )}
       >
-        <ScrollText size={15} className="text-gold-aged" />
-        <span>CRÔNICA & CHAT ({logs.length})</span>
+        {isDead ? (
+          <Ghost size={15} className="text-purple-400 animate-pulse" />
+        ) : (
+          <ScrollText size={15} className="text-gold-aged" />
+        )}
+        <span>{isDead ? '💀 CHAT DO ALÉM' : 'CRÔNICA & CHAT'} ({logs.length})</span>
         <ChevronUp size={14} />
       </button>
     );
   }
 
   return (
-    <div className="hidden sm:flex absolute bottom-3 left-3 z-40 w-[min(26rem,30vw)] min-w-[280px] h-[270px] flex-col rounded-lg border-2 border-stone-700/80 bg-gradient-to-b from-[#1c120b]/95 via-[#140c07]/95 to-[#0c0704]/98 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(212,175,55,0.15)] overflow-hidden">
+    <div className="hidden sm:flex absolute bottom-3 left-3 z-50 w-[min(26rem,30vw)] min-w-[280px] h-[270px] flex-col rounded-lg border-2 border-stone-700/80 bg-gradient-to-b from-[#1c120b]/95 via-[#140c07]/95 to-[#0c0704]/98 backdrop-blur-md shadow-[0_8px_30px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(212,175,55,0.15)] overflow-hidden">
       {/* Header do Painel com Abas e Botão Minimizar */}
       <div className="px-2.5 py-1.5 border-b border-stone-800 bg-black/60 flex items-center justify-between gap-1.5 shrink-0">
         <div className="flex items-center gap-1">
@@ -165,7 +182,9 @@ export default function LogPanel({ logs = [], onSendChat, isDead = false }) {
             className={cn(
               'px-2 py-0.5 rounded text-[10px] font-mono font-bold transition-all flex items-center gap-1',
               filter === 'chat'
-                ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/60 shadow-sm'
+                ? isDead
+                  ? 'bg-purple-950/70 text-purple-200 border border-purple-500/70 shadow-sm'
+                  : 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/60 shadow-sm'
                 : 'text-stone-400 hover:text-emerald-300'
             )}
           >
@@ -188,17 +207,26 @@ export default function LogPanel({ logs = [], onSendChat, isDead = false }) {
           </button>
         </div>
 
-        <button
-          onClick={() => {
-            audio.play('click');
-            setMinimized(true);
-          }}
-          className="p-1 rounded text-stone-400 hover:text-parchment hover:bg-stone-800/60 transition-colors"
-          title="Minimizar painel"
-          aria-label="Minimizar painel"
-        >
-          <ChevronDown size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          {isDead && (
+            <span className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-950/80 border border-purple-500/60 text-purple-300">
+              <Ghost size={11} className="text-purple-400" />
+              <span>ALÉM</span>
+            </span>
+          )}
+
+          <button
+            onClick={() => {
+              audio.play('click');
+              setMinimized(true);
+            }}
+            className="p-1 rounded text-stone-400 hover:text-parchment hover:bg-stone-800/60 transition-colors"
+            title="Minimizar painel"
+            aria-label="Minimizar painel"
+          >
+            <ChevronDown size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Lista de Registros com Scroll e Alto Contraste */}

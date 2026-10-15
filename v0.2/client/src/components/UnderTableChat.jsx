@@ -241,6 +241,28 @@ export default function UnderTableChat({
         </div>
       )}
 
+      {/* 2.1 STATUS DO ALÉM (ESPECTADOR MORTO) */}
+      {isDead && (
+        <div className="relative z-20 mx-3 mt-2 px-3 py-2 rounded bg-gradient-to-r from-purple-950 via-[#230f35] to-purple-950 border-2 border-purple-500/80 text-purple-200 flex items-center justify-between gap-2 shadow-[0_4px_16px_rgba(0,0,0,0.8)]">
+          <div className="flex items-center gap-2 font-typewriter text-xs font-semibold text-purple-200">
+            <Ghost size={16} className="text-purple-400 shrink-0 animate-pulse" />
+            <span>VOCÊ ESTÁ NO ALÉM: SUAS ANOTAÇÕES TÊM TINTA ESPECTRAL</span>
+          </div>
+          {onScrollToTable && (
+            <button
+              onClick={() => {
+                audio.play('click');
+                onScrollToTable();
+              }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/80 border border-purple-400 text-purple-300 font-mono text-[10px] font-bold shrink-0 hover:bg-purple-950/60 active:scale-95"
+            >
+              <ArrowUp size={11} />
+              <span>VER MESA</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* 3. O CADERNO DE ANOTAÇÕES VELHO (Físico: Capa de couro, folhas amareladas e espiral 3D) */}
       <div className="mx-2.5 my-3 relative">
         {/* Sombra realista projetada pelo caderno sobre a madeira escura */}

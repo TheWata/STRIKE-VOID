@@ -18,6 +18,8 @@ import {
   Menu,
   X,
   ChevronDown,
+  Ghost,
+  MessageSquare,
 } from 'lucide-react';
 import { socket } from './lib/socket';
 import { cn } from './lib/cn';
@@ -66,6 +68,10 @@ export default function App() {
     const el = document.getElementById('under-table-chat');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
+    }
+    if (tableContainerRef.current) {
+      const topPos = el ? el.offsetTop : tableContainerRef.current.scrollHeight;
+      tableContainerRef.current.scrollTo({ top: topPos, behavior: 'smooth' });
     }
   }, []);
 
@@ -528,14 +534,40 @@ export default function App() {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="font-grimoire text-parchment-dark tracking-widest text-xs sm:text-sm pb-4 sm:pb-8 text-center space-y-1">
-              <div>{me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}</div>
-              <button
-                onClick={scrollToUnderTable}
-                className="sm:hidden font-mono text-xs text-purple-300 hover:text-purple-200 underline"
-              >
-                Abrir Caderno sob a Mesa (Chat & Anotações) ↓
-              </button>
+            <div className="flex flex-col items-center justify-center gap-2 pb-3 sm:pb-6 text-center px-3 z-40 max-w-md mx-auto">
+              <div className="flex items-center gap-2 font-grimoire text-purple-300 tracking-widest text-xs sm:text-sm drop-shadow-md">
+                <Ghost size={16} className="text-purple-400 animate-pulse shrink-0" />
+                <span>{me ? 'VOCÊ FOI ELIMINADO — MODO ESPECTADOR' : 'MODO ESPECTADOR'}</span>
+                <Ghost size={16} className="text-purple-400 animate-pulse shrink-0" />
+              </div>
+              <p className="text-[11px] font-mono text-stone-400 leading-tight">
+                Seu corpo sucumbiu, mas você pode continuar assistindo à partida e interagindo no chat!
+              </p>
+
+              <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                {/* No celular: Botão proeminente para rolar até o caderno de anotações e chat sob a mesa */}
+                <button
+                  id="btn-dead-mobile-open-notebook"
+                  onClick={scrollToUnderTable}
+                  className="sm:hidden flex items-center justify-center gap-2 px-4 py-2 rounded-lg border-2 border-purple-500 bg-gradient-to-r from-purple-950 via-[#210e2e] to-purple-950 text-purple-200 font-mono text-xs font-bold shadow-[0_0_18px_rgba(168,85,247,0.4)] hover:border-purple-400 active:scale-95 transition-all"
+                >
+                  <BookOpen size={15} className="text-amber-300" />
+                  <span>ABRIR CADERNO SOB A MESA (CHAT) ↓</span>
+                </button>
+
+                {/* No desktop: Botão para focar o chat flutuante no canto */}
+                <button
+                  id="btn-dead-desktop-focus-chat"
+                  onClick={() => {
+                    const el = document.querySelector('#log-panel input, input[placeholder*="Falar"]');
+                    if (el) el.focus();
+                  }}
+                  className="hidden sm:inline-flex items-center justify-center gap-2 px-4 py-1.5 rounded-lg border border-purple-500/70 bg-purple-950/70 text-purple-200 font-mono text-xs font-bold hover:bg-purple-900 shadow-[0_0_12px_rgba(168,85,247,0.3)] active:scale-95 transition-all"
+                >
+                  <MessageSquare size={14} className="text-purple-300" />
+                  <span>DIGITAR NO CHAT DA MESA</span>
+                </button>
+              </div>
             </div>
           )}
         </footer>
@@ -605,12 +637,27 @@ export default function App() {
           <button
             id="btn-scroll-under-table"
             onClick={scrollToUnderTable}
-            className="flex items-center gap-2 text-[11px] font-mono text-amber-300 hover:text-white transition-all py-1 px-4 rounded-full bg-black/75 border border-gold-aged/50 hover:border-gold-aged active:scale-95 shadow-sm"
+            className={cn(
+              'flex items-center gap-2 text-[11px] font-mono transition-all py-1 px-4 rounded-full border active:scale-95 shadow-sm',
+              isDead
+                ? 'text-purple-200 bg-purple-950/80 border-purple-500/70 hover:border-purple-400 shadow-[0_0_12px_rgba(168,85,247,0.35)]'
+                : 'text-amber-300 hover:text-white bg-black/75 border-gold-aged/50 hover:border-gold-aged'
+            )}
             title="Rolar para abrir o caderno de anotações sob a mesa"
           >
-            <ChevronDown size={14} className="animate-bounce text-gold-aged" />
-            <span className="font-bold tracking-wider">📓 ABRIR CADERNO SOB A MESA (CHAT & ANOTAÇÕES)</span>
-            <ChevronDown size={14} className="animate-bounce text-gold-aged" />
+            {isDead ? (
+              <>
+                <Ghost size={14} className="animate-pulse text-purple-400" />
+                <span className="font-bold tracking-wider">📓 CADERNO DE CHAT DO ALÉM (SOB A MESA)</span>
+                <ChevronDown size={14} className="animate-bounce text-purple-400" />
+              </>
+            ) : (
+              <>
+                <ChevronDown size={14} className="animate-bounce text-gold-aged" />
+                <span className="font-bold tracking-wider">📓 ABRIR CADERNO SOB A MESA (CHAT & ANOTAÇÕES)</span>
+                <ChevronDown size={14} className="animate-bounce text-gold-aged" />
+              </>
+            )}
           </button>
         </div>
       </div>
