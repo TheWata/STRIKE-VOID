@@ -399,9 +399,13 @@ export default function App() {
   const isDead = me ? !me.isAlive : false;
   const handleSendChat = useCallback((text) => {
     if (!text || !text.trim()) return;
-    audio.play('click');
+    if (compact) {
+      audio.play('scribble');
+    } else {
+      audio.play('click');
+    }
     socket.emit('send_chat', { text: text.trim() });
-  }, []);
+  }, [compact]);
 
   const handleCopyHeaderCode = () => {
     if (gameState?.roomCode) {

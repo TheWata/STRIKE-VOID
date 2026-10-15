@@ -449,6 +449,31 @@ const SFX = {
     tone({ freq: 620, to: 320, type: 'triangle', t, dur: 0.06, vol: 0.14 });
     noise({ t, dur: 0.03, vol: 0.06, type: 'highpass', f1: 3000 });
   },
+  scribble: (t) => {
+    // Traços de ponta de lápis/caneta arranhando fibra de papel envelhecido
+    const strokes = [0, 0.05, 0.11, 0.18];
+    strokes.forEach((offset) => {
+      const st = t + offset;
+      const dur = 0.038 + rand(0.01, 0.025);
+      noise({
+        t: st,
+        dur,
+        vol: rand(0.22, 0.34),
+        type: 'bandpass',
+        f1: rand(3200, 5400),
+        f2: rand(1900, 3600),
+        q: 2.6,
+      });
+      tone({
+        freq: rand(400, 650),
+        to: rand(180, 280),
+        type: 'triangle',
+        t: st,
+        dur: 0.025,
+        vol: 0.04,
+      });
+    });
+  },
   select: (t) => {
     tone({ freq: 330, type: 'triangle', t, dur: 0.1, vol: 0.14 });
     tone({ freq: 495, type: 'sine', t: t + 0.04, dur: 0.14, vol: 0.1 });

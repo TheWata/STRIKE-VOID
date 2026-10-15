@@ -11,11 +11,13 @@ import {
   BookOpen,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
-import { LOG_STYLES } from '../lib/constants';
 import { audio } from '../lib/audio';
 
-/** Lista formatada como páginas pautadas de um caderno de anotações antigo */
-function NotebookLogList({ logs, filter, id }) {
+/**
+ * Registros formatados com tinta autêntica (tinteiro, grafite e carimbo)
+ * sobre a folha pautada amarelada de um caderno antigo.
+ */
+function YellowNotebookLogList({ logs, filter, id }) {
   const scrollRef = useRef(null);
 
   const filteredLogs = logs.filter((l) => {
@@ -34,38 +36,63 @@ function NotebookLogList({ logs, filter, id }) {
     <div
       ref={scrollRef}
       id={id}
-      className="overflow-y-auto max-h-[380px] min-h-[300px] p-3 pl-8 sm:pl-10 font-typewriter text-xs leading-relaxed space-y-2 select-text scrollbar-thin"
+      className="overflow-y-auto max-h-[390px] min-h-[300px] py-3 pr-3 pl-2 sm:pl-3 font-typewriter text-[12px] leading-[28px] space-y-1 select-text scrollbar-thin"
     >
       {filteredLogs.length === 0 ? (
-        <div className="text-center py-8 text-stone-500 text-xs italic font-typewriter">
+        <div className="text-center py-10 text-[#8c785b] text-xs italic font-typewriter">
           {filter === 'chat'
-            ? 'Nenhum bilhete rabiscado ainda. Passe um recado sob a mesa...'
-            : 'Páginas em branco. Nenhum acontecimento registrado ainda.'}
+            ? '— Nenhuma anotação clandestina ainda. Rabisque um bilhete abaixo... —'
+            : '— Folha limpa. Nenhum acontecimento registrado neste caderno ainda. —'}
         </div>
       ) : (
         filteredLogs.map((l) => {
-          const isChat = l.type === 'CHAT' || l.type === 'CHAT_DEAD';
+          const isChat = l.type === 'CHAT';
           const isDeadChat = l.type === 'CHAT_DEAD';
+
+          // Tinta sobre papel amarelado autêntico
+          let inkStyle = 'text-[#2a1b12]'; // Tinta padrão (sépia escuro)
+          let tagBg = 'bg-[#e2d0ab]/70 text-[#2c1d13] border-[#9c8462]';
+
+          if (isDeadChat) {
+            inkStyle = 'text-[#4c1d95] italic font-semibold';
+            tagBg = 'bg-purple-200/80 text-purple-900 border-purple-400';
+          } else if (isChat) {
+            inkStyle = 'text-[#1a1108] font-bold';
+            tagBg = 'bg-amber-200/80 text-amber-950 border-amber-600';
+          } else if (l.type === 'DAMAGE' || l.type === 'DEATH') {
+            inkStyle = 'text-[#881337] font-semibold';
+            tagBg = 'bg-rose-200/90 text-rose-950 border-rose-500';
+          } else if (l.type === 'WALL' || l.type === 'BREAK') {
+            inkStyle = 'text-[#1e3a8a] font-semibold';
+            tagBg = 'bg-blue-200/80 text-blue-950 border-blue-500';
+          } else if (l.type === 'VACUUM' || l.type === 'REFLECT') {
+            inkStyle = 'text-[#701a75] font-semibold';
+            tagBg = 'bg-fuchsia-200/80 text-fuchsia-950 border-fuchsia-500';
+          } else if (l.type === 'SYSTEM') {
+            inkStyle = 'text-[#57534e] italic';
+            tagBg = 'bg-stone-300/80 text-stone-900 border-stone-500';
+          }
 
           return (
             <div
               key={l.id}
               className={cn(
-                'relative pl-2.5 py-1 text-xs break-words rounded transition-colors',
-                isDeadChat
-                  ? 'text-purple-300 italic bg-purple-950/25 border-l-2 border-purple-500/80 shadow-sm'
-                  : isChat
-                    ? 'text-amber-200 font-medium bg-[#1d140d]/60 border-l-2 border-gold-aged/70'
-                    : LOG_STYLES[l.type] || 'text-parchment border-l-2 border-stone-600 pl-2'
+                'relative pl-2 py-0.5 rounded transition-colors break-words',
+                inkStyle
               )}
             >
-              {!isChat && (
-                <span className="opacity-60 text-[10px] font-mono mr-1.5 font-bold uppercase tracking-wider">
-                  [R{l.round}]
+              {!isChat && !isDeadChat && (
+                <span
+                  className={cn(
+                    'inline-block text-[9.5px] font-mono mr-1.5 px-1 py-0 rounded border font-bold uppercase tracking-wider',
+                    tagBg
+                  )}
+                >
+                  R{l.round}
                 </span>
               )}
-              {isDeadChat && <Ghost size={12} className="inline mr-1 text-purple-400" />}
-              {l.text}
+              {isDeadChat && <Ghost size={13} className="inline mr-1 text-[#6b21a8]" />}
+              <span>{l.text}</span>
             </div>
           );
         })
@@ -74,7 +101,7 @@ function NotebookLogList({ logs, filter, id }) {
   );
 }
 
-/** Input estilizado como anotação a caneta/tinteiro */
+/** Formulário estilizado como caneta tinteiro escrevendo na margem do caderno */
 function NotebookChatInput({ onSendChat, isDead }) {
   const [text, setText] = useState('');
 
@@ -89,7 +116,7 @@ function NotebookChatInput({ onSendChat, isDead }) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex items-center gap-2 p-2.5 bg-[#170f09] border-t-2 border-[#382415] shrink-0"
+      className="flex items-center gap-2 p-3 bg-gradient-to-r from-[#ebdcb9] via-[#e5d4ad] to-[#ebdcb9] border-t-2 border-[#b89f78] shadow-inner"
     >
       <div className="relative flex-1">
         <input
@@ -100,18 +127,18 @@ function NotebookChatInput({ onSendChat, isDead }) {
           placeholder={
             isDead
               ? '💀 Sussurrar do além com tinta espectral...'
-              : '✍️ Rabiscar bilhete clandestino sob a mesa...'
+              : '✍️ Rabiscar bilhete clandestino a tinta...'
           }
           className={cn(
-            'w-full min-h-[38px] px-3 py-1.5 rounded bg-[#100a06] border font-typewriter text-xs text-amber-100 placeholder:text-stone-500 outline-none transition-colors shadow-inner',
+            'w-full min-h-[38px] px-3 py-1.5 rounded-sm bg-[#fbf5e6] border-2 font-typewriter text-xs text-[#1e1107] placeholder:text-[#8f7b5f] outline-none transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]',
             isDead
-              ? 'border-purple-600/70 focus:border-purple-400 focus:shadow-[0_0_10px_rgba(168,85,247,0.3)]'
-              : 'border-[#4a3220] focus:border-gold-aged focus:shadow-[0_0_10px_rgba(212,175,55,0.25)]'
+              ? 'border-purple-600 focus:border-purple-700 focus:bg-purple-50/90'
+              : 'border-[#9e835e] focus:border-[#523318] focus:bg-white'
           )}
         />
         {isDead && (
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-purple-400 pointer-events-none">
-            <Ghost size={15} />
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-purple-700 pointer-events-none">
+            <Ghost size={16} />
           </span>
         )}
       </div>
@@ -120,26 +147,29 @@ function NotebookChatInput({ onSendChat, isDead }) {
         type="submit"
         disabled={!text.trim()}
         className={cn(
-          'min-h-[38px] px-3.5 flex items-center justify-center gap-1.5 rounded border font-mono text-xs font-bold transition-all active:scale-95 shadow-sm',
+          'min-h-[38px] px-3.5 flex items-center justify-center gap-1.5 rounded-sm border-2 font-typewriter text-xs font-bold transition-all active:scale-95 shadow-md',
           text.trim()
             ? isDead
-              ? 'border-purple-500 bg-purple-900/70 text-purple-200 hover:bg-purple-800 shadow-[0_0_10px_rgba(168,85,247,0.4)]'
-              : 'border-gold-aged bg-gradient-to-r from-blood/90 to-amber-900/90 text-parchment hover:bg-blood shadow-[0_0_12px_rgba(212,175,55,0.3)]'
-            : 'border-stone-800 bg-stone-900/40 text-stone-600 cursor-not-allowed'
+              ? 'border-purple-800 bg-purple-900 text-purple-100 hover:bg-purple-950'
+              : 'border-[#4a2e16] bg-gradient-to-b from-[#3a2211] to-[#241308] text-[#f4ebd9] hover:bg-[#1a0c04]'
+            : 'border-[#c4b394] bg-[#ded0b6] text-[#9c896d] cursor-not-allowed shadow-none'
         )}
         title="Enviar anotação clandestina [Enter]"
-        aria-label="Enviar mensagem"
+        aria-label="Enviar anotação"
       >
         <PenTool size={13} className="shrink-0" />
-        <span className="hidden xs:inline">RABISCAR</span>
+        <span>RABISCAR</span>
       </button>
     </form>
   );
 }
 
 /**
- * UnderTableChat: Caderno de anotações velho exclusivo para celular.
- * Mostra o chat e as ações logo abaixo das cartas ao rolar a página para baixo.
+ * UnderTableChat:
+ * Visual autêntico de um Caderno de Anotações Velho com Folhas Amareladas,
+ * argolas espirais no topo, pautas de caderno, margem vermelha e efeitos táteis.
+ * EXCLUSIVO PARA O CELULAR (sm:hidden).
+ * Reproduz som de rabisco no mobile apenas quando jogadores enviam mensagens.
  */
 export default function UnderTableChat({
   logs = [],
@@ -150,29 +180,51 @@ export default function UnderTableChat({
   onScrollToTable,
 }) {
   const [filter, setFilter] = useState('all'); // 'all' | 'chat' | 'combat'
+  const prevChatCountRef = useRef(null);
+  const justSentRef = useRef(false);
 
-  const chatCount = logs.filter((l) => l.type === 'CHAT' || l.type === 'CHAT_DEAD').length;
+  const chatLogs = logs.filter((l) => l.type === 'CHAT' || l.type === 'CHAT_DEAD');
+  const chatCount = chatLogs.length;
   const combatCount = logs.filter((l) => l.type !== 'CHAT' && l.type !== 'CHAT_DEAD' && l.type !== 'SYSTEM').length;
+
+  // Toca o som de rabiscar no papel APENAS quando JOGADORES mandam mensagem
+  useEffect(() => {
+    if (prevChatCountRef.current !== null && chatCount > prevChatCountRef.current) {
+      if (!justSentRef.current) {
+        audio.play('scribble');
+      }
+      justSentRef.current = false;
+    }
+    prevChatCountRef.current = chatCount;
+  }, [chatCount]);
+
+  const handleSendChatWithSound = (clean) => {
+    justSentRef.current = true;
+    audio.play('scribble');
+    onSendChat?.(clean);
+  };
 
   return (
     <section
       id="under-table-chat"
-      className="sm:hidden w-full shrink-0 flex flex-col relative pb-safe bg-[#0d0704] text-parchment select-text"
+      className="sm:hidden w-full shrink-0 flex flex-col relative pb-safe bg-[#0a0604] select-text"
     >
-      {/* 1. TRANSIÇÃO: A Espiadela Embaixo da Madeira */}
-      <div className="w-full bg-[#160d07] px-3 py-1.5 border-t-4 border-[#301c10] shadow-[inset_0_12px_20px_rgba(0,0,0,0.9)] flex items-center justify-between text-[11px] font-mono text-stone-400">
+      {/* 1. O ESPAÇO ESCURO SOB A MESA (Vigas de madeira e sombra do tampo) */}
+      <div className="w-full bg-[#120a06] px-3 py-2 border-t-4 border-[#2c1a0e] shadow-[inset_0_16px_28px_rgba(0,0,0,0.95)] flex items-center justify-between text-[11px] font-mono text-stone-400">
         <span className="flex items-center gap-1.5 text-amber-200/90 font-bold">
-          <span>🪵 SOB A MESA CERIMONIAL</span>
+          <span>🪵 ESCONDIDO SOB A MESA CERIMONIAL</span>
         </span>
-        <span className="text-[10px] text-stone-500 italic">"caderno de notas clandestinas"</span>
+        <span className="text-[10px] text-amber-400/80 font-mono tracking-wider">
+          CADERNO DE CAMPO
+        </span>
       </div>
 
-      {/* 2. ALERTA DE VEZ: Bilhete urgente anexado ao caderno quando for hora de jogar */}
+      {/* 2. LEMBRETE DE VEZ: Bilhete urgente anexado ao topo do caderno com clipe */}
       {canAct && phase === 'PLANNING' && (
-        <div className="relative z-20 mx-2 mt-2 px-3 py-2 rounded-lg bg-gradient-to-r from-red-950 via-blood/90 to-red-950 border-2 border-gold-aged flex items-center justify-between gap-2 shadow-[0_0_15px_rgba(220,38,38,0.5)] animate-pulse">
-          <div className="flex items-center gap-1.5 font-typewriter text-xs font-bold text-amber-100">
-            <AlertCircle size={15} className="text-gold-aged shrink-0" />
-            <span>SUA VEZ DE AGIR! COLOQUE SUA CARTA!</span>
+        <div className="relative z-20 mx-3 mt-2 px-3 py-2.5 rounded bg-gradient-to-r from-red-900 via-blood to-red-950 border-2 border-[#d4af37] text-white flex items-center justify-between gap-2 shadow-[0_4px_16px_rgba(0,0,0,0.8)] animate-pulse">
+          <div className="flex items-center gap-2 font-typewriter text-xs font-bold text-amber-100">
+            <span className="text-base">📎</span>
+            <span>SUA VEZ DE JOGAR! SUBA PARA A MESA!</span>
           </div>
           {onScrollToTable && (
             <button
@@ -183,122 +235,139 @@ export default function UnderTableChat({
               className="flex items-center gap-1 px-2.5 py-1 rounded bg-black/85 border border-gold-aged text-gold-aged font-mono font-bold text-[11px] hover:bg-gold-aged/20 active:scale-95 shadow-sm"
             >
               <ArrowUp size={12} />
-              <span>SUBIR À MESA</span>
+              <span>SUBIR</span>
             </button>
           )}
         </div>
       )}
 
-      {/* 3. O CADERNO VELHO (Encadernação, argolas e capa de couro desgastado) */}
-      <div className="mx-2 my-2.5 rounded-xl border-4 border-[#382315] bg-[#1a110a] shadow-[0_15px_40px_rgba(0,0,0,0.95)] overflow-hidden flex flex-col">
-        {/* Espiral / Argolas do topo do caderno */}
-        <div className="flex justify-between items-center px-4 py-1.5 bg-[#25180f] border-b-2 border-[#120a05] shadow-inner select-none">
-          <div className="flex items-center gap-2">
-            <BookOpen size={14} className="text-gold-aged" />
-            <span className="font-grimoire font-extrabold text-xs tracking-wider text-amber-200">
-              DIÁRIO DE ANOTAÇÕES
-            </span>
+      {/* 3. O CADERNO DE ANOTAÇÕES VELHO (Físico: Capa de couro, folhas amareladas e espiral 3D) */}
+      <div className="mx-2.5 my-3 relative">
+        {/* Sombra realista projetada pelo caderno sobre a madeira escura */}
+        <div className="rounded-xl overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.95),0_0_0_1px_rgba(40,25,15,0.8)] border-2 border-[#452b19]">
+          
+          {/* TOPO: Espiral de arame metálico 3D ligando as folhas amareladas */}
+          <div className="relative z-20 bg-gradient-to-b from-[#2b1b11] via-[#1f130b] to-[#160d07] px-3 pt-3 pb-2 border-b border-[#3d2716] shadow-md">
+            {/* Argolas espirais com furos na folha */}
+            <div className="flex justify-around items-center px-2">
+              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((n) => (
+                <div key={n} className="flex flex-col items-center">
+                  {/* Fio espiral metálico em arco 3D */}
+                  <div className="w-2.5 h-6 rounded-full bg-gradient-to-r from-[#948168] via-[#e2d5c3] to-[#423321] shadow-[0_4px_6px_rgba(0,0,0,0.9)] border border-[#261b11] -mb-2 z-10" />
+                  {/* Furo oval recortado no papel */}
+                  <div className="w-3 h-2.5 rounded-full bg-[#120a05] border border-[#382314] shadow-inner" />
+                </div>
+              ))}
+            </div>
+
+            {/* Título gravado a ferro quente no topo da capa */}
+            <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#352012]/80">
+              <div className="flex items-center gap-1.5">
+                <BookOpen size={13} className="text-[#cbb892]" />
+                <span className="font-grimoire font-black tracking-widest text-[#d8c39e] text-xs">
+                  DIÁRIO DE NOTAS CLANDESTINAS
+                </span>
+              </div>
+
+              {/* Marcador de fita / Subir para a mesa */}
+              {onScrollToTable && (
+                <button
+                  id="btn-notebook-back-to-table"
+                  onClick={() => {
+                    audio.play('click');
+                    onScrollToTable();
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-0.5 rounded-sm bg-gradient-to-r from-blood to-red-950 border border-gold-aged text-[#f4ebd9] font-mono text-[10px] font-bold shadow active:scale-95 transition-all"
+                  title="Fechar caderno e voltar para as cartas na mesa"
+                >
+                  <ArrowUp size={12} />
+                  <span>SUBIR À MESA</span>
+                </button>
+              )}
+            </div>
           </div>
 
-          {/* Furos e Argolas Metálicas do Caderno */}
-          <div className="flex items-center gap-1.5">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="w-2 h-4 rounded-full bg-gradient-to-b from-[#8c7457] via-[#4a3a2a] to-[#1a120b] border border-[#26170d] shadow-sm"
-              />
-            ))}
-          </div>
-
-          {/* Botão de Fechar Caderno / Subir para a Mesa */}
-          {onScrollToTable && (
+          {/* MARCADORES DE PÁGINA (Abas tipo papel post-it presas no topo da folha) */}
+          <div className="flex items-center gap-1.5 px-3 pt-2 pb-1 bg-[#23150d] border-b border-[#3d2716] overflow-x-auto select-none">
             <button
-              id="btn-notebook-back-to-table"
               onClick={() => {
-                audio.play('click');
-                onScrollToTable();
+                audio.play('select');
+                setFilter('all');
               }}
-              className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/80 border border-gold-aged/80 text-gold-aged font-mono text-[10px] font-bold hover:bg-gold-aged/20 active:scale-95 transition-all shadow-sm"
-              title="Voltar para a mesa de cartas"
+              className={cn(
+                'px-3 py-1 rounded-t-sm text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2 shadow-sm',
+                filter === 'all'
+                  ? 'bg-[#f4e8cb] text-[#1c1208] border-[#9c8462] -mb-[1px] z-10'
+                  : 'bg-[#ab9776]/70 text-[#2b1c11] border-[#7d694b] hover:bg-[#c2b090]'
+              )}
             >
-              <ArrowUp size={12} />
-              <span>SUBIR</span>
+              📜 TODAS ({logs.length})
             </button>
-          )}
+
+            <button
+              onClick={() => {
+                audio.play('select');
+                setFilter('chat');
+              }}
+              className={cn(
+                'px-3 py-1 rounded-t-sm text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2 shadow-sm flex items-center gap-1',
+                filter === 'chat'
+                  ? 'bg-[#f4e8cb] text-[#1c1208] border-amber-600 -mb-[1px] z-10'
+                  : 'bg-[#ab9776]/70 text-[#2b1c11] border-[#7d694b] hover:bg-[#c2b090]'
+              )}
+            >
+              <MessageSquare size={11} className="text-amber-800" />
+              <span>BILHETES ({chatCount})</span>
+            </button>
+
+            <button
+              onClick={() => {
+                audio.play('select');
+                setFilter('combat');
+              }}
+              className={cn(
+                'px-3 py-1 rounded-t-sm text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2 shadow-sm flex items-center gap-1',
+                filter === 'combat'
+                  ? 'bg-[#f4e8cb] text-[#881337] border-rose-600 -mb-[1px] z-10'
+                  : 'bg-[#ab9776]/70 text-[#2b1c11] border-[#7d694b] hover:bg-[#c2b090]'
+              )}
+            >
+              <Swords size={11} className="text-rose-800" />
+              <span>GOLPES ({combatCount})</span>
+            </button>
+          </div>
+
+          {/* 4. A FOLHA AMARELADA REAL (Parchment pautado, margem vermelha e textura) */}
+          <div
+            className="relative bg-[#f4e8cb] shadow-[inset_0_0_40px_rgba(160,130,80,0.35)]"
+            style={{
+              backgroundImage:
+                'repeating-linear-gradient(transparent, transparent 27px, rgba(120, 145, 180, 0.38) 28px)',
+            }}
+          >
+            {/* Mancha d'água / envelhecimento de xícara de café sutil no papel */}
+            <div className="absolute top-10 right-4 w-24 h-24 rounded-full border border-[#c4ab7e]/40 pointer-events-none opacity-40 -rotate-12" />
+
+            {/* Linha de Margem Vermelha de caderno escolar antigo */}
+            <div className="absolute top-0 bottom-0 left-7 sm:left-8 w-[1.5px] bg-[#d96666]/60 pointer-events-none" />
+
+            {/* Furos de fichário tradicionais na margem esquerda */}
+            <div className="absolute top-12 left-2 w-2.5 h-2.5 rounded-full bg-[#1b1008] border border-[#a89069] shadow-inner pointer-events-none" />
+            <div className="absolute top-1/2 -translate-y-1/2 left-2 w-2.5 h-2.5 rounded-full bg-[#1b1008] border border-[#a89069] shadow-inner pointer-events-none" />
+            <div className="absolute bottom-12 left-2 w-2.5 h-2.5 rounded-full bg-[#1b1008] border border-[#a89069] shadow-inner pointer-events-none" />
+
+            {/* Lista de anotações com tinta sobre a folha amarelada */}
+            <div className="ml-7 sm:ml-8">
+              <YellowNotebookLogList logs={logs} filter={filter} id="notebook-logs-list" />
+            </div>
+          </div>
+
+          {/* 5. ÁREA DE ESCRITA A CANETA (Input de chat no pé da página) */}
+          <NotebookChatInput onSendChat={handleSendChatWithSound} isDead={isDead} />
         </div>
 
-        {/* Abas do Caderno (Marcadores de página tipo post-it rústicos) */}
-        <div className="flex items-center gap-1 px-3 pt-2 pb-1.5 bg-[#1e130c] border-b border-[#301c10] overflow-x-auto select-none">
-          <button
-            onClick={() => {
-              audio.play('select');
-              setFilter('all');
-            }}
-            className={cn(
-              'px-2.5 py-1 rounded-t-md text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2',
-              filter === 'all'
-                ? 'bg-[#18110b] text-amber-200 border-gold-aged shadow-sm'
-                : 'bg-black/50 text-stone-400 border-stone-800 hover:text-parchment'
-            )}
-          >
-            📜 TODAS ({logs.length})
-          </button>
-
-          <button
-            onClick={() => {
-              audio.play('select');
-              setFilter('chat');
-            }}
-            className={cn(
-              'px-2.5 py-1 rounded-t-md text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2 flex items-center gap-1',
-              filter === 'chat'
-                ? 'bg-[#18110b] text-emerald-300 border-emerald-500 shadow-sm'
-                : 'bg-black/50 text-stone-400 border-stone-800 hover:text-emerald-300'
-            )}
-          >
-            <MessageSquare size={11} />
-            <span>BILHETES ({chatCount})</span>
-          </button>
-
-          <button
-            onClick={() => {
-              audio.play('select');
-              setFilter('combat');
-            }}
-            className={cn(
-              'px-2.5 py-1 rounded-t-md text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2 flex items-center gap-1',
-              filter === 'combat'
-                ? 'bg-[#18110b] text-red-300 border-blood-bright shadow-sm'
-                : 'bg-black/50 text-stone-400 border-stone-800 hover:text-red-300'
-            )}
-          >
-            <Swords size={11} />
-            <span>GOLPES ({combatCount})</span>
-          </button>
-        </div>
-
-        {/* 4. A FOLHA PAUTADA (Textura de papel envelhecido com pautas e margem vermelha) */}
-        <div
-          className="relative flex-1 bg-[#18110b] shadow-[inset_0_0_30px_rgba(0,0,0,0.85)]"
-          style={{
-            backgroundImage:
-              'repeating-linear-gradient(transparent, transparent 27px, rgba(212, 175, 55, 0.08) 28px)',
-          }}
-        >
-          {/* Linha de margem vermelha de caderno escolar antigo */}
-          <div className="absolute top-0 bottom-0 left-6 sm:left-7 w-[1.5px] bg-red-800/40 pointer-events-none" />
-
-          {/* Furos de fichário na margem esquerda */}
-          <div className="absolute top-8 left-2 w-2.5 h-2.5 rounded-full bg-[#0a0604] border border-[#3e2717] shadow-inner pointer-events-none" />
-          <div className="absolute top-1/2 -translate-y-1/2 left-2 w-2.5 h-2.5 rounded-full bg-[#0a0604] border border-[#3e2717] shadow-inner pointer-events-none" />
-          <div className="absolute bottom-8 left-2 w-2.5 h-2.5 rounded-full bg-[#0a0604] border border-[#3e2717] shadow-inner pointer-events-none" />
-
-          {/* Conteúdo das mensagens e acontecimentos */}
-          <NotebookLogList logs={logs} filter={filter} id="notebook-logs-list" />
-        </div>
-
-        {/* 5. ÁREA DE ESCRITA A CANETA / TINTEIRO */}
-        <NotebookChatInput onSendChat={onSendChat} isDead={isDead} />
+        {/* 6. PILHA DE PÁGINAS VISÍVEIS (Efeito 3D de espessura de 50 folhas no canto inferior e direito) */}
+        <div className="h-2.5 bg-[#dfcfaf] rounded-b border-x-2 border-b-2 border-[#8f7956] shadow-[2px_2px_0px_#caa877,4px_4px_0px_#ab8b5e,0_8px_20px_rgba(0,0,0,0.8)] -mt-1 mx-1" />
       </div>
     </section>
   );
