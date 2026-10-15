@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LogIn, Plus, Globe, Lock, Users, RotateCw, Skull, Sparkles, BookOpen, Layers } from 'lucide-react';
+import { LogIn, Plus, Globe, Lock, Users, RotateCw, Skull, Sparkles, BookOpen } from 'lucide-react';
 import { cn } from '../lib/cn';
 
 export default function HomeHub({
@@ -15,7 +15,6 @@ export default function HomeHub({
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [createRoomName, setCreateRoomName] = useState('');
   const [isPublic, setIsPublic] = useState(true);
-  const [initialHandCards, setInitialHandCards] = useState(3);
 
   // Inicializa nome da sala sugerido ao mudar nickname
   useEffect(() => {
@@ -36,7 +35,6 @@ export default function HomeHub({
     onCreateRoom({
       roomName: createRoomName.trim() || `SALA DE ${(nickname || 'CONDENADO').toUpperCase()}`,
       isPublic,
-      initialHandCards,
     });
   };
 
@@ -157,33 +155,6 @@ export default function HomeHub({
                   placeholder="Nome da sua mesa..."
                   className="w-full min-h-[44px] bg-black/80 border-2 border-iron rounded-md px-3 py-2 font-typewriter text-parchment text-base sm:text-sm outline-none focus:border-gold-aged placeholder:text-stone-700"
                 />
-
-                {/* Seletor de Cartas Iniciais (1 a 5, padrão 3) */}
-                <div className="rounded border border-iron/70 bg-black/60 p-2.5">
-                  <div className="flex items-center justify-between text-xs font-mono mb-1.5">
-                    <span className="text-parchment-dark flex items-center gap-1">
-                      <Layers size={13} className="text-gold-aged" /> CARTAS INICIAIS:
-                    </span>
-                    <span className="text-gold-aged font-bold">{initialHandCards} {initialHandCards === 1 ? 'carta' : 'cartas'}</span>
-                  </div>
-                  <div className="grid grid-cols-5 gap-1">
-                    {[1, 2, 3, 4, 5].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setInitialHandCards(num)}
-                        className={cn(
-                          'py-1.5 rounded text-xs font-mono font-bold transition-all border',
-                          initialHandCards === num
-                            ? 'border-gold-aged bg-gold-aged/25 text-amber-200 shadow-[0_0_10px_rgba(212,175,55,0.3)]'
-                            : 'border-stone-800 bg-stone-900/60 text-stone-400 hover:text-parchment hover:border-stone-600'
-                        )}
-                      >
-                        {num} {num === 3 && <span className="text-[9px] block text-stone-400 font-normal">Padrão</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
 
                 {/* Seletor Pública / Privada */}
                 <div className="flex rounded border border-iron/70 bg-black/60 p-1 gap-1">
