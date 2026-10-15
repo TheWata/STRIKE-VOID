@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { LogIn, Plus, Globe, Lock, Users, RotateCw, Skull, Sparkles } from 'lucide-react';
+import { LogIn, Plus, Globe, Lock, Users, RotateCw, Skull, Sparkles, BookOpen } from 'lucide-react';
 
 export default function HomeHub({
   nickname,
@@ -9,6 +9,7 @@ export default function HomeHub({
   onJoinRoom,
   onCreateRoom,
   onRefreshRooms,
+  onOpenGuide,
 }) {
   const [roomCodeInput, setRoomCodeInput] = useState('');
   const [createRoomName, setCreateRoomName] = useState('');
@@ -56,6 +57,16 @@ export default function HomeHub({
           <p className="font-typewriter text-parchment-dark text-[11px] sm:text-sm tracking-wider sm:tracking-widest max-w-lg mx-auto">
             ROLETA SIMULTÂNEA · FACAS · PAREDES · REVERSOS
           </p>
+          <div className="pt-2">
+            <button
+              id="btn-hub-guide"
+              type="button"
+              onClick={onOpenGuide}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-blood-bright/60 bg-blood/20 hover:bg-blood/40 hover:border-blood-bright text-parchment text-xs font-mono tracking-wider transition-all shadow-[0_0_12px_rgba(220,38,38,0.3)] active:scale-95"
+            >
+              <BookOpen size={13} className="text-blood-bright" /> COMO JOGAR (MANUAL DO CONDENADO)
+            </button>
+          </div>
         </div>
 
         {/* Barra de Identidade do Jogador */}

@@ -18,6 +18,7 @@ import {
   Users,
   ShieldAlert,
   Heart,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { MIN_MAX_HP, MAX_MAX_HP, DEFAULT_MAX_HP } from '../lib/constants';
@@ -88,6 +89,7 @@ export default function RoomLobby({
   onKickPlayer,
   onStartGame,
   onOpenSettings,
+  onOpenGuide,
   onCopyCode,
   onSetMaxHp,
 }) {
@@ -299,7 +301,16 @@ export default function RoomLobby({
                   className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded border border-iron text-xs font-mono text-parchment-dark hover:text-gold-aged transition-colors"
                   title="Ajustar regras e tempos da partida"
                 >
-                  <Settings size={13} /> REGRAS
+                  <Settings size={13} /> TEMPOS
+                </button>
+
+                <button
+                  id="btn-lobby-guide"
+                  onClick={onOpenGuide}
+                  className="flex-1 sm:flex-none flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded border border-blood-bright/60 bg-blood/20 text-xs font-mono text-parchment hover:bg-blood/40 hover:text-white transition-colors"
+                  title="Consultar manual e regras do jogo"
+                >
+                  <BookOpen size={13} className="text-blood-bright" /> GUIA
                 </button>
               </div>
             </div>
@@ -329,12 +340,21 @@ export default function RoomLobby({
             <div className="text-[11px] font-mono text-parchment-dark">
               O líder da sala pode adicionar bots ou mudar as regras antes de começar.
             </div>
-            <button
-              onClick={onOpenSettings}
-              className="inline-flex items-center gap-1 min-h-[40px] text-[11px] font-mono text-gold-aged hover:underline"
-            >
-              <Settings size={12} /> Ver regras atuais
-            </button>
+            <div className="flex items-center justify-center gap-3 pt-1">
+              <button
+                onClick={onOpenGuide}
+                className="inline-flex items-center gap-1 min-h-[40px] text-[11px] font-mono text-blood-bright hover:underline"
+              >
+                <BookOpen size={12} /> Como Jogar
+              </button>
+              <span className="text-stone-600">·</span>
+              <button
+                onClick={onOpenSettings}
+                className="inline-flex items-center gap-1 min-h-[40px] text-[11px] font-mono text-gold-aged hover:underline"
+              >
+                <Settings size={12} /> Ver regras atuais
+              </button>
+            </div>
           </div>
         )}
       </motion.div>

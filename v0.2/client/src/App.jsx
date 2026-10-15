@@ -12,6 +12,8 @@ import {
   Check,
   LogOut,
   ScrollText,
+  HelpCircle,
+  BookOpen,
 } from 'lucide-react';
 import { socket } from './lib/socket';
 import { cn } from './lib/cn';
@@ -28,6 +30,7 @@ import LogPanel, { LogDrawer } from './components/LogPanel';
 import DamageOverlay from './components/DamageOverlay';
 import HomeHub from './components/HomeHub';
 import RoomLobby from './components/RoomLobby';
+import GameGuideModal from './components/GameGuideModal';
 import { audio } from './lib/audio';
 
 /* Botão quadrado de ícone do cabeçalho (alvo de toque de 40px no mobile) */
@@ -42,6 +45,7 @@ export default function App() {
   const [publicRooms, setPublicRooms] = useState([]);
   const [selectedCardId, setSelectedCardId] = useState(null);
   const [showSettings, setShowSettings] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
   const [toast, setToast] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -661,6 +665,22 @@ export default function App() {
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <AudioControls />
+            <button
+              id="btn-guide"
+              onClick={() => {
+                audio.play('click');
+                setShowGuide(true);
+              }}
+              className={cn(
+                HEADER_ICON_BTN,
+                'border-blood-bright/70 bg-blood/20 text-parchment hover:border-blood-bright hover:bg-blood/40 hover:text-white shadow-[0_0_12px_rgba(220,38,38,0.35)] active:scale-95'
+              )}
+              aria-label="Como Jogar / Guia de Regras"
+              title="Como Jogar / Guia de Regras"
+            >
+              <HelpCircle size={16} className="text-blood-bright shrink-0" />
+              <span className="hidden sm:inline font-bold">GUIA</span>
+            </button>
             {inGame && compact && (
               <button
                 onClick={() => setShowLogs(true)}
@@ -711,6 +731,7 @@ export default function App() {
             onJoinRoom={handleJoinRoom}
             onCreateRoom={handleCreateRoom}
             onRefreshRooms={() => socket.emit('get_public_rooms')}
+            onOpenGuide={() => setShowGuide(true)}
           />
         ) : !inGame ? (
           /* 2. Sala de Espera / Lobby da Sala */
@@ -725,6 +746,7 @@ export default function App() {
             onKickPlayer={handleKickPlayer}
             onStartGame={handleStartGame}
             onOpenSettings={() => setShowSettings(true)}
+            onOpenGuide={() => setShowGuide(true)}
             onCopyCode={(code) => showToast(`Código ${code} copiado!`, 'success')}
             onSetMaxHp={handleSetMaxHp}
           />
@@ -738,6 +760,9 @@ export default function App() {
 
         {/* Logs em gaveta (mobile) */}
         {compact && <LogDrawer open={showLogs} onClose={() => setShowLogs(false)} logs={logs} />}
+
+        {/* Modal Interativo de Regras / Como Jogar */}
+        <GameGuideModal open={showGuide} onClose={() => setShowGuide(false)} />
 
         {/* Modal de Configurações */}
         {gameState?.settings && (
