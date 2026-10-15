@@ -120,7 +120,7 @@ function InscryptionCardBase({ card, isSelected, onClick, onDragStart, onDragEnd
   const size = small
     ? 'w-[64px] h-[92px]'
     : compact
-      ? 'w-[clamp(72px,min(26vw,24dvh),112px)] aspect-[118/168]'
+      ? 'w-[clamp(58px,min(18vw,22dvh),106px)] aspect-[118/168]'
       : 'w-[118px] h-[168px]';
 
   if (faceDown) {

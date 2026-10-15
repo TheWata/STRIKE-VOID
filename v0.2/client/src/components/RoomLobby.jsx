@@ -19,23 +19,25 @@ import {
   ShieldAlert,
   Heart,
   BookOpen,
+  Layers,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
-import { MIN_MAX_HP, MAX_MAX_HP, DEFAULT_MAX_HP } from '../lib/constants';
+import { MIN_MAX_HP, MAX_MAX_HP, DEFAULT_MAX_HP, MIN_HAND_CARDS, MAX_HAND_CARDS, DEFAULT_HAND_CARDS } from '../lib/constants';
 
 const HP_OPTIONS = Array.from({ length: MAX_MAX_HP - MIN_MAX_HP + 1 }, (_, i) => MIN_MAX_HP + i);
+const HAND_OPTIONS = Array.from({ length: MAX_HAND_CARDS - MIN_HAND_CARDS + 1 }, (_, i) => MIN_HAND_CARDS + i);
 
 /** Seletor da Quantidade de Vida Inicial: editável só pelo Host, somente leitura para os demais. */
 function HpSelector({ value, isHost, onChange }) {
   return (
-    <div id="hp-selector" className="rounded-lg border border-iron/60 bg-black/50 p-3">
+    <div id="hp-selector" className="rounded-lg border border-iron/60 bg-black/50 p-3 flex flex-col justify-between">
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="flex items-center gap-1.5 font-grimoire font-bold text-xs sm:text-sm tracking-wider text-parchment">
           <Heart size={15} className="text-blood-bright fill-blood-bright" />
           VIDA INICIAL
         </span>
-        <span className="font-mono text-[10px] sm:text-[11px] text-parchment-dark">
-          {isHost ? 'Você define para toda a mesa' : 'Definido pelo líder'}
+        <span className="font-mono text-[10px] text-parchment-dark">
+          {isHost ? '2 a 5 Vidas' : 'Líder define'}
         </span>
       </div>
 
@@ -78,6 +80,59 @@ function HpSelector({ value, isHost, onChange }) {
   );
 }
 
+/** Seletor do Máximo de Cartas na Mão (mín 3, máx 5, padrão 3) */
+function HandCardsSelector({ value, isHost, onChange }) {
+  return (
+    <div id="hand-cards-selector" className="rounded-lg border border-iron/60 bg-black/50 p-3 flex flex-col justify-between">
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className="flex items-center gap-1.5 font-grimoire font-bold text-xs sm:text-sm tracking-wider text-parchment">
+          <Layers size={15} className="text-gold-aged" />
+          MÁXIMO DE CARTAS
+        </span>
+        <span className="font-mono text-[10px] text-parchment-dark">
+          {isHost ? '3 a 5 na mão' : 'Líder define'}
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex flex-1 gap-1.5" role="radiogroup" aria-label="Quantidade máxima de cartas na mão">
+          {HAND_OPTIONS.map((n) => {
+            const selected = n === value;
+            return (
+              <button
+                key={n}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                disabled={!isHost}
+                onClick={() => isHost && onChange(n)}
+                className={cn(
+                  'flex-1 min-h-[44px] rounded border-2 font-mono font-extrabold text-base transition-all touch-manipulation',
+                  'flex items-center justify-center gap-1',
+                  selected
+                    ? 'border-gold-aged bg-gold-aged/30 text-amber-200 shadow-[0_0_14px_rgba(212,175,55,0.55)]'
+                    : 'border-iron/70 bg-black/60 text-parchment-dark',
+                  isHost && !selected && 'hover:border-gold-aged hover:text-gold-aged active:bg-gold-aged/20',
+                  !isHost && 'cursor-default'
+                )}
+              >
+                {n}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Prévia de cartas com a quantidade escolhida */}
+        <div className="hidden min-[400px]:flex items-center gap-0.5 shrink-0 text-gold-aged" aria-hidden>
+          {Array.from({ length: value }).map((_, i) => (
+            <Layers key={i} size={value >= 5 ? 12 : 14} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RoomLobby({
   roomState,
   me,
@@ -92,6 +147,7 @@ export default function RoomLobby({
   onOpenGuide,
   onCopyCode,
   onSetMaxHp,
+  onSetMaxHandCards,
 }) {
   const [hideCode, setHideCode] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -100,6 +156,7 @@ export default function RoomLobby({
   const minPlayers = roomState?.minPlayers || 4;
   const maxPlayers = roomState?.maxPlayers || 8;
   const maxHp = roomState?.settings?.maxHp ?? roomState?.maxHp ?? DEFAULT_MAX_HP;
+  const maxHandCards = roomState?.settings?.maxHandCards ?? roomState?.maxHandCards ?? DEFAULT_HAND_CARDS;
   const canStart = isHost && players.length >= minPlayers && players.length <= maxPlayers;
 
   const handleCopy = () => {
@@ -186,9 +243,19 @@ export default function RoomLobby({
           </div>
         </div>
 
-        {/* Configuração: Quantidade de Vida Inicial (2 a 5) */}
-        <div className="mb-3 sm:mb-5">
+        {/* Configurações da Mesa: Vida Inicial (2 a 5) & Limite de Cartas (3 a 5) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 mb-2 sm:mb-3">
           <HpSelector value={maxHp} isHost={isHost} onChange={onSetMaxHp} />
+          <HandCardsSelector value={maxHandCards} isHost={isHost} onChange={onSetMaxHandCards} />
+        </div>
+
+        {/* Aviso de Regra Antitrinca */}
+        <div className="rounded border border-gold-aged/40 bg-black/60 px-3 py-1.5 mb-3 sm:mb-5 flex flex-wrap items-center justify-between gap-1 text-[10px] sm:text-[11px] font-mono text-parchment-dark shadow-sm">
+          <span className="flex items-center gap-1.5 text-gold-aged font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-gold-aged animate-pulse" />
+            REGRA ANTITRINCA ATIVA:
+          </span>
+          <span className="text-amber-200/90">Proibido possuir 3 cartas iguais na mão</span>
         </div>
 
         {/* Lista de Jogadores na Mesa */}

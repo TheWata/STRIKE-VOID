@@ -339,6 +339,7 @@ export default function App() {
   const handleRemoveBot = (botId) => socket.emit('remove_bot', botId);
   const handleKickPlayer = (targetId) => socket.emit('kick_player', { targetId });
   const handleSetMaxHp = (maxHp) => socket.emit('set_max_hp', { maxHp });
+  const handleSetMaxHandCards = (maxHandCards) => socket.emit('set_max_hand_cards', { maxHandCards });
   const handleStartGame = () => socket.emit('start_game');
   const handleRestartGame = () => socket.emit('restart_game');
 
@@ -763,6 +764,7 @@ export default function App() {
             onOpenGuide={() => setShowGuide(true)}
             onCopyCode={(code) => showToast(`Código ${code} copiado!`, 'success')}
             onSetMaxHp={handleSetMaxHp}
+            onSetMaxHandCards={handleSetMaxHandCards}
           />
         ) : compact ? (
           /* 3a. Mesa compacta (smartphones) */

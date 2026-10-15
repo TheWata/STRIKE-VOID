@@ -23,3 +23,8 @@ export const LOG_STYLES = {
 export const MIN_MAX_HP = 2;
 export const MAX_MAX_HP = 5;
 export const DEFAULT_MAX_HP = 3;
+
+export const MIN_HAND_CARDS = 3;
+export const MAX_HAND_CARDS = 5;
+export const DEFAULT_HAND_CARDS = 3;
+

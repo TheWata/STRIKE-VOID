@@ -112,9 +112,19 @@ export default function SettingsModal({ open, settings, aliveCount, onClose, onS
               onChange={(v) => set({ analysisDuration: v })}
             />
 
+            <Slider
+              label="Máximo de Cartas na Mão (Regra Antitrinca)"
+              min={3}
+              max={5}
+              step={1}
+              value={local.maxHandCards ?? 3}
+              display={`${local.maxHandCards ?? 3} cartas`}
+              onChange={(v) => set({ maxHandCards: v })}
+            />
+
             <div className="rounded border-2 border-stone-900 bg-stone-900/90 text-parchment font-mono text-[10px] sm:text-[11px] text-center py-2 px-1 mb-3 sm:mb-4">
               <div className="text-parchment-dark mb-1">
-                Prévia ({n} vivos · {maxHp} vidas iniciais)
+                Prévia ({n} vivos · {maxHp} vidas iniciais · {local.maxHandCards ?? 3} cartas máx)
               </div>
               <div className="flex flex-wrap justify-center gap-x-3 gap-y-0.5">
                 {hpLevels.map((hp) => (
@@ -139,7 +149,6 @@ export default function SettingsModal({ open, settings, aliveCount, onClose, onS
               <button
                 id="btn-settings-save"
                 onClick={() => {
-                  // A vida inicial é controlada pelo seletor do Lobby; não é reenviada daqui
                   const payload = { ...local };
                   delete payload.maxHp;
                   onSave(payload);

@@ -198,16 +198,19 @@ function TabTheGame() {
           </p>
         </div>
 
-        {/* Mão Limitada */}
+        {/* Mão Limitada & Regra Antitrinca */}
         <div className="rounded-lg border border-iron/70 bg-black/40 p-3 sm:p-4">
           <div className="flex items-center gap-2 text-gold-aged font-grimoire font-bold text-xs sm:text-sm tracking-wider mb-1">
-            <Layers size={16} /> MÃO DE 3 CARTAS
+            <Layers size={16} /> MÃO DE CARTAS & REGRA ANTITRINCA
           </div>
           <p className="text-[11px] sm:text-xs text-parchment-dark">
-            Você sempre mantém exatamente <strong>3 cartas na mão</strong>. A cada nova rodada, você compra cartas do
-            baralho balanceado de 96 cartas (divididas igualmente entre <em>32 Facas</em>, <em>32 Paredes</em> e{' '}
-            <em>32 Reversos</em>). Quando o baralho se esgota, a pilha de descarte é automaticamente reembaralhada.
+            O limite da mão é configurável pelo líder (de <strong>3 a 5 cartas</strong>, padrão 3). A cada round, você
+            reabastece a mão a partir do baralho compartilhado de 96 cartas (32 Facas, 32 Paredes, 32 Reversos).
           </p>
+          <div className="mt-2 pt-1.5 border-t border-iron/40 text-[10.5px] font-mono text-amber-200">
+            <strong>⚖️ Proibido 3 Cartas Iguais:</strong> O sistema impede qualquer jogador de acumular uma trinca na mão
+            (máximo de 2 cartas de cada tipo), exigindo versatilidade tática e blefe constante!
+          </div>
         </div>
       </div>
 

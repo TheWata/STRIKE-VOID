@@ -93,6 +93,23 @@ function applyMaxHp(room, value) {
   return hp;
 }
 
+/* Limite máximo de cartas na mão configurável por sala (mín 3, máx 5, padrão 3) */
+const MIN_HAND_CARDS = 3;
+const MAX_HAND_CARDS = 5;
+const DEFAULT_HAND_CARDS = 3;
+
+function clampHandCards(value, fallback = DEFAULT_HAND_CARDS) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(MAX_HAND_CARDS, Math.max(MIN_HAND_CARDS, n));
+}
+
+function applyMaxHandCards(room, value) {
+  const cards = clampHandCards(value, room.gameState.settings.maxHandCards);
+  room.gameState.settings.maxHandCards = cards;
+  return cards;
+}
+
 function createRoom({ code, name, hostId, isPublic }) {
   return {
     code,
@@ -114,6 +131,7 @@ function createRoom({ code, name, hostId, isPublic }) {
         damagePenalty: 0.33,
         analysisDuration: 8.0,
         maxHp: DEFAULT_MAX_HP,
+        maxHandCards: DEFAULT_HAND_CARDS,
       },
       deck: [],
       discardPile: [],
@@ -184,6 +202,62 @@ function drawCard(room) {
   return room.gameState.deck.pop();
 }
 
+/**
+ * Compra uma carta para o jogador garantindo que ele NUNCA tenha 3 cartas iguais na mão
+ * (ou seja, no máximo 2 cartas de cada tipo: 2 Facas, 2 Paredes, 2 Reversos).
+ */
+function drawCardForPlayer(room, player) {
+  const counts = { FACA: 0, PAREDE: 0, REVERSO: 0 };
+  for (const c of player.hand) {
+    if (counts[c.type] !== undefined) counts[c.type]++;
+  }
+
+  // Tipos que já têm 2 ou mais cópias na mão (proibido comprar a 3ª cópia)
+  const forbidden = new Set();
+  for (const type of ['FACA', 'PAREDE', 'REVERSO']) {
+    if (counts[type] >= 2) forbidden.add(type);
+  }
+
+  // Garante que o baralho tenha cartas disponíveis
+  if (room.gameState.deck.length === 0) {
+    room.gameState.deck = room.gameState.discardPile;
+    room.gameState.discardPile = [];
+    shuffle(room.gameState.deck);
+  }
+
+  // Procura no deck atual (do topo para baixo) por uma carta cujo tipo não seja proibido
+  let cardIndex = -1;
+  for (let i = room.gameState.deck.length - 1; i >= 0; i--) {
+    if (!forbidden.has(room.gameState.deck[i].type)) {
+      cardIndex = i;
+      break;
+    }
+  }
+
+  if (cardIndex !== -1) {
+    return room.gameState.deck.splice(cardIndex, 1)[0];
+  }
+
+  // Se não houver no deck atual mas houver descarte, recicla o descarte e tenta novamente
+  if (room.gameState.discardPile.length > 0) {
+    room.gameState.deck.push(...room.gameState.discardPile);
+    room.gameState.discardPile = [];
+    shuffle(room.gameState.deck);
+
+    for (let i = room.gameState.deck.length - 1; i >= 0; i--) {
+      if (!forbidden.has(room.gameState.deck[i].type)) {
+        return room.gameState.deck.splice(i, 1)[0];
+      }
+    }
+  }
+
+  // Fallback seguro caso o baralho compartilhado esteja temporariamente sem o tipo desejado:
+  const allowed = ['FACA', 'PAREDE', 'REVERSO'].filter((t) => !forbidden.has(t));
+  if (allowed.length === 0) return null;
+  const pickedType = allowed[Math.floor(Math.random() * allowed.length)];
+  return { id: uuid(), type: pickedType };
+}
+
 /* ------------------------------------------------------------------ */
 /* 4. EQUAÇÃO DE TEMPO INDIVIDUAL                                     */
 /* ------------------------------------------------------------------ */
@@ -238,6 +312,7 @@ function sanitizeStateForClients(room, viewerId) {
     isPaused: room.gameState.isPaused,
     settings: room.gameState.settings,
     maxHp: room.gameState.settings.maxHp,
+    maxHandCards: room.gameState.settings.maxHandCards || DEFAULT_HAND_CARDS,
     logs: room.gameState.logs.slice(-120),
     winner: room.gameState.winner,
     deckCount: room.gameState.deck ? room.gameState.deck.length : 0,
@@ -383,8 +458,13 @@ async function runGame(room, token) {
       p.lockedIn = false;
     }
     const aliveCount = alivePlayers(room).length;
+    const targetHandSize = room.gameState.settings.maxHandCards || DEFAULT_HAND_CARDS;
     for (const p of alivePlayers(room)) {
-      while (p.hand.length < 3) p.hand.push(drawCard(room));
+      while (p.hand.length < targetHandSize) {
+        const card = drawCardForPlayer(room, p);
+        if (!card) break;
+        p.hand.push(card);
+      }
       p.allowedTime = calculatePlayerTime(p, aliveCount, room.gameState.settings);
     }
     addLog(room, 'SYSTEM', '— ROUND ' + room.gameState.round + ' —');
@@ -964,8 +1044,11 @@ io.on('connection', (socket) => {
     s.secondsPerPlayer = num(newSettings.secondsPerPlayer, 1, 5, s.secondsPerPlayer);
     s.damagePenalty = num(newSettings.damagePenalty, 0, 0.5, s.damagePenalty);
     s.analysisDuration = num(newSettings.analysisDuration, 3, 20, s.analysisDuration);
-    // A vida inicial só pode mudar no Lobby (nunca no meio de uma partida)
-    if (room.status === 'LOBBY' && newSettings.maxHp !== undefined) applyMaxHp(room, newSettings.maxHp);
+    // A vida inicial e o limite de cartas só podem mudar no Lobby (nunca no meio de uma partida)
+    if (room.status === 'LOBBY') {
+      if (newSettings.maxHp !== undefined) applyMaxHp(room, newSettings.maxHp);
+      if (newSettings.maxHandCards !== undefined) applyMaxHandCards(room, newSettings.maxHandCards);
+    }
     emitRoomState(room);
   });
 
@@ -980,6 +1063,20 @@ io.on('connection', (socket) => {
       return toast(socket.id, `A vida inicial deve estar entre ${MIN_MAX_HP} e ${MAX_MAX_HP}.`);
     }
     applyMaxHp(room, n);
+    emitRoomState(room);
+  });
+
+  // Host define o Máximo de Cartas na Mão (3 a 5) no Lobby; sincroniza em tempo real com toda a sala
+  socket.on('set_max_hand_cards', ({ maxHandCards } = {}) => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room || room.hostId !== socket.id) return;
+    if (room.status !== 'LOBBY') return toast(socket.id, 'O limite de cartas só pode ser alterado no Lobby.');
+    const n = Math.round(Number(maxHandCards));
+    if (!Number.isFinite(n) || n < MIN_HAND_CARDS || n > MAX_HAND_CARDS) {
+      return toast(socket.id, `O limite de cartas deve estar entre ${MIN_HAND_CARDS} e ${MAX_HAND_CARDS}.`);
+    }
+    applyMaxHandCards(room, n);
     emitRoomState(room);
   });
 
