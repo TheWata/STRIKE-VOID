@@ -276,13 +276,14 @@ function calculatePlayerTime(player, aliveCount, settings) {
 /* ------------------------------------------------------------------ */
 /* 5. LOGS + SANITIZAÇÃO DE ESTADO                                    */
 /* ------------------------------------------------------------------ */
-function addLog(room, type, text) {
+function addLog(room, type, text, meta = {}) {
   room.gameState.logs.push({
     id: ++room.gameState.logCounter,
     round: room.gameState.round,
     type,
     text,
     timestamp: Date.now(),
+    ...meta,
   });
   if (room.gameState.logs.length > 300) room.gameState.logs.shift();
 }
@@ -1135,6 +1136,31 @@ io.on('connection', (socket) => {
     if (!room || room.gameState.phase !== 'ANALYSIS' || !getPlayer(room, socket.id)) return;
     room.gameState.skipAnalysisFlag = true;
     room.gameState.isPaused = false;
+  });
+
+  /* ---- CHAT DA MESA (VIVOS E MORTOS) ---- */
+  socket.on('send_chat', ({ text } = {}) => {
+    const roomCode = socket.data?.roomCode;
+    const room = rooms.get(roomCode);
+    if (!room) return;
+    const player = getPlayer(room, socket.id);
+    if (!player) return;
+
+    const clean = String(text || '').trim().slice(0, 140);
+    if (!clean) return;
+
+    const isDead = !player.isAlive && room.gameState.phase !== 'LOBBY';
+    const logType = isDead ? 'CHAT_DEAD' : 'CHAT';
+    const prefix = isDead ? `💀 [ALÉM] ${player.name}: ` : `💬 ${player.name}: `;
+
+    addLog(room, logType, `${prefix}${clean}`, {
+      senderId: player.id,
+      senderName: player.name,
+      isDead,
+      chatMessage: clean,
+    });
+
+    emitRoomState(room);
   });
 
   socket.on('disconnect', () => {

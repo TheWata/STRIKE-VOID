@@ -343,6 +343,13 @@ export default function App() {
   const handleStartGame = () => socket.emit('start_game');
   const handleRestartGame = () => socket.emit('restart_game');
 
+  const isDead = me ? !me.isAlive : false;
+  const handleSendChat = useCallback((text) => {
+    if (!text || !text.trim()) return;
+    audio.play('click');
+    socket.emit('send_chat', { text: text.trim() });
+  }, []);
+
   const handleCopyHeaderCode = () => {
     if (gameState?.roomCode) {
       navigator.clipboard?.writeText(gameState.roomCode);
@@ -492,7 +499,27 @@ export default function App() {
           </>
         ) : (
           <div className="font-grimoire text-parchment-dark tracking-widest text-xs text-center py-6">
-            {me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}
+            {me ? (
+              <div className="space-y-2">
+                <div>💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO</div>
+                <button
+                  onClick={() => setShowLogs(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-purple-500/70 bg-purple-950/60 text-purple-200 text-xs font-mono font-bold hover:bg-purple-900 transition-all shadow-[0_0_12px_rgba(168,85,247,0.3)] active:scale-95"
+                >
+                  💬 Abrir Chat & Crônica (Falar do Além)
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div>👁 ESPECTADOR</div>
+                <button
+                  onClick={() => setShowLogs(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-stone-700 bg-black/60 text-parchment text-xs font-mono active:scale-95"
+                >
+                  💬 Abrir Chat & Crônica
+                </button>
+              </div>
+            )}
           </div>
         )}
       </section>
@@ -588,8 +615,11 @@ export default function App() {
             </AnimatePresence>
           </div>
         ) : (
-          <div className="font-grimoire text-parchment-dark tracking-widest text-sm pb-8">
-            {me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}
+          <div className="font-grimoire text-parchment-dark tracking-widest text-sm pb-8 text-center space-y-1.5">
+            <div>{me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}</div>
+            <div className="font-mono text-xs text-purple-300">
+              Você ainda pode conversar com a mesa no Chat da Crônica abaixo! ⬇
+            </div>
           </div>
         )}
       </footer>
@@ -626,7 +656,7 @@ export default function App() {
         </div>
       )}
 
-      <LogPanel logs={logs} />
+      <LogPanel logs={logs} onSendChat={handleSendChat} isDead={isDead} />
     </>
   );
 
@@ -640,8 +670,8 @@ export default function App() {
         {/* Brilho de velas */}
         <div className="candle pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
 
-        {/* Barra superior com iluminação suave e contraste enriquecido */}
-        <header className="relative z-40 flex items-center justify-between gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 border-b-2 border-stone-700/80 bg-gradient-to-r from-[#2c1d12] via-[#241710] to-[#1e130c] shadow-[0_4px_25px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(212,175,55,0.22)]">
+        {/* Barra superior com iluminação suave e contraste enriquecido (z-[70] acima de qualquer overlay) */}
+        <header className="relative z-[70] flex items-center justify-between gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 border-b-2 border-stone-700/80 bg-gradient-to-r from-[#2c1d12] via-[#241710] to-[#1e130c] shadow-[0_4px_25px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(212,175,55,0.22)]">
           <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
             <div className="font-grimoire font-extrabold tracking-[0.18em] sm:tracking-[0.25em] text-amber-100 text-sm sm:text-base whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center">
               STRIKE<span className="text-blood-bright font-black mx-0.5 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]">/</span>VOID
@@ -774,8 +804,16 @@ export default function App() {
           desktopTable
         )}
 
-        {/* Logs em gaveta (mobile) */}
-        {compact && <LogDrawer open={showLogs} onClose={() => setShowLogs(false)} logs={logs} />}
+        {/* Logs em gaveta (mobile) com chat e suporte para mortos */}
+        {compact && (
+          <LogDrawer
+            open={showLogs}
+            onClose={() => setShowLogs(false)}
+            logs={logs}
+            onSendChat={handleSendChat}
+            isDead={isDead}
+          />
+        )}
 
         {/* Modal Interativo de Regras / Como Jogar */}
         <GameGuideModal open={showGuide} onClose={() => setShowGuide(false)} />

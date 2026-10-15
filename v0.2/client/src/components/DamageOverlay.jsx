@@ -58,7 +58,7 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
     bleed = (
       <motion.div
         key={`wounded-${cur}`}
-        className="fixed inset-0 pointer-events-none z-40"
+        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 overflow-hidden"
         style={vignetteStyle('wounded', damageRatio)}
         initial={{ opacity: 0 }}
         animate={reduceMotion ? { opacity: 0.9 } : { opacity: [0.65, 1, 0.65] }}
@@ -70,7 +70,7 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
     bleed = (
       <motion.div
         key="critical"
-        className="fixed inset-0 pointer-events-none z-40"
+        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 overflow-hidden"
         style={{ ...vignetteStyle('critical', damageRatio), transformOrigin: '50% 50%' }}
         initial={{ opacity: 0 }}
         animate={
@@ -89,7 +89,7 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
     bleed = (
       <motion.div
         key="dead"
-        className="fixed inset-0 pointer-events-none z-40"
+        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 overflow-hidden"
         style={{
           background: 'radial-gradient(ellipse 70% 85% at 50% 50%, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.78) 100%)',
           backdropFilter: 'grayscale(1) brightness(0.62) contrast(1.1)',
@@ -109,7 +109,7 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
         <motion.div
           key={`flash-${hitKey}`}
           aria-hidden
-          className="fixed inset-0 pointer-events-none z-50 bg-red-600"
+          className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 bg-red-600"
           initial={{ opacity: 0.65 }}
           animate={{ opacity: 0 }}
           transition={{ duration: 0.4, ease: 'easeOut' }}
