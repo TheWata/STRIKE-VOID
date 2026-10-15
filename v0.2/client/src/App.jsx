@@ -695,9 +695,10 @@ export default function App() {
                 id="btn-settings"
                 onClick={() => setShowSettings(true)}
                 className={cn(HEADER_ICON_BTN, 'border-gold-aged/70 text-gold-aged hover:bg-gold-aged/10')}
-                aria-label="Regras"
+                aria-label="Ajustar tempos da partida"
+                title="Ajustar tempos da partida"
               >
-                <Settings size={16} /> <span className="hidden sm:inline">REGRAS</span>
+                <Settings size={16} /> <span className="hidden sm:inline">TEMPOS</span>
               </button>
             )}
             {inAnyRoom && (
