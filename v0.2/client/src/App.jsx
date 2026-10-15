@@ -15,6 +15,9 @@ import {
   HelpCircle,
   BookOpen,
   Trash2,
+  Menu,
+  X,
+  ChevronDown,
 } from 'lucide-react';
 import { socket } from './lib/socket';
 import { cn } from './lib/cn';
@@ -31,6 +34,8 @@ import DamageOverlay from './components/DamageOverlay';
 import HomeHub from './components/HomeHub';
 import RoomLobby from './components/RoomLobby';
 import GameGuideModal from './components/GameGuideModal';
+import MobileHeaderMenu from './components/MobileHeaderMenu';
+import UnderTableChat from './components/UnderTableChat';
 import { audio } from './lib/audio';
 
 /* Botão quadrado de ícone do cabeçalho (alvo de toque de 40px no mobile) */
@@ -47,6 +52,7 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [showGuide, setShowGuide] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [toast, setToast] = useState(null);
   const [copiedCode, setCopiedCode] = useState(false);
   const [, setConnected] = useState(socket.connected);
@@ -54,6 +60,22 @@ export default function App() {
   const dragCardRef = useRef(null);
   const toastTimer = useRef(null);
   const prevHpRef = useRef(null);
+  const tableContainerRef = useRef(null);
+
+  const scrollToUnderTable = useCallback(() => {
+    const el = document.getElementById('under-table-chat');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, []);
+
+  const scrollToTableTop = useCallback(() => {
+    if (tableContainerRef.current) {
+      tableContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, []);
 
   const compact = useCompactLayout();
   const reduceMotion = useReducedMotion();
@@ -401,138 +423,153 @@ export default function App() {
 
   /* ---------------- MESA CERIMONIAL (Única e responsiva para Mobile, Tablet e Desktop) ---------------- */
   const gameTable = (
-    <>
-      <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 sm:p-2">
-        <div
-          className="relative"
-          style={{
-            width: 'min(98vw, calc(100dvh - 215px))',
-            maxHeight: 'calc(100dvh - 215px)',
-            aspectRatio: '1 / 1',
-          }}
-        >
-          <div className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.9)]" />
-          <div className="table-octagon table-felt absolute inset-[3.5%]" />
+    <div
+      ref={tableContainerRef}
+      id="game-table-container"
+      className="flex-1 min-h-0 flex flex-col overflow-y-auto overflow-x-hidden scroll-smooth relative"
+    >
+      {/* 1. MESA CERIMONIAL E MÃO DE CARTAS (Preenche a tela inicial no mobile) */}
+      <div className="relative min-h-[calc(100dvh-54px)] sm:min-h-0 sm:flex-1 flex flex-col justify-between shrink-0 sm:shrink">
+        <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 sm:p-2">
+          <div
+            className="relative"
+            style={{
+              width: 'min(98vw, calc(100dvh - 215px))',
+              maxHeight: 'calc(100dvh - 215px)',
+              aspectRatio: '1 / 1',
+            }}
+          >
+            <div className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.9)]" />
+            <div className="table-octagon table-felt absolute inset-[3.5%]" />
 
-          <TargetArrowsSVG players={players} localIndex={localIndex} />
+            <TargetArrowsSVG players={players} localIndex={localIndex} />
 
-          {players.map((p, i) => (
-            <PlayerSeat
-              key={p.id}
-              player={p}
-              index={i}
-              localIndex={localIndex}
-              totalPlayers={players.length}
-              isMe={p.id === me?.id}
-              phase={phase}
-              targetable={isTargetable(p)}
-              dimmed={canAct && !!selectedCard && !isTargetable(p)}
-              onSeatClick={onSeatClick}
-              onDropCard={onDropCard}
-            />
-          ))}
+            {players.map((p, i) => (
+              <PlayerSeat
+                key={p.id}
+                player={p}
+                index={i}
+                localIndex={localIndex}
+                totalPlayers={players.length}
+                isMe={p.id === me?.id}
+                phase={phase}
+                targetable={isTargetable(p)}
+                dimmed={canAct && !!selectedCard && !isTargetable(p)}
+                onSeatClick={onSeatClick}
+                onDropCard={onDropCard}
+              />
+            ))}
 
-          {/* Centro da mesa: relógio + controles de análise */}
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 sm:gap-1.5">
-            <CentralClock socket={socket} myAllowedTime={me?.allowedTime} phase={phase} locked={!!me?.lockedIn || !me?.isAlive} />
-            {phase === 'ANALYSIS' && (
-              <div className="flex flex-col gap-1 sm:gap-1.5">
-                <button
-                  id="btn-pause"
-                  onClick={() => socket.emit('toggle_pause')}
-                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/85 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20"
-                >
-                  <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR' : '⏸️ PAUSAR'}
-                </button>
-                <button
-                  id="btn-skip"
-                  onClick={() => socket.emit('skip_analysis')}
-                  className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/85 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30"
-                >
-                  <SkipForward size={11} /> ⏭️ PRÓXIMO
-                </button>
-              </div>
+            {/* Centro da mesa: relógio + controles de análise */}
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 flex flex-col items-center gap-1 sm:gap-1.5">
+              <CentralClock socket={socket} myAllowedTime={me?.allowedTime} phase={phase} locked={!!me?.lockedIn || !me?.isAlive} />
+              {phase === 'ANALYSIS' && (
+                <div className="flex flex-col gap-1 sm:gap-1.5">
+                  <button
+                    id="btn-pause"
+                    onClick={() => socket.emit('toggle_pause')}
+                    className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/85 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20"
+                  >
+                    <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR' : '⏸️ PAUSAR'}
+                  </button>
+                  <button
+                    id="btn-skip"
+                    onClick={() => socket.emit('skip_analysis')}
+                    className="flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/85 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30"
+                  >
+                    <SkipForward size={11} /> ⏭️ PRÓXIMO
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Aviso de parede */}
+            {walled && canAct && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [1, 0.6, 1] }}
+                transition={{ duration: 1.2, repeat: Infinity }}
+                className="absolute left-1/2 -translate-x-1/2 bottom-[2%] z-50 px-3 py-1 rounded border-2 border-blood-bright bg-black/95 text-blood-bright text-[10px] sm:text-[11px] font-mono font-bold text-center max-w-[85%]"
+              >
+                🔒 EMPAREDADO: USE CARTAS EM SI MESMO OU PASSE/DESCARTE
+              </motion.div>
             )}
           </div>
+        </main>
 
-          {/* Aviso de parede */}
-          {walled && canAct && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [1, 0.6, 1] }}
-              transition={{ duration: 1.2, repeat: Infinity }}
-              className="absolute left-1/2 -translate-x-1/2 bottom-[2%] z-50 px-3 py-1 rounded border-2 border-blood-bright bg-black/95 text-blood-bright text-[10px] sm:text-[11px] font-mono font-bold text-center max-w-[85%]"
-            >
-              🔒 EMPAREDADO: USE CARTAS EM SI MESMO OU PASSE/DESCARTE
-            </motion.div>
-          )}
-        </div>
-      </main>
-
-      {/* Mão de cartas (acima da vinheta de sangramento: z-[45]) */}
-      <footer className="relative z-[45] h-[155px] sm:h-[195px] flex items-end justify-center pb-2 sm:pb-3 px-1">
-        {me && me.isAlive ? (
-          <div className="flex items-end justify-center gap-1.5 sm:gap-3 max-w-full overflow-x-auto pb-0.5">
-            <AnimatePresence>
-              {me.hand.map((card, i) => (
-                <motion.div
-                  key={card.id}
-                  initial={{ y: -300, opacity: 0, rotate: -8 }}
-                  animate={{ y: 0, opacity: 1, rotate: 0 }}
-                  exit={{ y: -60, opacity: 0 }}
-                  transition={{ delay: i * 0.1, type: 'spring', stiffness: 130, damping: 16 }}
-                >
-                  <InscryptionCard
-                    card={card}
-                    isSelected={selectedCardIds.includes(card.id)}
-                    onClick={onCardClick}
-                    onDragStart={onCardDragStart}
-                    onDragEnd={() => (dragCardRef.current = null)}
-                    disabled={!canAct}
-                    compact={compact}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <div className="font-grimoire text-parchment-dark tracking-widest text-xs sm:text-sm pb-4 sm:pb-8 text-center space-y-1">
-            <div>{me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}</div>
-            <button
-              onClick={() => setShowLogs(true)}
-              className="font-mono text-xs text-purple-300 hover:text-purple-200 underline"
-            >
-              Abrir Chat & Crônica da Mesa 💬
-            </button>
-          </div>
-        )}
-      </footer>
-
-      {/* Painel de ações do jogador: Mirar em mim mesmo e Passar a vez / Descarte */}
-      {me && me.isAlive && (
-        <div className="absolute right-2 bottom-[158px] sm:bottom-3 sm:right-3 z-[45] flex flex-col gap-1.5 w-[140px] sm:w-[190px]">
-          {canAct && selectedCard && (
-            <button
-              id="btn-self-target"
-              onClick={() => {
-                sendAction(selectedCard.id, me.id);
-                setSelectedCardIds([]);
-              }}
-              className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-gold-aged bg-black/85 text-gold-aged font-grimoire font-bold text-[10px] sm:text-xs hover:bg-gold-aged/20 shadow-md active:scale-95"
-            >
-              <Crosshair size={13} /> MIRAR EM MIM
-            </button>
-          )}
-
-          {canAct && (discardLimit > 0 ? (
-            selectedCardIds.length > 0 ? (
+        {/* Mão de cartas (acima da vinheta de sangramento: z-[45]) */}
+        <footer className="relative z-[45] h-[155px] sm:h-[195px] flex items-end justify-center pb-2 sm:pb-3 px-1">
+          {me && me.isAlive ? (
+            <div className="flex items-end justify-center gap-1.5 sm:gap-3 max-w-full overflow-x-auto pb-0.5">
+              <AnimatePresence>
+                {me.hand.map((card, i) => (
+                  <motion.div
+                    key={card.id}
+                    initial={{ y: -300, opacity: 0, rotate: -8 }}
+                    animate={{ y: 0, opacity: 1, rotate: 0 }}
+                    exit={{ y: -60, opacity: 0 }}
+                    transition={{ delay: i * 0.1, type: 'spring', stiffness: 130, damping: 16 }}
+                  >
+                    <InscryptionCard
+                      card={card}
+                      isSelected={selectedCardIds.includes(card.id)}
+                      onClick={onCardClick}
+                      onDragStart={onCardDragStart}
+                      onDragEnd={() => (dragCardRef.current = null)}
+                      disabled={!canAct}
+                      compact={compact}
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+            </div>
+          ) : (
+            <div className="font-grimoire text-parchment-dark tracking-widest text-xs sm:text-sm pb-4 sm:pb-8 text-center space-y-1">
+              <div>{me ? '💀 VOCÊ FOI ELIMINADO — ASSISTINDO DA ESCURIDÃO' : '👁 ESPECTADOR'}</div>
               <button
-                id="btn-discard"
-                onClick={handleDiscard}
-                className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-amber-500 bg-amber-950/85 text-amber-200 font-grimoire font-bold text-[10px] sm:text-xs hover:bg-amber-900 shadow-md active:scale-95"
+                onClick={scrollToUnderTable}
+                className="font-mono text-xs text-purple-300 hover:text-purple-200 underline"
               >
-                <Trash2 size={13} className="text-amber-400" /> DESCARTAR ({selectedCardIds.length})
+                Olhar Embaixo da Mesa (Chat & Crônica) ↓
               </button>
+            </div>
+          )}
+        </footer>
+
+        {/* Painel de ações do jogador: Mirar em mim mesmo e Passar a vez / Descarte */}
+        {me && me.isAlive && (
+          <div className="absolute right-2 bottom-[158px] sm:bottom-3 sm:right-3 z-[45] flex flex-col gap-1.5 w-[140px] sm:w-[190px]">
+            {canAct && selectedCard && (
+              <button
+                id="btn-self-target"
+                onClick={() => {
+                  sendAction(selectedCard.id, me.id);
+                  setSelectedCardIds([]);
+                }}
+                className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-gold-aged bg-black/85 text-gold-aged font-grimoire font-bold text-[10px] sm:text-xs hover:bg-gold-aged/20 shadow-md active:scale-95"
+              >
+                <Crosshair size={13} /> MIRAR EM MIM
+              </button>
+            )}
+
+            {canAct && (discardLimit > 0 ? (
+              selectedCardIds.length > 0 ? (
+                <button
+                  id="btn-discard"
+                  onClick={handleDiscard}
+                  className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-amber-500 bg-amber-950/85 text-amber-200 font-grimoire font-bold text-[10px] sm:text-xs hover:bg-amber-900 shadow-md active:scale-95"
+                >
+                  <Trash2 size={13} className="text-amber-400" /> DESCARTAR ({selectedCardIds.length})
+                </button>
+              ) : (
+                <button
+                  id="btn-pass"
+                  onClick={handlePassTurn}
+                  className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-iron bg-black/85 text-parchment-dark font-grimoire font-bold text-[10px] sm:text-xs hover:border-parchment shadow-md active:scale-95"
+                >
+                  <Hand size={13} /> PASSAR A VEZ
+                </button>
+              )
             ) : (
               <button
                 id="btn-pass"
@@ -541,36 +578,52 @@ export default function App() {
               >
                 <Hand size={13} /> PASSAR A VEZ
               </button>
-            )
-          ) : (
-            <button
-              id="btn-pass"
-              onClick={handlePassTurn}
-              className="flex items-center justify-center gap-1.5 py-1.5 sm:py-2 rounded border-2 border-iron bg-black/85 text-parchment-dark font-grimoire font-bold text-[10px] sm:text-xs hover:border-parchment shadow-md active:scale-95"
-            >
-              <Hand size={13} /> PASSAR A VEZ
-            </button>
-          ))}
+            ))}
 
-          <div className="text-[9px] sm:text-[10px] font-mono text-parchment-dark text-center leading-tight">
-            {canAct
-              ? selectedCard
-                ? 'Clique num assento para atacar'
-                : selectedCardIds.length > 0
-                  ? `${selectedCardIds.length} selecionada(s) p/ descarte`
-                  : discardLimit > 0
-                    ? 'Selecione carta(s) ou passe a vez'
-                    : 'Clique numa carta para agir'
-              : phase === 'PLANNING'
-                ? 'Jogada travada. Aguardando...'
-                : ''}
+            <div className="text-[9px] sm:text-[10px] font-mono text-parchment-dark text-center leading-tight">
+              {canAct
+                ? selectedCard
+                  ? 'Clique num assento para atacar'
+                  : selectedCardIds.length > 0
+                    ? `${selectedCardIds.length} selecionada(s) p/ descarte`
+                    : discardLimit > 0
+                      ? 'Selecione carta(s) ou passe a vez'
+                      : 'Clique numa carta para agir'
+                : phase === 'PLANNING'
+                  ? 'Jogada travada. Aguardando...'
+                  : ''}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Crônica e Chat Desktop */}
+        {/* Dica interativa para olhar embaixo da mesa (Mobile e telas menores) */}
+        <div className="w-full bg-gradient-to-r from-transparent via-[#25170e] to-transparent border-t border-stone-800/80 py-1.5 flex items-center justify-center shrink-0">
+          <button
+            id="btn-scroll-under-table"
+            onClick={scrollToUnderTable}
+            className="flex items-center gap-2 text-[11px] font-mono text-amber-300 hover:text-white transition-all py-1 px-4 rounded-full bg-black/75 border border-gold-aged/50 hover:border-gold-aged active:scale-95 shadow-sm"
+            title="Rolar para olhar embaixo da mesa (Chat & Registros)"
+          >
+            <ChevronDown size={14} className="animate-bounce text-gold-aged" />
+            <span className="font-bold tracking-wider">OLHAR EMBAIXO DA MESA (CHAT & CRÔNICA)</span>
+            <ChevronDown size={14} className="animate-bounce text-gold-aged" />
+          </button>
+        </div>
+      </div>
+
+      {/* 2. EMBAIXO DA MESA (CHAT & CRÔNICA EM LARGURA TOTAL) */}
+      <UnderTableChat
+        logs={logs}
+        onSendChat={handleSendChat}
+        isDead={isDead}
+        canAct={canAct}
+        phase={phase}
+        onScrollToTable={scrollToTableTop}
+      />
+
+      {/* Crônica e Chat Desktop Flutuante */}
       <LogPanel logs={logs} onSendChat={handleSendChat} isDead={isDead} />
-    </>
+    </div>
   );
 
   return (
@@ -616,7 +669,8 @@ export default function App() {
             )}
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* AÇÕES NO DESKTOP (telas >= sm) */}
+          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
             <AudioControls />
             <button
               id="btn-guide"
@@ -634,15 +688,6 @@ export default function App() {
               <HelpCircle size={16} className="text-red-300 shrink-0" />
               <span className="hidden sm:inline font-bold">GUIA</span>
             </button>
-            {inGame && compact && (
-              <button
-                onClick={() => setShowLogs(true)}
-                className={cn(HEADER_ICON_BTN, 'border-stone-600 bg-stone-900/90 text-amber-100 hover:text-gold-aged hover:border-gold-aged')}
-                aria-label="Abrir logs da rodada"
-              >
-                <ScrollText size={16} />
-              </button>
-            )}
             {inAnyRoom && (
               <button
                 id="btn-settings"
@@ -664,6 +709,40 @@ export default function App() {
                 <LogOut size={16} /> <span className="hidden sm:inline">SAIR</span>
               </button>
             )}
+          </div>
+
+          {/* AÇÕES NO MOBILE (telas < sm): EXATAMENTE DOIS BOTÕES (SAIR + HAMBURGER) */}
+          <div className="flex sm:hidden items-center gap-2 shrink-0">
+            {inAnyRoom && (
+              <button
+                id="btn-mobile-leave"
+                onClick={handleLeaveRoom}
+                className="flex items-center justify-center gap-1 h-9 px-2.5 rounded-md border border-blood-bright/70 bg-blood/30 hover:bg-blood/50 text-red-200 text-xs font-mono font-bold active:scale-95 shadow-sm"
+                title="Sair da sala"
+                aria-label="Sair da sala"
+              >
+                <LogOut size={14} />
+                <span>SAIR</span>
+              </button>
+            )}
+
+            <button
+              id="btn-mobile-menu"
+              onClick={() => {
+                audio.play('click');
+                setShowMobileMenu((v) => !v);
+              }}
+              className={cn(
+                'flex items-center justify-center h-9 w-9 rounded-md border transition-all active:scale-95 shadow-sm',
+                showMobileMenu
+                  ? 'border-gold-aged bg-gold-aged/30 text-white shadow-[0_0_10px_rgba(212,175,55,0.4)]'
+                  : 'border-stone-600 bg-stone-900/90 text-amber-200 hover:border-gold-aged'
+              )}
+              title="Menu de Opções (Regras, Configurações, Volume)"
+              aria-label="Menu de Opções"
+            >
+              {showMobileMenu ? <X size={18} /> : <Menu size={18} />}
+            </button>
           </div>
         </header>
 
@@ -723,6 +802,20 @@ export default function App() {
             isDead={isDead}
           />
         )}
+
+        {/* Menu Hamburger no Mobile (Regras, Configurações, Volume, Sair) */}
+        <MobileHeaderMenu
+          open={showMobileMenu}
+          onClose={() => setShowMobileMenu(false)}
+          gameState={gameState}
+          isHost={isHost}
+          inGame={inGame}
+          inAnyRoom={inAnyRoom}
+          onOpenGuide={() => setShowGuide(true)}
+          onOpenSettings={() => setShowSettings(true)}
+          onLeaveRoom={handleLeaveRoom}
+          onScrollToUnderTable={scrollToUnderTable}
+        />
 
         {/* Modal Interativo de Regras / Como Jogar */}
         <GameGuideModal open={showGuide} onClose={() => setShowGuide(false)} />

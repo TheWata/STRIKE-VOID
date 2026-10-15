@@ -117,11 +117,101 @@ const META = {
 };
 
 function InscryptionCardBase({ card, isSelected, onClick, onDragStart, onDragEnd, disabled, faceDown, small, compact }) {
+  const cardRef = React.useRef(null);
+  const glareRef = React.useRef(null);
+  const isHoveringRef = React.useRef(false);
+
   const size = small
     ? 'w-[64px] h-[92px]'
     : compact
       ? 'w-[clamp(58px,min(18vw,22dvh),106px)] aspect-[118/168]'
       : 'w-[118px] h-[168px]';
+
+  // Elevação base quando selecionada vs neutra
+  const baseElevate = isSelected
+    ? compact
+      ? 'translateY(-14px) scale(1.05)'
+      : 'translateY(-24px) scale(1.06)'
+    : 'translateY(0px) scale(1)';
+
+  // Atualiza transform base quando muda seleção ou desabilitação
+  React.useEffect(() => {
+    if (!cardRef.current || small) return;
+    if (!isHoveringRef.current) {
+      cardRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 0.4s ease';
+      cardRef.current.style.transform = `perspective(800px) ${baseElevate} rotateX(0deg) rotateY(0deg)`;
+      cardRef.current.style.boxShadow = '';
+      if (glareRef.current) glareRef.current.style.opacity = '0';
+    }
+  }, [baseElevate, small]);
+
+  const updateTilt = (clientX, clientY) => {
+    if (disabled || small || !cardRef.current) return;
+    const rect = cardRef.current.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const cx = rect.width / 2;
+    const cy = rect.height / 2;
+
+    // Normalizado de -1 a 1
+    const dx = Math.max(-1, Math.min(1, (x - cx) / cx));
+    const dy = Math.max(-1, Math.min(1, (y - cy) / cy));
+
+    // Inscryption: mover o cursor pra cima inclina o topo para frente
+    const rotX = -dy * 17; // graus
+    const rotY = dx * 17;  // graus
+
+    const px = Math.max(0, Math.min(100, (x / rect.width) * 100));
+    const py = Math.max(0, Math.min(100, (y / rect.height) * 100));
+
+    // Sombra dinâmica que se move oposta à inclinação
+    const shadowX = (-dx * 14).toFixed(1);
+    const shadowY = (-dy * 10 + 16).toFixed(1);
+    const goldGlow = isSelected
+      ? ', 0 0 28px rgba(212,175,55,0.85)'
+      : ', 0 0 16px rgba(212,175,55,0.35)';
+
+    cardRef.current.style.transition = 'transform 0.05s ease-out, box-shadow 0.05s ease-out';
+    cardRef.current.style.transform = `perspective(800px) ${baseElevate} rotateX(${rotX.toFixed(2)}deg) rotateY(${rotY.toFixed(2)}deg)`;
+    cardRef.current.style.boxShadow = `inset 0 0 20px rgba(44,29,18,0.6), ${shadowX}px ${shadowY}px 24px rgba(0,0,0,0.85)${goldGlow}`;
+
+    // Brilho especular (reflexo das velas sobre o cartão envernizado)
+    if (glareRef.current) {
+      glareRef.current.style.opacity = '1';
+      glareRef.current.style.background = `radial-gradient(circle at ${px.toFixed(1)}% ${py.toFixed(1)}%, rgba(255, 240, 190, 0.35) 0%, rgba(212, 175, 55, 0.12) 40%, transparent 75%)`;
+    }
+  };
+
+  const handleMouseMove = (e) => {
+    isHoveringRef.current = true;
+    updateTilt(e.clientX, e.clientY);
+  };
+
+  const handleMouseEnter = (e) => {
+    if (disabled || small) return;
+    isHoveringRef.current = true;
+    updateTilt(e.clientX, e.clientY);
+  };
+
+  const handleMouseLeave = () => {
+    isHoveringRef.current = false;
+    if (small || !cardRef.current) return;
+    cardRef.current.style.transition = 'transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1), box-shadow 0.4s ease';
+    cardRef.current.style.transform = `perspective(800px) ${baseElevate} rotateX(0deg) rotateY(0deg)`;
+    cardRef.current.style.boxShadow = '';
+    if (glareRef.current) glareRef.current.style.opacity = '0';
+  };
+
+  // Suporte a toque no mobile (sensação tátil ao deslizar)
+  const handleTouchMove = (e) => {
+    if (!e.touches || e.touches.length === 0) return;
+    const t = e.touches[0];
+    updateTilt(t.clientX, t.clientY);
+  };
+
+  const handleTouchEnd = () => {
+    handleMouseLeave();
+  };
 
   if (faceDown) {
     return (
@@ -146,41 +236,76 @@ function InscryptionCardBase({ card, isSelected, onClick, onDragStart, onDragEnd
 
   return (
     <div
+      ref={cardRef}
       role={onClick ? 'button' : undefined}
       aria-pressed={onClick ? !!isSelected : undefined}
       aria-disabled={onClick ? !!disabled : undefined}
       draggable={!disabled && !!onDragStart}
-      onDragStart={(e) => onDragStart && onDragStart(e, card)}
-      onDragEnd={onDragEnd}
+      onDragStart={(e) => {
+        handleMouseLeave();
+        onDragStart && onDragStart(e, card);
+      }}
+      onDragEnd={(e) => {
+        handleMouseLeave();
+        onDragEnd && onDragEnd(e);
+      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onClick={() => !disabled && onClick && onClick(card)}
+      style={{
+        transformStyle: 'preserve-3d',
+        transform: `perspective(800px) ${baseElevate}`,
+      }}
       className={cn(
-        'relative flex flex-col rounded-md bg-[#cbb892] border-stone-900',
+        'relative flex flex-col rounded-md bg-[#cbb892] border-stone-900 select-none will-change-transform',
         compact ? 'border-[3px] touch-manipulation' : 'border-4',
-        'shadow-[inset_0_0_20px_rgba(44,29,18,0.6)] transition-transform duration-200',
+        'shadow-[inset_0_0_20px_rgba(44,29,18,0.6)]',
         size,
-        interactive && 'cursor-pointer hover:-translate-y-3 hover:shadow-[0_0_18px_rgba(212,175,55,0.5)]',
+        interactive && 'cursor-pointer',
         interactive && compact && 'active:scale-95',
         disabled && 'opacity-60 saturate-50',
         isSelected &&
           (compact
-            ? '-translate-y-3 scale-105 ring-4 ring-gold-aged shadow-[0_0_26px_rgba(212,175,55,0.9)]'
-            : '-translate-y-6 ring-2 ring-gold-aged shadow-[0_0_24px_rgba(212,175,55,0.8)]')
+            ? 'ring-4 ring-gold-aged shadow-[0_0_26px_rgba(212,175,55,0.9)]'
+            : 'ring-2 ring-gold-aged shadow-[0_0_24px_rgba(212,175,55,0.8)]')
       )}
     >
+      {/* Camada de brilho especular (Inscryption Candlelight Glare) */}
+      {!small && (
+        <div
+          ref={glareRef}
+          className="pointer-events-none absolute inset-0 rounded-md transition-opacity duration-200 opacity-0 z-30 mix-blend-overlay"
+        />
+      )}
+
+      {/* Título da carta com profundidade 3D */}
       <div
+        style={{ transform: !small ? 'translateZ(12px)' : undefined }}
         className={cn(
-          'font-grimoire font-extrabold tracking-widest text-stone-900 border-b-2 border-stone-900 text-center leading-tight',
+          'font-grimoire font-extrabold tracking-widest text-stone-900 border-b-2 border-stone-900 text-center leading-tight shrink-0',
           small ? 'text-[8px] py-[1px]' : compact ? 'text-[11px] py-[1px]' : 'text-[13px] py-[2px]'
         )}
       >
         {meta.name}
       </div>
-      <div className="flex-1 m-[3px] border-2 border-stone-900 bg-[#b9a47a] overflow-hidden p-[2px]">
+
+      {/* Caixa de Ilustração rebaixada com efeito de relevo 3D */}
+      <div
+        style={{ transform: !small ? 'translateZ(6px)' : undefined }}
+        className="flex-1 m-[3px] border-2 border-stone-900 bg-[#b9a47a] overflow-hidden p-[2px] shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)]"
+      >
         <Art />
       </div>
+
+      {/* Rodapé descritivo com profundidade 3D */}
       <div
+        style={{ transform: !small ? 'translateZ(10px)' : undefined }}
         className={cn(
-          'font-typewriter text-stone-900 text-center border-t-2 border-stone-900 leading-tight',
+          'font-typewriter text-stone-900 text-center border-t-2 border-stone-900 leading-tight shrink-0',
           small ? 'text-[5px] py-[1px]' : compact ? 'text-[6.5px] py-[1px]' : 'text-[8.5px] py-[2px]'
         )}
       >

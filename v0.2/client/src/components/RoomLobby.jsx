@@ -157,11 +157,11 @@ export default function RoomLobby({
             <button
               id="btn-lobby-settings"
               onClick={onOpenSettings}
-              className="flex items-center gap-1.5 min-h-[40px] px-3 rounded border border-gold-aged/80 bg-gold-aged/20 hover:bg-gold-aged/35 text-amber-200 text-xs font-mono font-bold transition-all shadow-sm"
+              className="flex items-center gap-1.5 min-h-[40px] px-2.5 sm:px-3 rounded border border-gold-aged/80 bg-gold-aged/20 hover:bg-gold-aged/35 text-amber-200 text-xs font-mono font-bold transition-all shadow-sm"
               title="Abrir Configurações da Mesa"
             >
-              <Settings size={14} className="text-gold-aged" />
-              <span>CONFIGURAÇÕES</span>
+              <Settings size={14} className="text-gold-aged shrink-0" />
+              <span className="hidden sm:inline">CONFIGURAÇÕES</span>
             </button>
 
             <button

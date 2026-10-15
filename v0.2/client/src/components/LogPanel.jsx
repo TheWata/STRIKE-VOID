@@ -6,7 +6,7 @@ import { LOG_STYLES } from '../lib/constants';
 import { audio } from '../lib/audio';
 
 /** Lista formatada de logs com alta legibilidade e contraste */
-function LogList({ logs, filter, id, className }) {
+export function LogList({ logs, filter, id, className }) {
   const ref = useRef(null);
 
   const filteredLogs = logs.filter((l) => {
@@ -62,7 +62,7 @@ function LogList({ logs, filter, id, className }) {
 }
 
 /** Formulário de entrada de chat integrado */
-function ChatInput({ onSendChat, isDead }) {
+export function ChatInput({ onSendChat, isDead }) {
   const [text, setText] = useState('');
 
   const handleSubmit = (e) => {
