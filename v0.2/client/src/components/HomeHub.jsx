@@ -56,7 +56,7 @@ export default function HomeHub({
             STRIKE<span className="text-blood-bright">/</span>VOID
           </h1>
           <p className="font-typewriter text-parchment-dark text-[11px] sm:text-sm tracking-wider sm:tracking-widest max-w-lg mx-auto">
-            ROLETA SIMULTÂNEA · FACAS · PAREDES · REVERSOS
+            MESA 3D · FACAS · PAREDES · ESPELHO AMALDIÇOADO · PACTOS & ALMAS
           </p>
           <div className="pt-2">
             <button

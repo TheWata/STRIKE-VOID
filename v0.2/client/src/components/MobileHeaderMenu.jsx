@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, HelpCircle, Settings, LogOut, Copy, Check, MessageSquare, Volume2, Shield } from 'lucide-react';
+import { X, HelpCircle, Settings, LogOut, Copy, Check, Volume2, BookOpen } from 'lucide-react';
 import { AudioSettingsPanel } from './AudioControls';
 import { audio } from '../lib/audio';
 import { PHASE_LABELS } from '../lib/constants';

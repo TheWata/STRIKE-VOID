@@ -2,18 +2,10 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import InscryptionCard from './InscryptionCard';
 import { cn } from '../lib/cn';
+import { seatAngle, seatPosition } from '../helpers/math3d';
 
-/** Coordenadas polares: jogador local sempre na base inferior (90deg). */
-export function seatAngle(index, localIndex, totalPlayers) {
-  return ((index - localIndex + totalPlayers) % totalPlayers) * ((2 * Math.PI) / totalPlayers) + Math.PI / 2;
-}
+export { seatAngle, seatPosition };
 
-export function seatPosition(index, localIndex, totalPlayers, rx = 38, ry = 36) {
-  const angle = seatAngle(index, localIndex, totalPlayers);
-  return { x: 50 + rx * Math.cos(angle), y: 50 + ry * Math.sin(angle), angle };
-}
-
-/** Tamanho das caveiras conforme a vida máxima (2 a 5) para caber na placa do assento sem quebrar o layout. */
 export function skullSizeClass(maxLives, compact = false) {
   if (compact) return maxLives >= 5 ? 'w-3 h-3' : maxLives === 4 ? 'w-3.5 h-3.5' : 'w-4 h-4';
   return maxLives >= 5 ? 'w-[15px] h-[15px]' : maxLives === 4 ? 'w-[17px] h-[17px]' : 'w-6 h-6';
@@ -33,7 +25,13 @@ export function Skull({ alive, className = 'w-6 h-6' }) {
       <path d="M12 13 l-1.3 2.4 h2.6z" fill="#0a0705" />
       <path d="M9 17.5v2.5M12 17.5v2.5M15 17.5v2.5" stroke="#0a0705" strokeWidth="0.9" />
       {!alive && (
-        <path d="M13.5 2.5 L11.5 7 L14 9 L11 13" fill="none" stroke="#0a0705" strokeWidth="1.2" strokeLinejoin="round" />
+        <path
+          d="M13.5 2.5 L11.5 7 L14 9 L11 13"
+          fill="none"
+          stroke="#0a0705"
+          strokeWidth="1.2"
+          strokeLinejoin="round"
+        />
       )}
     </svg>
   );
@@ -49,13 +47,32 @@ function WallOverlay() {
     >
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
         {[10, 30, 50, 70, 90].map((x) => (
-          <rect key={x} x={x - 2} y="0" width="4" height="100" fill="#1a110b" stroke="#4a5568" strokeWidth="0.6" />
+          <rect
+            key={x}
+            x={x - 2}
+            y="0"
+            width="4"
+            height="100"
+            fill="#1a110b"
+            stroke="#4a5568"
+            strokeWidth="0.6"
+          />
         ))}
         {[30, 70].map((y) => (
           <g key={y}>
-            <path d={`M0 ${y} Q 12 ${y - 6} 25 ${y} T 50 ${y} T 75 ${y} T 100 ${y}`} fill="none" stroke="#6b7685" strokeWidth="1.6" />
+            <path
+              d={`M0 ${y} Q 12 ${y - 6} 25 ${y} T 50 ${y} T 75 ${y} T 100 ${y}`}
+              fill="none"
+              stroke="#6b7685"
+              strokeWidth="1.6"
+            />
             {[12, 37, 62, 87].map((x) => (
-              <path key={x} d={`M${x - 3} ${y - 3} L${x + 3} ${y + 3} M${x + 3} ${y - 3} L${x - 3} ${y + 3}`} stroke="#9aa5b4" strokeWidth="1" />
+              <path
+                key={x}
+                d={`M${x - 3} ${y - 3} L${x + 3} ${y + 3} M${x + 3} ${y - 3} L${x - 3} ${y + 3}`}
+                stroke="#9aa5b4"
+                strokeWidth="1"
+              />
             ))}
           </g>
         ))}
@@ -73,7 +90,11 @@ function WallOverlay() {
 
 function BrokenWallOverlay() {
   return (
-    <motion.div className="absolute inset-0 z-30 pointer-events-none" initial={{ opacity: 1 }} animate={{ opacity: 1 }}>
+    <motion.div
+      className="absolute inset-0 z-30 pointer-events-none"
+      initial={{ opacity: 1 }}
+      animate={{ opacity: 1 }}
+    >
       {[-1, 1].map((dir) => (
         <motion.div
           key={dir}
@@ -83,9 +104,23 @@ function BrokenWallOverlay() {
           animate={{ x: dir * 50, rotate: dir * 18, opacity: 0 }}
           transition={{ duration: 1.3, ease: 'easeOut' }}
         >
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-[200%] h-full" style={{ marginLeft: dir === -1 ? 0 : '-100%' }}>
+          <svg
+            viewBox="0 0 100 100"
+            preserveAspectRatio="none"
+            className="w-[200%] h-full"
+            style={{ marginLeft: dir === -1 ? 0 : '-100%' }}
+          >
             {[10, 30, 50, 70, 90].map((x) => (
-              <rect key={x} x={x - 2} y="0" width="4" height="100" fill="#1a110b" stroke="#4a5568" strokeWidth="0.6" />
+              <rect
+                key={x}
+                x={x - 2}
+                y="0"
+                width="4"
+                height="100"
+                fill="#1a110b"
+                stroke="#4a5568"
+                strokeWidth="0.6"
+              />
             ))}
           </svg>
         </motion.div>
@@ -111,7 +146,11 @@ function DamageOverlay() {
         animate={{ opacity: [0.85, 0.1, 0.35, 0.05] }}
         transition={{ duration: 1.1 }}
       />
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 z-30 w-full h-full pointer-events-none">
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="absolute inset-0 z-30 w-full h-full pointer-events-none"
+      >
         <motion.path
           d="M8 4 L94 96"
           stroke="#fff"
@@ -153,7 +192,9 @@ function ReflectOverlay() {
     <>
       <motion.div
         className="absolute -inset-1 z-20 rounded pointer-events-none"
-        animate={{ boxShadow: ['0 0 10px #d4af37', '0 0 38px #fde68a', '0 0 10px #d4af37'] }}
+        animate={{
+          boxShadow: ['0 0 10px #d4af37', '0 0 38px #fde68a', '0 0 10px #d4af37'],
+        }}
         transition={{ duration: 0.9, repeat: Infinity }}
       />
       <motion.svg
@@ -162,7 +203,12 @@ function ReflectOverlay() {
         animate={{ scale: [1, 1.25, 1], opacity: [0.9, 1, 0.9] }}
         transition={{ duration: 0.9, repeat: Infinity }}
       >
-        <path d="M20 2 L37 9 V24 C37 35 29 43 20 46 C11 43 3 35 3 24 V9Z" fill="rgba(253,230,138,0.35)" stroke="#d4af37" strokeWidth="2.5" />
+        <path
+          d="M20 2 L37 9 V24 C37 35 29 43 20 46 C11 43 3 35 3 24 V9Z"
+          fill="rgba(253,230,138,0.35)"
+          stroke="#d4af37"
+          strokeWidth="2.5"
+        />
         <path d="M20 2 V46" stroke="#fde68a" strokeWidth="1.2" opacity="0.8" />
         <path d="M9 14 L16 30 M31 14 L24 30" stroke="#fff" strokeWidth="1.5" opacity="0.7" />
       </motion.svg>
@@ -170,7 +216,7 @@ function ReflectOverlay() {
   );
 }
 
-function CardSlot({ player, phase, slotStyle }) {
+export function CardSlot({ player, phase, slotStyle }) {
   const action = player.selectedAction;
   let content = null;
 
@@ -185,9 +231,21 @@ function CardSlot({ player, phase, slotStyle }) {
           key="none"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="w-[64px] h-[92px] flex items-center justify-center border-2 border-dashed border-iron/60 rounded-md text-[9px] text-iron text-center font-mono"
+          className="w-[64px] h-[92px] flex items-center justify-center border-2 border-dashed border-iron/60 bg-black/65 rounded-md text-[9px] text-iron text-center font-mono"
         >
           PASSOU
+        </motion.div>
+      );
+    } else if (action.cardType === 'DISCARD') {
+      content = (
+        <motion.div
+          key="discard"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="w-[64px] h-[92px] flex flex-col items-center justify-center border-2 border-dashed border-amber-500/60 bg-black/75 rounded-md text-[8px] text-amber-300 text-center font-mono px-1"
+        >
+          <span>DESCARTOU</span>
+          <span className="font-bold text-[10px]">{action.discardedCount || 1}</span>
         </motion.div>
       );
     } else if (action.cardType) {
@@ -206,25 +264,42 @@ function CardSlot({ player, phase, slotStyle }) {
   }
 
   return (
-    <div className="absolute z-[5] pointer-events-none" style={slotStyle}>
+    <div className="absolute z-[15] pointer-events-none" style={slotStyle}>
       <div style={{ perspective: 600 }}>{content}</div>
     </div>
   );
 }
 
-function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, targetable, dimmed, onSeatClick, onDropCard }) {
+function PlayerSeatBase({
+  player,
+  index,
+  localIndex,
+  totalPlayers,
+  isMe,
+  phase,
+  targetable,
+  dimmed,
+  onSeatClick,
+  onDropCard,
+}) {
   const [over, setOver] = useState(false);
   const { x, y, angle } = seatPosition(index, localIndex, totalPlayers);
   const slotX = 50 + 20 * Math.cos(angle);
   const slotY = 50 + 19 * Math.sin(angle);
   const fx = player.visualEffect;
   const shake = fx === 'DAMAGE' || fx === 'VACUUM';
+  const knifeDmg = player.knifeDamage || 1;
+  const hasPact = (player.bloodPactWith || []).length > 0;
 
   return (
     <>
       <div
         className="absolute z-10"
-        style={{ left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)' }}
+        style={{
+          left: `${x}%`,
+          top: `${y}%`,
+          transform: 'translate(-50%, -50%) translateZ(8px)',
+        }}
         onDragOver={(e) => {
           if (!player.isAlive) return;
           e.preventDefault();
@@ -236,7 +311,7 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
           setOver(false);
           if (player.isAlive && onDropCard) onDropCard(player, e);
         }}
-        onClick={() => targetable && onSeatClick && onSeatClick(player)}
+        onClick={() => onSeatClick && onSeatClick(player)}
       >
         <motion.div
           animate={shake ? { x: [0, -12, 12, -8, 8, 0] } : { x: 0 }}
@@ -252,11 +327,17 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
         >
           {/* Placa de identificação enferrujada */}
           <div className="flex items-center justify-between gap-0.5 sm:gap-1 rounded-sm px-1 sm:px-1.5 py-[1px] sm:py-[2px] mb-0.5 sm:mb-1 bg-gradient-to-r from-[#5a3b27] via-[#8a5a36] to-[#5a3b27] border border-[#2a1810] shadow-inner">
-            <span className="font-typewriter text-[9px] sm:text-[11px] text-[#f1e2bd] truncate max-w-[75%]">{player.name}</span>
+            <span className="font-typewriter text-[9px] sm:text-[11px] text-[#f1e2bd] truncate max-w-[75%]">
+              {player.name}
+            </span>
             <span
               className={cn(
                 'text-[7px] sm:text-[8px] font-mono font-bold px-0.5 sm:px-1 rounded-sm',
-                isMe ? 'bg-gold-aged text-black' : player.isBot ? 'bg-iron text-white' : 'bg-parchment-dark text-black'
+                isMe
+                  ? 'bg-gold-aged text-black'
+                  : player.isBot
+                    ? 'bg-iron text-white'
+                    : 'bg-parchment-dark text-black'
               )}
             >
               {isMe ? 'VOCÊ' : player.isBot ? 'BOT' : 'HUMANO'}
@@ -264,7 +345,12 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
           </div>
 
           {/* Caveiras */}
-          <div className={cn('flex flex-wrap justify-center', player.maxLives >= 5 ? 'gap-0.5' : 'gap-0.5 sm:gap-1')}>
+          <div
+            className={cn(
+              'flex flex-wrap justify-center',
+              player.maxLives >= 5 ? 'gap-0.5' : 'gap-0.5 sm:gap-1'
+            )}
+          >
             {Array.from({ length: player.maxLives }).map((_, i) => (
               <Skull
                 key={i}
@@ -274,15 +360,45 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
             ))}
           </div>
 
+          {/* Indicadores de Buff de Faca / Pacto de Sangue / Mão Revelada */}
+          {player.isAlive && (knifeDmg > 1 || hasPact || player.isHandRevealed) && (
+            <div className="flex flex-wrap items-center justify-center gap-0.5 mt-1">
+              {knifeDmg > 1 && (
+                <span className="px-1 rounded bg-teal-950 border border-teal-400 text-[7px] font-mono font-bold text-teal-200">
+                  🗡️{knifeDmg}x
+                </span>
+              )}
+              {hasPact && (
+                <span className="px-1 rounded bg-rose-950 border border-rose-500 text-[7px] font-mono font-bold text-rose-200">
+                  🩸PACTO
+                </span>
+              )}
+              {player.isHandRevealed && (
+                <span className="px-1 rounded bg-amber-950 border border-amber-400 text-[7px] font-mono font-bold text-amber-200">
+                  👁️REVELADO
+                </span>
+              )}
+            </div>
+          )}
+
           {!player.isAlive && (
-            <div className="text-center text-[8px] sm:text-[9px] font-mono text-blood-bright font-bold mt-0.5">ELIMINADO</div>
+            <div className="text-center text-[8px] sm:text-[9px] font-mono text-blood-bright font-bold mt-0.5">
+              ELIMINADO
+            </div>
           )}
 
           {/* Mira vermelha quando é alvo válido */}
           {targetable && (
-            <svg viewBox="0 0 40 40" className="absolute inset-0 m-auto w-10 h-10 z-40 pointer-events-none animate-pulse">
+            <svg
+              viewBox="0 0 40 40"
+              className="absolute inset-0 m-auto w-10 h-10 z-40 pointer-events-none animate-pulse"
+            >
               <circle cx="20" cy="20" r="12" fill="none" stroke="#dc2626" strokeWidth="1.6" />
-              <path d="M20 2 V12 M20 28 V38 M2 20 H12 M28 20 H38" stroke="#dc2626" strokeWidth="1.8" />
+              <path
+                d="M20 2 V12 M20 28 V38 M2 20 H12 M28 20 H38"
+                stroke="#dc2626"
+                strokeWidth="1.8"
+              />
             </svg>
           )}
 
@@ -309,7 +425,11 @@ function PlayerSeatBase({ player, index, localIndex, totalPlayers, isMe, phase, 
       <CardSlot
         player={player}
         phase={phase}
-        slotStyle={{ left: `${slotX}%`, top: `${slotY}%`, transform: 'translate(-50%, -50%)' }}
+        slotStyle={{
+          left: `${slotX}%`,
+          top: `${slotY}%`,
+          transform: 'translate(-50%, -50%) translateZ(14px)',
+        }}
       />
     </>
   );
