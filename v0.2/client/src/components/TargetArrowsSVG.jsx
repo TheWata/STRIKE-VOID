@@ -151,6 +151,28 @@ function TargetArrowsSVGBase({ players, localIndex }) {
         >
           <polygon points="0,0 5,2.5 0,5" fill="#f43f5e" />
         </marker>
+        <marker
+          id="arrowhead-lime"
+          markerWidth="5"
+          markerHeight="5"
+          refX="4"
+          refY="2.5"
+          orient="auto"
+          markerUnits="userSpaceOnUse"
+        >
+          <polygon points="0,0 5,2.5 0,5" fill="#a3e635" />
+        </marker>
+        <marker
+          id="arrowhead-emerald"
+          markerWidth="5"
+          markerHeight="5"
+          refX="4"
+          refY="2.5"
+          orient="auto"
+          markerUnits="userSpaceOnUse"
+        >
+          <polygon points="0,0 5,2.5 0,5" fill="#4ade80" />
+        </marker>
       </defs>
 
       {/* Fios carmesim de Pacto de Sangue */}
@@ -191,13 +213,17 @@ function TargetArrowsSVGBase({ players, localIndex }) {
               ? '#7fa3c0'
               : ar.type === CARD_TYPES.MANIPULAMENTO_ALMA
                 ? '#2dd4bf'
-                : ar.type === CARD_TYPES.DESARMAR
-                  ? '#fb923c'
-                  : ar.type === CARD_TYPES.REVELAR
-                    ? '#f59e0b'
-                    : ar.type === CARD_TYPES.PACTO_SANGUE
-                      ? '#f43f5e'
-                      : '#dc2626';
+                : ar.type === CARD_TYPES.SERINGA
+                  ? '#4ade80'
+                  : ar.type === CARD_TYPES.MARCA_MORTE
+                    ? '#a3e635'
+                    : ar.type === CARD_TYPES.DESARMAR
+                      ? '#fb923c'
+                      : ar.type === CARD_TYPES.REVELAR
+                        ? '#f59e0b'
+                        : ar.type === CARD_TYPES.PACTO_SANGUE
+                          ? '#f43f5e'
+                          : '#dc2626';
 
         const marker = ar.reflected
           ? 'url(#arrowhead-gold)'
@@ -207,13 +233,17 @@ function TargetArrowsSVGBase({ players, localIndex }) {
               ? 'url(#arrowhead-blue)'
               : ar.type === CARD_TYPES.MANIPULAMENTO_ALMA
                 ? 'url(#arrowhead-teal)'
-                : ar.type === CARD_TYPES.DESARMAR
-                  ? 'url(#arrowhead-orange)'
-                  : ar.type === CARD_TYPES.REVELAR
-                    ? 'url(#arrowhead-gold)'
-                    : ar.type === CARD_TYPES.PACTO_SANGUE
-                      ? 'url(#arrowhead-rose)'
-                      : 'url(#arrowhead-red)';
+                : ar.type === CARD_TYPES.SERINGA
+                  ? 'url(#arrowhead-emerald)'
+                  : ar.type === CARD_TYPES.MARCA_MORTE
+                    ? 'url(#arrowhead-lime)'
+                    : ar.type === CARD_TYPES.DESARMAR
+                      ? 'url(#arrowhead-orange)'
+                      : ar.type === CARD_TYPES.REVELAR
+                        ? 'url(#arrowhead-gold)'
+                        : ar.type === CARD_TYPES.PACTO_SANGUE
+                          ? 'url(#arrowhead-rose)'
+                          : 'url(#arrowhead-red)';
 
         let d;
         if (ar.self) {

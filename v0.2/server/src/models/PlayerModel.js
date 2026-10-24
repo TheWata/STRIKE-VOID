@@ -23,6 +23,9 @@ function createPlayer(id, name, isBot, maxHp = DEFAULT_MAX_HP) {
     isReflecting: false,
     knifeDamage: 1,
     bloodPactWith: [],
+    deathMarkTurns: null,
+    deathMarkAppliedRound: null,
+    tookDamageThisRound: false,
     handRevealedUntilRound: 0,
     hand: [],
     selectedAction: null,
@@ -40,6 +43,9 @@ function resetPlayerForMatch(player, maxHp = DEFAULT_MAX_HP) {
   player.isReflecting = false;
   player.knifeDamage = 1;
   player.bloodPactWith = [];
+  player.deathMarkTurns = null;
+  player.deathMarkAppliedRound = null;
+  player.tookDamageThisRound = false;
   player.handRevealedUntilRound = 0;
   player.hand = [];
   player.selectedAction = null;

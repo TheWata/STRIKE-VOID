@@ -1,5 +1,20 @@
 const { uuid } = require('../helpers/idHelper');
-const { ALL_CARD_TYPES, DECK_COMPOSITION } = require('../models/CardModel');
+const { CARD_TYPES, ALL_CARD_TYPES, DECK_COMPOSITION } = require('../models/CardModel');
+
+function createCardInstance(type) {
+  if (type === CARD_TYPES.SERINGA) {
+    return { id: uuid(), type, charges: 0 };
+  }
+  return { id: uuid(), type };
+}
+
+function normalizeCard(card) {
+  if (!card) return card;
+  if (card.type === CARD_TYPES.SERINGA) {
+    card.charges = 0;
+  }
+  return card;
+}
 
 function shuffle(arr) {
   for (let i = arr.length - 1; i > 0; i--) {
@@ -13,19 +28,28 @@ function buildDeck() {
   const deck = [];
   for (const [type, count] of Object.entries(DECK_COMPOSITION)) {
     for (let i = 0; i < count; i++) {
-      deck.push({ id: uuid(), type });
+      deck.push(createCardInstance(type));
     }
   }
   return shuffle(deck);
 }
 
-function drawCard(room) {
-  if (room.gameState.deck.length === 0) {
-    room.gameState.deck = room.gameState.discardPile;
+function recycleDiscardIntoDeck(room) {
+  if (room.gameState.discardPile.length > 0) {
+    for (const c of room.gameState.discardPile) {
+      normalizeCard(c);
+      room.gameState.deck.push(c);
+    }
     room.gameState.discardPile = [];
     shuffle(room.gameState.deck);
   }
-  return room.gameState.deck.pop();
+}
+
+function drawCard(room) {
+  if (room.gameState.deck.length === 0) {
+    recycleDiscardIntoDeck(room);
+  }
+  return normalizeCard(room.gameState.deck.pop());
 }
 
 /**
@@ -45,9 +69,7 @@ function drawCardForPlayer(room, player) {
   }
 
   if (room.gameState.deck.length === 0) {
-    room.gameState.deck = room.gameState.discardPile;
-    room.gameState.discardPile = [];
-    shuffle(room.gameState.deck);
+    recycleDiscardIntoDeck(room);
   }
 
   let cardIndex = -1;
@@ -59,17 +81,15 @@ function drawCardForPlayer(room, player) {
   }
 
   if (cardIndex !== -1) {
-    return room.gameState.deck.splice(cardIndex, 1)[0];
+    return normalizeCard(room.gameState.deck.splice(cardIndex, 1)[0]);
   }
 
   if (room.gameState.discardPile.length > 0) {
-    room.gameState.deck.push(...room.gameState.discardPile);
-    room.gameState.discardPile = [];
-    shuffle(room.gameState.deck);
+    recycleDiscardIntoDeck(room);
 
     for (let i = room.gameState.deck.length - 1; i >= 0; i--) {
       if (!forbidden.has(room.gameState.deck[i].type)) {
-        return room.gameState.deck.splice(i, 1)[0];
+        return normalizeCard(room.gameState.deck.splice(i, 1)[0]);
       }
     }
   }
@@ -77,10 +97,12 @@ function drawCardForPlayer(room, player) {
   const allowed = ALL_CARD_TYPES.filter((t) => !forbidden.has(t));
   if (allowed.length === 0) return null;
   const pickedType = allowed[Math.floor(Math.random() * allowed.length)];
-  return { id: uuid(), type: pickedType };
+  return createCardInstance(pickedType);
 }
 
 module.exports = {
+  createCardInstance,
+  normalizeCard,
   shuffle,
   buildDeck,
   drawCard,

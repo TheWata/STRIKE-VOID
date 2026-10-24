@@ -205,10 +205,10 @@ export default function GameTable3DView({
               ? 'bg-amber-900/50 border-amber-400 text-amber-100 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
               : 'bg-stone-950/80 border-stone-800 text-stone-400 hover:text-parchment hover:border-stone-600'
           )}
-          title="Olhar embaixo da mesa: Caderno de Anotações e Chat [Mouse Embaixo / Seta Baixo]"
+          title="Olhar embaixo da mesa: Livro de Cartas, Caderno de Anotações e Chat [Mouse Embaixo / Seta Baixo]"
         >
           <BookOpen size={13} className="shrink-0 text-amber-400" />
-          <span className="hidden md:inline">CADERNO</span>
+          <span className="hidden md:inline">LIVRO & CHAT</span>
         </button>
 
         <button
@@ -631,12 +631,29 @@ export default function GameTable3DView({
                   'artifact-btn flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 rounded border-2 font-grimoire font-bold text-[10px] sm:text-xs shadow-md active:scale-95 transition-all',
                   selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA
                     ? 'border-teal-400 bg-teal-950/90 text-teal-200 hover:bg-teal-900 shadow-[0_0_18px_rgba(45,212,191,0.35)]'
-                    : 'border-gold-aged bg-black/90 text-gold-aged hover:bg-gold-aged/20'
+                    : selectedCard.type === CARD_TYPES.PACTO_SANGUE
+                      ? (me.bloodPactWith || []).length > 0
+                        ? 'border-amber-400 bg-amber-950/90 text-amber-100 hover:bg-amber-900 shadow-[0_0_18px_rgba(245,158,11,0.4)]'
+                        : 'border-rose-500 bg-rose-950/90 text-rose-200 hover:bg-rose-900 shadow-[0_0_18px_rgba(244,63,94,0.35)]'
+                      : selectedCard.type === CARD_TYPES.SERINGA
+                        ? 'border-emerald-400 bg-emerald-950/90 text-emerald-200 hover:bg-emerald-900 shadow-[0_0_18px_rgba(52,211,153,0.35)]'
+                        : 'border-gold-aged bg-black/90 text-gold-aged hover:bg-gold-aged/20'
                 )}
               >
                 {selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA ? (
                   <>
                     <Flame size={13} className="text-teal-300" /> +1 DANO NA MINHA FACA
+                  </>
+                ) : selectedCard.type === CARD_TYPES.PACTO_SANGUE ? (
+                  (me.bloodPactWith || []).length > 0 ? (
+                    <>⛓️‍💥 QUEBRAR MEU PACTO</>
+                  ) : (
+                    <>🩸 PACTO EM MIM (-1 VIDA)</>
+                  )
+                ) : selectedCard.type === CARD_TYPES.SERINGA ? (
+                  <>
+                    💉 USAR EM MIM ({selectedCard.charges || 0}/4
+                    {(selectedCard.charges || 0) > (me.maxLives - me.lives) ? ' · OVERDOSE!' : ''})
                   </>
                 ) : (
                   <>
@@ -711,7 +728,7 @@ export default function GameTable3DView({
           >
             <ChevronDown size={13} className="animate-bounce text-gold-aged" />
             <span className="font-bold tracking-wider">
-              📓 PASSE O MOUSE AQUI EMBAIXO PARA OLHAR O CADERNO DE ANOTAÇÕES & CHAT ({logs.length})
+              📖 PASSE O MOUSE AQUI EMBAIXO PARA ABRIR O LIVRO DE CARTAS & CADERNO DE CHAT ({logs.length})
             </span>
             <ChevronDown size={13} className="animate-bounce text-gold-aged" />
           </button>

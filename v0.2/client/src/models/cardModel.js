@@ -6,92 +6,178 @@ export const CARD_TYPES = {
   DESARMAR: 'DESARMAR',
   MANIPULAMENTO_ALMA: 'MANIPULAMENTO_ALMA',
   PACTO_SANGUE: 'PACTO_SANGUE',
+  MARCA_MORTE: 'MARCA_MORTE',
+  SERINGA: 'SERINGA',
+};
+
+export const CARD_CATEGORIES = {
+  REACAO: {
+    id: 'REACAO',
+    label: 'REAÇÃO',
+    priority: 1,
+    badgeCls: 'border-purple-400/70 bg-purple-950/90 text-purple-200',
+  },
+  DEFENSIVO: {
+    id: 'DEFENSIVO',
+    label: 'DEFENSIVO',
+    priority: 2,
+    badgeCls: 'border-cyan-400/70 bg-cyan-950/90 text-cyan-200',
+  },
+  SUPORTE: {
+    id: 'SUPORTE',
+    label: 'SUPORTE',
+    priority: 3,
+    badgeCls: 'border-emerald-400/70 bg-emerald-950/90 text-emerald-200',
+  },
+  CONTROLE: {
+    id: 'CONTROLE',
+    label: 'CONTROLE',
+    priority: 4,
+    badgeCls: 'border-amber-400/70 bg-amber-950/90 text-amber-200',
+  },
+  OFENSIVO: {
+    id: 'OFENSIVO',
+    label: 'OFENSIVO',
+    priority: 5,
+    badgeCls: 'border-red-500/75 bg-red-950/90 text-red-200',
+  },
 };
 
 export const CARD_META = {
-  [CARD_TYPES.FACA]: {
-    type: CARD_TYPES.FACA,
-    name: 'FACA',
-    shortName: 'FACA',
-    foot: '1 DANO / QUEBRA PAREDE',
-    badge: 'Ofensiva · 1+ Dano',
-    accentColor: '#dc2626',
+  [CARD_TYPES.REVERSO]: {
+    type: CARD_TYPES.REVERSO,
+    name: 'ESPELHO AMALDIÇOADO',
+    shortName: 'ESPELHO AMALD.',
+    foot: 'REFLETE / ROUBA PAREDE',
+    category: 'REACAO',
+    categoryLabel: 'REAÇÃO',
+    priority: 1,
+    badge: 'P1 · Reação',
+    accentColor: '#c084fc',
     requiresOtherPlayer: false,
     ignoresWall: false,
     description:
-      'Golpeia o alvo causando 1 de Dano (ou mais se fortalecida por Manipulamento de Alma) ou destrói uma Parede.',
+      'Prioridade 1 (Reação): Espelho quebrado que reflete ações de volta aos atacantes ou rouba paredes. No vazio, cobra 1 Vida!',
   },
   [CARD_TYPES.PAREDE]: {
     type: CARD_TYPES.PAREDE,
     name: 'PAREDE',
     shortName: 'PAREDE',
     foot: 'ISOLA ALVO / AUTO-MIRA',
-    badge: 'Defensiva · Prisão',
+    category: 'DEFENSIVO',
+    categoryLabel: 'DEFENSIVO',
+    priority: 2,
+    badge: 'P2 · Defensivo',
     accentColor: '#7fa3c0',
     requiresOtherPlayer: false,
     ignoresWall: false,
     description:
-      'Ergue grades de ferro ao redor do alvo. Absorve 1 facada, mas impede o emparedado de mirar nos outros.',
+      'Prioridade 2 (Defensivo): Ergue grades de ferro ao redor do alvo. Absorve 1 facada, mas impede o emparedado de mirar nos outros.',
   },
-  [CARD_TYPES.REVERSO]: {
-    type: CARD_TYPES.REVERSO,
-    name: 'ESPELHO AMALDIÇOADO',
-    shortName: 'ESPELHO AMALD.',
-    foot: 'REFLETE / ROUBA PAREDE',
-    badge: 'Reflexo · Maldição',
-    accentColor: '#c084fc',
+  [CARD_TYPES.SERINGA]: {
+    type: CARD_TYPES.SERINGA,
+    name: 'SERINGA',
+    shortName: 'SERINGA',
+    foot: '+1 CARGA/TURNO · OVERDOSE',
+    category: 'SUPORTE',
+    categoryLabel: 'SUPORTE',
+    priority: 3,
+    badge: 'P3 · Suporte',
+    accentColor: '#4ade80',
     requiresOtherPlayer: false,
     ignoresWall: false,
     description:
-      'Um espelho quebrado amaldiçoado que reflete ações de volta aos atacantes ou rouba paredes. No vazio, cobra 1 Vida!',
-  },
-  [CARD_TYPES.REVELAR]: {
-    type: CARD_TYPES.REVELAR,
-    name: 'REVELAR',
-    shortName: 'REVELAR',
-    foot: 'EXPÕE A MÃO DO ALVO',
-    badge: 'Visão · Espionagem',
-    accentColor: '#f59e0b',
-    requiresOtherPlayer: true,
-    ignoresWall: false,
-    description:
-      'O Olho Abissal revela todas as cartas da mão do jogador selecionado para toda a mesa durante esta e a próxima rodada.',
-  },
-  [CARD_TYPES.DESARMAR]: {
-    type: CARD_TYPES.DESARMAR,
-    name: 'DESARMAR',
-    shortName: 'DESARMAR',
-    foot: 'DESCARTA 2 DO ALVO',
-    badge: 'Sabotagem · Descarte',
-    accentColor: '#fb923c',
-    requiresOtherPlayer: true,
-    ignoresWall: false,
-    description:
-      'Arranca e descarta 2 cartas aleatórias diretamente da mão de outro jogador.',
+      'Prioridade 3 (Suporte): Começa vazia (0/4) e ganha +1 carga a cada turno na mão. Cura 1 Vida por carga. Se a cura exceder a vida máxima, entra em OVERDOSE e aplica Marca da Morte com (5 − excesso) turnos!',
   },
   [CARD_TYPES.MANIPULAMENTO_ALMA]: {
     type: CARD_TYPES.MANIPULAMENTO_ALMA,
     name: 'MANIP. DE ALMA',
     shortName: 'MANIP. ALMA',
     foot: 'TROCA VIDA / +1 FACA',
-    badge: 'Arcano · Vida & Dano',
+    category: 'SUPORTE',
+    categoryLabel: 'SUPORTE',
+    priority: 3,
+    badge: 'P3 · Suporte',
     accentColor: '#2dd4bf',
     requiresOtherPlayer: false,
     ignoresWall: false,
     description:
-      'Se usado em outro jogador, troca sua barra de vida com a dele. Se usado em si mesmo, aumenta permanentemente o dano da própria Faca (+1 Dano)!',
+      'Prioridade 3 (Suporte): Se usado em outro jogador, troca sua barra de vida com a dele. Se usado em si mesmo, aumenta permanentemente o dano da própria Faca (+1 Dano)!',
+  },
+  [CARD_TYPES.REVELAR]: {
+    type: CARD_TYPES.REVELAR,
+    name: 'REVELAR',
+    shortName: 'REVELAR',
+    foot: 'EXPÕE A MÃO DO ALVO',
+    category: 'SUPORTE',
+    categoryLabel: 'SUPORTE',
+    priority: 3,
+    badge: 'P3 · Suporte',
+    accentColor: '#f59e0b',
+    requiresOtherPlayer: true,
+    ignoresWall: false,
+    description:
+      'Prioridade 3 (Suporte): O Olho Abissal revela todas as cartas da mão do jogador selecionado para toda a mesa durante esta e a próxima rodada.',
   },
   [CARD_TYPES.PACTO_SANGUE]: {
     type: CARD_TYPES.PACTO_SANGUE,
     name: 'PACTO DE SANGUE',
     shortName: 'PACTO SANGUE',
-    foot: 'IGNORA PAREDE / VINCULA',
-    badge: 'Sangue · Vínculo',
+    foot: 'VINCULA / EM SI QUEBRA',
+    category: 'CONTROLE',
+    categoryLabel: 'CONTROLE',
+    priority: 4,
+    badge: 'P4 · Controle',
     accentColor: '#f43f5e',
-    requiresOtherPlayer: true,
+    requiresOtherPlayer: false,
     ignoresWall: true,
     description:
-      'Ignora qualquer Parede e vincula sua barra de vida à de outra pessoa (todo dano sofrido é compartilhado). Se refletido pelo Espelho Amaldiçoado, você toma 1 de dano!',
+      'Prioridade 4 (Controle): Ignora Parede e vincula sua vida à de outra pessoa. Usado em SI MESMO: quebra seus pactos ativos (se não estiver em pacto, perde 1 Vida). Se refletido, toma 1 de dano!',
+  },
+  [CARD_TYPES.MARCA_MORTE]: {
+    type: CARD_TYPES.MARCA_MORTE,
+    name: 'MARCA DA MORTE',
+    shortName: 'MARCA MORTE',
+    foot: '5 RODADAS SEM DANO = MORTE',
+    category: 'CONTROLE',
+    categoryLabel: 'CONTROLE',
+    priority: 4,
+    badge: 'P4 · Controle',
+    accentColor: '#a3e635',
+    requiresOtherPlayer: true,
+    ignoresWall: false,
+    description:
+      'Prioridade 4 (Controle): Amaldiçoa outro jogador com a Marca da Morte. Se o marcado ficar 5 rodadas sem tomar dano, morre instantaneamente! Sofrer dano sacia e remove a marca.',
+  },
+  [CARD_TYPES.DESARMAR]: {
+    type: CARD_TYPES.DESARMAR,
+    name: 'DESARMAR',
+    shortName: 'DESARMAR',
+    foot: 'DESCARTA 2 DO ALVO',
+    category: 'CONTROLE',
+    categoryLabel: 'CONTROLE',
+    priority: 4,
+    badge: 'P4 · Controle',
+    accentColor: '#fb923c',
+    requiresOtherPlayer: true,
+    ignoresWall: false,
+    description:
+      'Prioridade 4 (Controle): Arranca e descarta 2 cartas aleatórias diretamente da mão de outro jogador.',
+  },
+  [CARD_TYPES.FACA]: {
+    type: CARD_TYPES.FACA,
+    name: 'FACA',
+    shortName: 'FACA',
+    foot: '1 DANO / QUEBRA PAREDE',
+    category: 'OFENSIVO',
+    categoryLabel: 'OFENSIVO',
+    priority: 5,
+    badge: 'P5 · Ofensivo',
+    accentColor: '#dc2626',
+    requiresOtherPlayer: false,
+    ignoresWall: false,
+    description:
+      'Prioridade 5 (Ofensivo): Golpeia o alvo causando 1 de Dano (ou mais se fortalecida por Manipulamento de Alma) ou destrói uma Parede.',
   },
 };
 
@@ -105,14 +191,14 @@ export function canTargetPlayer({ canAct, selectedCard, targetPlayer, me }) {
   const meta = CARD_META[selectedCard.type];
   const isSelf = targetPlayer.id === me.id;
 
-  // Cartas que exigem outro jogador como alvo (Revelar, Desarmar, Pacto de Sangue)
+  // Cartas que exigem outro jogador como alvo (Revelar, Desarmar, Marca da Morte)
   if (meta?.requiresOtherPlayer && isSelf) {
     return false;
   }
 
-  // Pacto de Sangue ignora parede do conjurador e do alvo
+  // Pacto de Sangue ignora parede do conjurador e do alvo (pode mirar em si ou em qualquer vivo)
   if (meta?.ignoresWall) {
-    return !isSelf;
+    return true;
   }
 
   // Se o conjurador estiver emparedado, só pode mirar em si mesmo

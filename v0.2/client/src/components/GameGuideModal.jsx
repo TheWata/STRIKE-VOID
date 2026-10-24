@@ -12,8 +12,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { audio } from '../lib/audio';
-import InscryptionCard from './InscryptionCard';
-import { CARD_TYPES } from '../models/cardModel';
+import CardGrimoireBook from './CardGrimoireBook';
 
 export default function GameGuideModal({ open, onClose }) {
   const [activeTab, setActiveTab] = useState('cards'); // 'game' | 'cards'
@@ -53,7 +52,7 @@ export default function GameGuideModal({ open, onClose }) {
             exit={{ scale: 0.92, y: 16, opacity: 0 }}
             transition={{ type: 'spring', damping: 24, stiffness: 280 }}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-3xl max-h-[86dvh] flex flex-col rounded-xl border-4 border-stone-900 bg-gradient-to-b from-[#241710] via-wood-dark to-[#0f0906] text-parchment shadow-[0_0_60px_rgba(0,0,0,0.95),inset_0_0_40px_rgba(44,29,18,0.7)] overflow-hidden"
+            className="w-full max-w-4xl max-h-[88dvh] flex flex-col rounded-xl border-4 border-stone-900 bg-gradient-to-b from-[#241710] via-wood-dark to-[#0f0906] text-parchment shadow-[0_0_60px_rgba(0,0,0,0.95),inset_0_0_40px_rgba(44,29,18,0.7)] overflow-hidden"
           >
             {/* Header */}
             <div className="relative px-3 sm:px-6 pt-3.5 sm:pt-4 pb-3.5 border-b-2 border-stone-700/80 bg-gradient-to-r from-[#332115] via-[#3d2719] to-[#2a1b11] shadow-[0_2px_15px_rgba(0,0,0,0.6),inset_0_1px_0_rgba(212,175,55,0.25)] flex items-center justify-between gap-2 shrink-0">
@@ -68,11 +67,11 @@ export default function GameGuideModal({ open, onClose }) {
                   >
                     MANUAL DO CONDENADO
                     <span className="text-[10px] font-mono font-bold text-amber-300 bg-gold-aged/20 border border-gold-aged/50 px-1.5 py-0.2 rounded hidden sm:inline-block shadow-sm">
-                      3D · 7 CARTAS
+                      3D · 9 CARTAS · 5 PRIORIDADES
                     </span>
                   </h2>
                   <p className="text-[10px] sm:text-xs font-mono text-amber-200/80 tracking-wide">
-                    Grimório de cartas, visão 3D em 1ª pessoa e sobrevivência no STRIKE / VOID
+                    Grimório de cartas, tipos, prioridades (P1–P5) e sobrevivência no STRIKE / VOID
                   </p>
                 </div>
               </div>
@@ -103,8 +102,8 @@ export default function GameGuideModal({ open, onClose }) {
                 )}
               >
                 <Layers size={15} className={activeTab === 'cards' ? 'text-gold-aged' : 'text-stone-400'} />
-                <span>🃏 AS 7 CARTAS</span>
-                <span className="hidden sm:inline text-[11px] font-mono opacity-80">(Grimório Completo)</span>
+                <span>🃏 AS 9 CARTAS</span>
+                <span className="hidden sm:inline text-[11px] font-mono opacity-80">(Grimório & Tipos)</span>
               </button>
 
               <button
@@ -172,7 +171,7 @@ function TabTheGame() {
           </div>
           <div className="rounded bg-wood-dark/80 border border-amber-500/40 p-2.5">
             <strong className="text-amber-200 block mb-0.5">3. MOUSE MAIS EMBAIXO ↓</strong>
-            Olha embaixo da mesa e abre o <strong>Caderno de Anotações & Chat</strong> clandestino.
+            Olha embaixo da mesa e abre o <strong>Livro de Cartas (Grimório)</strong> junto com o <strong>Caderno de Anotações & Chat</strong>.
           </div>
         </div>
       </div>
@@ -191,24 +190,28 @@ function TabTheGame() {
       {/* Ordem de Resolução */}
       <div className="rounded-lg border border-iron/70 bg-black/40 p-3 sm:p-4">
         <div className="font-grimoire font-bold text-xs sm:text-sm tracking-wider text-parchment mb-2 flex items-center gap-2">
-          <Swords size={15} className="text-gold-aged" /> COREOGRAFIA DA RESOLUÇÃO (4 ETAPAS)
+          <Swords size={15} className="text-gold-aged" /> TIPOS DE CARTAS & ORDEM DE PRIORIDADE (P1 → P5)
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 text-[10.5px] font-mono">
-          <div className="rounded border border-fuchsia-950 bg-black/60 p-2">
-            <span className="text-fuchsia-400 font-bold block mb-0.5">1. ESPELHOS AMALDIÇOADOS</span>
-            Reflete ataques, quebra Pacto de Sangue contra o autor e pune uso no vazio com -1 Vida.
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-[10.5px] font-mono">
+          <div className="rounded border border-purple-700/70 bg-purple-950/30 p-2">
+            <span className="text-purple-300 font-bold block mb-0.5">P1 · REAÇÃO</span>
+            <strong>Espelho Amaldiçoado:</strong> Reflete ataques e maldições, rouba paredes e pune uso no vazio com -1 Vida.
           </div>
-          <div className="rounded border border-blue-950 bg-black/60 p-2">
-            <span className="text-blue-400 font-bold block mb-0.5">2. PAREDES</span>
-            Ergue grades de ferro que bloqueiam 1 facada e prendem a mira do alvo.
+          <div className="rounded border border-cyan-700/70 bg-cyan-950/30 p-2">
+            <span className="text-cyan-300 font-bold block mb-0.5">P2 · DEFENSIVO</span>
+            <strong>Parede:</strong> Ergue grades de ferro que bloqueiam 1 facada e prendem a mira do alvo.
           </div>
-          <div className="rounded border border-amber-900 bg-black/60 p-2">
-            <span className="text-amber-400 font-bold block mb-0.5">3. RITUAIS & ARCANOS</span>
-            Resolve Pacto de Sangue, Manipulamento de Alma, Desarmar e Revelar.
+          <div className="rounded border border-emerald-700/70 bg-emerald-950/30 p-2">
+            <span className="text-emerald-300 font-bold block mb-0.5">P3 · SUPORTE</span>
+            <strong>Seringa, Manip. de Alma e Revelar:</strong> Curas (ou Overdose!), trocas de vida, +1 Faca e visão.
           </div>
-          <div className="rounded border border-red-950 bg-black/60 p-2">
-            <span className="text-red-400 font-bold block mb-0.5">4. FACAS</span>
-            Executa golpes diretos, estilhaça paredes e propaga dano pelos Pactos de Sangue!
+          <div className="rounded border border-amber-700/70 bg-amber-950/30 p-2">
+            <span className="text-amber-300 font-bold block mb-0.5">P4 · CONTROLE</span>
+            <strong>Pacto de Sangue, Marca da Morte e Desarmar:</strong> Vínculos, quebras de pacto, maldições e descartes.
+          </div>
+          <div className="rounded border border-red-700/70 bg-red-950/30 p-2">
+            <span className="text-red-300 font-bold block mb-0.5">P5 · OFENSIVO</span>
+            <strong>Faca:</strong> Golpes diretos, quebra de paredes e avanço da Marca da Morte em quem não sangrou!
           </div>
         </div>
       </div>
@@ -217,122 +220,9 @@ function TabTheGame() {
 }
 
 function TabTheCards() {
-  const cardsList = [
-    {
-      type: CARD_TYPES.FACA,
-      title: '🔪 FACA (ATAQUE & QUEBRA DE PAREDE)',
-      badge: 'Ofensiva · 1+ Dano',
-      borderCls: 'border-red-950/70',
-      titleCls: 'text-red-400',
-      bullets: [
-        'Causa 1 de Dano (ou mais se fortalecida por Manipulamento de Alma) se o alvo não estiver emparedado.',
-        'Se o alvo estiver protegido por Parede, destrói a Parede (e se a Faca tiver dano > 1, o dano excedente perfura o alvo!).',
-        'Usar em si mesmo quando EMPAREDADO destrói sua própria Parede sem sofrer dano!',
-      ],
-    },
-    {
-      type: CARD_TYPES.PAREDE,
-      title: '🧱 PAREDE (DEFESA & PRISÃO TÁTICA)',
-      badge: 'Defensiva · Isolamento',
-      borderCls: 'border-cyan-950/80',
-      titleCls: 'text-[#7fa3c0]',
-      bullets: [
-        'Ergue grades de ferro em volta do alvo selecionado (em você ou num oponente).',
-        'Absorve 1 facada e se quebra.',
-        'Enquanto estiver EMPAREDADO, o jogador só pode mirar em si mesmo (exceto com Pacto de Sangue, que ignora paredes!).',
-      ],
-    },
-    {
-      type: CARD_TYPES.REVERSO,
-      title: '🪞 ESPELHO AMALDIÇOADO (ANTIGO REVERSO)',
-      badge: 'Reflexo · Maldição',
-      borderCls: 'border-fuchsia-950/80',
-      titleCls: 'text-fuchsia-300',
-      bullets: [
-        'Arte atualizada para um Espelho Quebrado sombrio.',
-        'Reflete ações externas de volta para quem atacou o alvo protegido pelo espelho.',
-        'Inverte auto-golpes (Blefe Russo) ou rouba Paredes erguidas pelo alvo para o conjurador.',
-        'Lei do Vácuo: se nenhuma ação interagir com o alvo na rodada, quem usou o Espelho Amaldiçoado perde 1 Vida!',
-      ],
-    },
-    {
-      type: CARD_TYPES.REVELAR,
-      title: '👁️ REVELAR (OLHO ABISSAL)',
-      badge: 'Nova · Espionagem',
-      borderCls: 'border-amber-900/80',
-      titleCls: 'text-amber-300',
-      bullets: [
-        'Utiliza a arte hipnótica do Olho Abissal.',
-        'Revela todas as cartas da mão da pessoa selecionada para TODA A MESA!',
-        'As cartas reveladas ficam expostas flutuando acima da silhueta do alvo e registradas no Caderno.',
-      ],
-    },
-    {
-      type: CARD_TYPES.DESARMAR,
-      title: '🧤 DESARMAR (SABOTAGEM DIRETA)',
-      badge: 'Nova · Descarte Forçado',
-      borderCls: 'border-orange-900/80',
-      titleCls: 'text-orange-300',
-      bullets: [
-        'Arranca e descarta 2 cartas aleatórias diretamente da mão de outro jogador.',
-        'Como cada jogador compra apenas 1 carta por rodada, desarmar um oponente reduz drasticamente as opções dele!',
-      ],
-    },
-    {
-      type: CARD_TYPES.MANIPULAMENTO_ALMA,
-      title: '👻 MANIPULAMENTO DE ALMA (VIDA OU PODER)',
-      badge: 'Nova · Troca de Vida / +1 Faca',
-      borderCls: 'border-teal-900/80',
-      titleCls: 'text-teal-300',
-      bullets: [
-        'Em outro jogador: Troca a sua barra de vida atual pela barra de vida do alvo selecionado!',
-        'Em si mesmo: Canaliza a própria alma e aumenta permanentemente o dano da sua própria Faca (+1 de Dano)!',
-      ],
-    },
-    {
-      type: CARD_TYPES.PACTO_SANGUE,
-      title: '🩸 PACTO DE SANGUE (VÍNCULO CARMESIM)',
-      badge: 'Nova · Ignora Parede & Vincula Vida',
-      borderCls: 'border-rose-900/80',
-      titleCls: 'text-rose-400',
-      bullets: [
-        'Ignora Parede: Pode ser usado mesmo se você ou o alvo estiverem Emparedados!',
-        'Vincula a barra de vida com outra pessoa: sempre que um dos dois sofrer dano, o outro também perde vida!',
-        'Risco Mortal: Se o alvo refletir o Pacto de Sangue com o Espelho Amaldiçoado, você toma 1 de Dano imediatamente!',
-      ],
-    },
-  ];
-
   return (
     <div className="space-y-3 text-parchment">
-      {cardsList.map((item) => (
-        <div
-          key={item.type}
-          className={cn(
-            'rounded-lg border-2 bg-black/60 p-3 sm:p-4 flex flex-col sm:flex-row gap-3 sm:gap-4 items-start',
-            item.borderCls
-          )}
-        >
-          <div className="shrink-0 mx-auto sm:mx-0">
-            <InscryptionCard card={{ type: item.type }} small />
-          </div>
-          <div className="flex-1 space-y-1.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className={cn('font-grimoire font-extrabold text-sm sm:text-base tracking-wider', item.titleCls)}>
-                {item.title}
-              </h3>
-              <span className="text-[10px] font-mono bg-stone-900 border border-stone-700 text-amber-200 px-1.5 py-0.5 rounded">
-                {item.badge}
-              </span>
-            </div>
-            <ul className="list-disc list-inside space-y-1 text-[11px] sm:text-xs text-parchment-dark">
-              {item.bullets.map((b, idx) => (
-                <li key={idx}>{b}</li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ))}
+      <CardGrimoireBook />
     </div>
   );
 }

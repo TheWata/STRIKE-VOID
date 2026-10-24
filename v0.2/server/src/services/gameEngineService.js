@@ -1,6 +1,13 @@
-const { CARD_TYPES, CARD_NAMES, SPECIAL_CARD_TYPES } = require('../models/CardModel');
+const {
+  CARD_TYPES,
+  CARD_NAMES,
+  SUPPORT_CARD_TYPES,
+  CONTROL_CARD_TYPES,
+  BASE_DEATH_MARK_TURNS,
+  MAX_SYRINGE_CHARGES,
+} = require('../models/CardModel');
 const { resetPlayerForMatch } = require('../models/PlayerModel');
-const { buildDeck, drawCardForPlayer } = require('./deckService');
+const { buildDeck, drawCardForPlayer, normalizeCard } = require('./deckService');
 const { getPlayer, alivePlayers, emitRoomState, getPublicRoomsList } = require('./roomService');
 const { scheduleBot } = require('./botService');
 const { wait, calculatePlayerTime } = require('../helpers/timeCalculator');
@@ -26,22 +33,25 @@ function applyAction(room, player, cardId, targetId) {
     };
   }
 
-  // Validações específicas das novas cartas
+  // Validações específicas por tipo de carta
   if (card.type === CARD_TYPES.DESARMAR && finalTarget === player.id) {
     return { ok: false, error: 'Desarmar só pode ser usado contra outro jogador!' };
-  }
-  if (card.type === CARD_TYPES.PACTO_SANGUE && finalTarget === player.id) {
-    return { ok: false, error: 'Pacto de Sangue deve vincular sua vida com outro jogador!' };
   }
   if (card.type === CARD_TYPES.REVELAR && finalTarget === player.id) {
     return { ok: false, error: 'Revelar deve ser usado para expor a mão de outro jogador!' };
   }
+  if (card.type === CARD_TYPES.MARCA_MORTE && finalTarget === player.id) {
+    return { ok: false, error: 'Marca da Morte deve ser lançada em outro jogador!' };
+  }
+
+  const cardCharges = card.type === CARD_TYPES.SERINGA ? card.charges || 0 : undefined;
 
   player.hand.splice(idx, 1);
-  room.gameState.discardPile.push(card);
+  room.gameState.discardPile.push(normalizeCard(card));
   player.selectedAction = {
     cardId: card.id,
     cardType: card.type,
+    cardCharges,
     targetId: finalTarget,
     originalTargetId: finalTarget,
     status: 'PENDING',
@@ -61,7 +71,36 @@ function passAction(player) {
 }
 
 /**
- * Aplica dano a um jogador e propaga o dano para todos os vinculados por Pacto de Sangue.
+ * Rompe todos os vínculos de Pacto de Sangue de um jogador.
+ */
+function breakBloodPactsForPlayer(room, player) {
+  const partners = [...(player.bloodPactWith || [])];
+  player.bloodPactWith = [];
+  for (const pid of partners) {
+    const partner = getPlayer(room, pid);
+    if (partner && partner.bloodPactWith) {
+      partner.bloodPactWith = partner.bloodPactWith.filter((id) => id !== player.id);
+    }
+  }
+  return partners;
+}
+
+/**
+ * Aplica ou reduz a contagem da Marca da Morte em um jogador.
+ */
+function inflictDeathMark(room, target, turns) {
+  const safeTurns = Math.max(1, Math.min(BASE_DEATH_MARK_TURNS, Math.round(turns)));
+  if (target.deathMarkTurns != null && target.deathMarkTurns > 0) {
+    target.deathMarkTurns = Math.min(target.deathMarkTurns, safeTurns);
+  } else {
+    target.deathMarkTurns = safeTurns;
+  }
+  target.deathMarkAppliedRound = room.gameState.round;
+}
+
+/**
+ * Aplica dano a um jogador, purga sua Marca da Morte (pois sangrou)
+ * e propaga o dano para todos os vinculados por Pacto de Sangue.
  */
 function applyDamage(room, target, amount, visited = new Set(), visualFx = 'DAMAGE') {
   if (!target || !target.isAlive || amount <= 0 || visited.has(target.id)) return;
@@ -69,6 +108,18 @@ function applyDamage(room, target, amount, visited = new Set(), visualFx = 'DAMA
 
   target.lives = Math.max(0, target.lives - amount);
   target.visualEffect = visualFx;
+  target.tookDamageThisRound = true;
+
+  // Se estava sob efeito da Marca da Morte e ainda sobreviveu ao golpe, o sangue derramado sacia a Marca!
+  if (target.deathMarkTurns != null && target.deathMarkTurns > 0 && target.lives > 0) {
+    target.deathMarkTurns = null;
+    target.deathMarkAppliedRound = null;
+    addLog(
+      room,
+      'CURSE',
+      `💀✨ [MARCA SACIADA] ${target.name} sangrou na mesa e se livrou da Marca da Morte!`
+    );
+  }
 
   const pactPartners = target.bloodPactWith || [];
   for (const partnerId of pactPartners) {
@@ -84,18 +135,65 @@ function applyDamage(room, target, amount, visited = new Set(), visualFx = 'DAMA
   }
 }
 
+/**
+ * Processa a contagem regressiva da Marca da Morte ao final da rodada.
+ * Quem passar 5 rodadas (ou os turnos restantes após Overdose) sem tomar dano morre instantaneamente.
+ */
+function processDeathMarksEndOfRound(room) {
+  for (const p of alivePlayers(room)) {
+    if (p.deathMarkTurns == null || p.deathMarkTurns <= 0) continue;
+    // Se tomou dano nesta rodada, a marca já foi limpa em applyDamage
+    if (p.tookDamageThisRound) {
+      p.deathMarkTurns = null;
+      p.deathMarkAppliedRound = null;
+      continue;
+    }
+    // Só desconta turno a partir da rodada seguinte à aplicação da marca
+    if (p.deathMarkAppliedRound != null && p.deathMarkAppliedRound >= room.gameState.round) {
+      continue;
+    }
+
+    p.deathMarkTurns -= 1;
+    if (p.deathMarkTurns <= 0) {
+      p.lives = 0;
+      p.deathMarkTurns = null;
+      p.deathMarkAppliedRound = null;
+      p.visualEffect = 'DEATH_MARK_KILL';
+      addLog(
+        room,
+        'DEATH',
+        `☠️ [MARCA DA MORTE] A contagem chegou a ZERO! ${p.name} ficou sem tomar dano e MORREU INSTANTANEAMENTE!`
+      );
+    } else {
+      addLog(
+        room,
+        'CURSE',
+        `⏳ [MARCA DA MORTE] ${p.name} não sangrou nesta rodada! Restam ${p.deathMarkTurns} rodada(s) antes da morte instantânea!`
+      );
+    }
+  }
+}
+
 function checkDeaths(room) {
   for (const p of room.players) {
     if (p.lives <= 0 && p.isAlive) {
       p.isAlive = false;
       p.isWalled = false;
-      p.bloodPactWith = [];
-      for (const other of room.players) {
-        if (other.bloodPactWith) {
-          other.bloodPactWith = other.bloodPactWith.filter((id) => id !== p.id);
-        }
-      }
+      p.deathMarkTurns = null;
+      p.deathMarkAppliedRound = null;
+      breakBloodPactsForPlayer(room, p);
       addLog(room, 'DEATH', '💀 ' + p.name + ' FOI ELIMINADO DA MESA!');
+    }
+  }
+}
+
+/**
+ * Carrega em +1 todas as Seringas que já estavam na mão do jogador ao iniciar um novo turno (máx 4 cargas).
+ */
+function chargeSyringesInHand(player) {
+  for (const c of player.hand) {
+    if (c.type === CARD_TYPES.SERINGA) {
+      c.charges = Math.min(MAX_SYRINGE_CHARGES, (c.charges || 0) + 1);
     }
   }
 }
@@ -112,6 +210,7 @@ async function runGame(io, room, token) {
     for (const p of room.players) {
       p.visualEffect = null;
       p.isReflecting = false;
+      p.tookDamageThisRound = false;
       p.selectedAction = null;
       p.lockedIn = false;
     }
@@ -128,6 +227,9 @@ async function runGame(io, room, token) {
           p.hand.push(card);
         }
       } else {
+        // Antes de comprar a nova carta do turno, cada Seringa que passou o turno na mão enche +1 carga (máx 4)
+        chargeSyringesInHand(p);
+
         if (p.hand.length < maxHandSize) {
           const card = drawCardForPlayer(room, p);
           if (card) p.hand.push(card);
@@ -187,7 +289,9 @@ async function runGame(io, room, token) {
     const alive = () => alivePlayers(room);
     const actionOf = (p) => p.selectedAction || { cardType: 'NONE', targetId: null };
 
-    /* ---------------- 1. REVEAL_REVERSO (ESPELHO AMALDIÇOADO) ---------------- */
+    /* ================================================================== */
+    /* PRIORIDADE 1 — REAÇÃO: REVEAL_REVERSO (ESPELHO AMALDIÇOADO)        */
+    /* ================================================================== */
     room.gameState.phase = 'REVEAL_REVERSO';
     for (const p of room.players) p.visualEffect = null;
     const revUsers = alive().filter((p) => actionOf(p).cardType === CARD_TYPES.REVERSO);
@@ -214,6 +318,8 @@ async function runGame(io, room, token) {
       CARD_TYPES.DESARMAR,
       CARD_TYPES.MANIPULAMENTO_ALMA,
       CARD_TYPES.PACTO_SANGUE,
+      CARD_TYPES.MARCA_MORTE,
+      CARD_TYPES.SERINGA,
     ];
 
     for (const [targetId, reversores] of reversosByTarget.entries()) {
@@ -338,7 +444,9 @@ async function runGame(io, room, token) {
     await wait(2400);
     if (aborted()) return;
 
-    /* ---------------- 2. REVEAL_PAREDE ---------------- */
+    /* ================================================================== */
+    /* PRIORIDADE 2 — DEFENSIVO: REVEAL_PAREDE                            */
+    /* ================================================================== */
     room.gameState.phase = 'REVEAL_PAREDE';
     for (const p of room.players) p.visualEffect = null;
     for (const player of alive().filter((p) => actionOf(p).cardType === CARD_TYPES.PAREDE)) {
@@ -365,43 +473,63 @@ async function runGame(io, room, token) {
       }
     }
     emitRoomState(io, room);
-    await wait(2200);
+    await wait(2100);
     if (aborted()) return;
 
-    /* ---------------- 3. REVEAL_ESPECIAIS (REVELAR, DESARMAR, MANIP. ALMA, PACTO SANGUE) ---------------- */
-    const specialUsers = alive().filter((p) => SPECIAL_CARD_TYPES.includes(actionOf(p).cardType));
-    if (specialUsers.length > 0) {
-      room.gameState.phase = 'REVEAL_ESPECIAIS';
+    /* ================================================================== */
+    /* PRIORIDADE 3 — SUPORTE: SERINGA, MANIPULAMENTO DE ALMA, REVELAR    */
+    /* ================================================================== */
+    const supportUsers = alive().filter((p) => SUPPORT_CARD_TYPES.includes(actionOf(p).cardType));
+    if (supportUsers.length > 0) {
+      room.gameState.phase = 'REVEAL_SUPORTE';
       for (const p of room.players) p.visualEffect = null;
 
-      // 3.1 PACTO DE SANGUE (Ignora parede, vincula vida; se refletido toma dano)
-      for (const player of specialUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.PACTO_SANGUE)) {
+      // 3.1 SERINGA (Cura exata até maxLives; qualquer excesso de carga gera Overdose com Marca da Morte!)
+      for (const player of supportUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.SERINGA)) {
         const action = player.selectedAction;
-        if (action.status === 'REFLECTED') {
+        const charges = action.cardCharges || 0;
+        const target = getPlayer(room, action.targetId);
+        if (!target || !target.isAlive) continue;
+
+        if (charges <= 0) {
+          target.visualEffect = 'SYRINGE_EMPTY';
           addLog(
             room,
-            'DAMAGE',
-            `🩸 [PACTO REFLETIDO] O Pacto de Sangue de ${player.name} ricocheteou no Espelho Amaldiçoado e feriu ${player.name} (-1 Vida)!`
+            'HEAL',
+            `💉 [SERINGA VAZIA] ${player.name} injetou uma Seringa vazia (0 cargas) em ${target.name} — nada aconteceu!`
           );
-          applyDamage(room, player, 1, new Set(), 'DAMAGE');
         } else {
-          const target = getPlayer(room, action.targetId);
-          if (target && target.isAlive && target.id !== player.id) {
-            if (!player.bloodPactWith.includes(target.id)) player.bloodPactWith.push(target.id);
-            if (!target.bloodPactWith.includes(player.id)) target.bloodPactWith.push(player.id);
-            player.visualEffect = 'BLOOD_PACT';
-            target.visualEffect = 'BLOOD_PACT';
+          const missingHp = Math.max(0, target.maxLives - target.lives);
+          const excess = charges - missingHp;
+
+          if (excess <= 0) {
+            // Cura limpa sem ultrapassar a vida máxima
+            const prevHp = target.lives;
+            target.lives = Math.min(target.maxLives, target.lives + charges);
+            target.visualEffect = 'HEAL';
             addLog(
               room,
-              'PACT',
-              `🩸 [PACTO DE SANGUE] ${player.name} ignorou barreiras e vinculou sua barra de vida com ${target.name}!`
+              'HEAL',
+              `💉 [SERINGA] ${player.name} aplicou Seringa (${charges} carga(s)) em ${target.name}: vida restaurada (${prevHp}➔${target.lives}/${target.maxLives} HP)!`
+            );
+          } else {
+            // OVERDOSE! Cura tudo, mas aplica Marca da Morte menos cada carga além da vida máxima
+            const prevHp = target.lives;
+            target.lives = target.maxLives;
+            const remainingTurns = Math.max(1, BASE_DEATH_MARK_TURNS - excess);
+            inflictDeathMark(room, target, remainingTurns);
+            target.visualEffect = 'OVERDOSE';
+            addLog(
+              room,
+              'CURSE',
+              `💉☠️ [OVERDOSE!] Seringa (${charges} cargas) curou ${target.name} (${prevHp}➔${target.lives}/${target.maxLives} HP), mas ${excess} carga(s) excederam a vida máxima! ${target.name} contraiu MARCA DA MORTE com apenas ${target.deathMarkTurns} turno(s) restante(s)!`
             );
           }
         }
       }
 
-      // 3.2 MANIPULAMENTO DE ALMA (Troca barra de vida com outro; se em si mesmo aumenta dano da própria faca)
-      for (const player of specialUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.MANIPULAMENTO_ALMA)) {
+      // 3.2 MANIPULAMENTO DE ALMA (Troca barra de vida com outro; em si mesmo aumenta dano da própria Faca)
+      for (const player of supportUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.MANIPULAMENTO_ALMA)) {
         const action = player.selectedAction;
         if (action.originalTargetId === player.id) {
           player.knifeDamage = (player.knifeDamage || 1) + 1;
@@ -438,8 +566,115 @@ async function runGame(io, room, token) {
         }
       }
 
-      // 3.3 DESARMAR (Descarta 2 cartas aleatórias da mão do alvo)
-      for (const player of specialUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.DESARMAR)) {
+      // 3.3 REVELAR (Revela as cartas da pessoa selecionada para toda a mesa)
+      for (const player of supportUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.REVELAR)) {
+        const action = player.selectedAction;
+        const target = getPlayer(room, action.targetId);
+        if (!target || !target.isAlive) continue;
+
+        target.handRevealedUntilRound = room.gameState.round + 1;
+        target.visualEffect = 'REVEALED';
+        const cardsText =
+          target.hand.length > 0
+            ? target.hand.map((c) => CARD_NAMES[c.type] || c.type).join(', ')
+            : 'Mão Vazia';
+        addLog(
+          room,
+          'REVEAL',
+          `👁️ [REVELAR] ${player.name} expôs as cartas de ${target.name} para toda a mesa: [${cardsText}]!`
+        );
+      }
+
+      checkDeaths(room);
+      emitRoomState(io, room);
+      await wait(2400);
+      if (aborted()) return;
+    }
+
+    /* ================================================================== */
+    /* PRIORIDADE 4 — CONTROLE/MALDIÇÃO: PACTO, MARCA DA MORTE, DESARMAR  */
+    /* ================================================================== */
+    const controlUsers = alive().filter((p) => CONTROL_CARD_TYPES.includes(actionOf(p).cardType));
+    if (controlUsers.length > 0) {
+      room.gameState.phase = 'REVEAL_ESPECIAIS';
+      for (const p of room.players) p.visualEffect = null;
+
+      // 4.1 PACTO DE SANGUE:
+      // - Se usado em SI MESMO: quebra o pacto se já estiver em um; se não estiver em nenhum, toma 1 de dano!
+      // - Se usado em OUTRO e refletido: toma 1 de dano!
+      // - Se usado em OUTRO normalmente: ignora parede e vincula a barra de vida!
+      for (const player of controlUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.PACTO_SANGUE)) {
+        const action = player.selectedAction;
+        if (action.originalTargetId === player.id) {
+          // Usado em si mesmo!
+          if ((player.bloodPactWith || []).length > 0) {
+            const brokenIds = breakBloodPactsForPlayer(room, player);
+            const brokenNames = brokenIds
+              .map((id) => getPlayer(room, id)?.name)
+              .filter(Boolean)
+              .join(', ');
+            player.visualEffect = 'PACT_BROKEN';
+            addLog(
+              room,
+              'PACT',
+              `⛓️‍💥 [PACTO QUEBRADO] ${player.name} usou Pacto de Sangue em si mesmo e rompeu o vínculo com ${brokenNames || 'a mesa'}!`
+            );
+          } else {
+            addLog(
+              room,
+              'DAMAGE',
+              `🩸 [PACTO VAZIO] ${player.name} usou Pacto de Sangue em si mesmo sem estar em nenhum pacto e sofreu -1 Vida!`
+            );
+            applyDamage(room, player, 1, new Set(), 'DAMAGE');
+          }
+        } else if (action.status === 'REFLECTED') {
+          addLog(
+            room,
+            'DAMAGE',
+            `🩸 [PACTO REFLETIDO] O Pacto de Sangue de ${player.name} ricocheteou no Espelho Amaldiçoado e feriu ${player.name} (-1 Vida)!`
+          );
+          applyDamage(room, player, 1, new Set(), 'DAMAGE');
+        } else {
+          const target = getPlayer(room, action.targetId);
+          if (target && target.isAlive && target.id !== player.id) {
+            if (!player.bloodPactWith.includes(target.id)) player.bloodPactWith.push(target.id);
+            if (!target.bloodPactWith.includes(player.id)) target.bloodPactWith.push(player.id);
+            player.visualEffect = 'BLOOD_PACT';
+            target.visualEffect = 'BLOOD_PACT';
+            addLog(
+              room,
+              'PACT',
+              `🩸 [PACTO DE SANGUE] ${player.name} ignorou barreiras e vinculou sua barra de vida com ${target.name}!`
+            );
+          }
+        }
+      }
+
+      // 4.2 MARCA DA MORTE (Marca o alvo: se ficar 5 rodadas sem tomar dano, morre instantaneamente)
+      for (const player of controlUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.MARCA_MORTE)) {
+        const action = player.selectedAction;
+        const target = getPlayer(room, action.targetId);
+        if (!target || !target.isAlive) continue;
+
+        inflictDeathMark(room, target, BASE_DEATH_MARK_TURNS);
+        target.visualEffect = 'DEATH_MARKED';
+        if (action.status === 'REFLECTED') {
+          addLog(
+            room,
+            'CURSE',
+            `☠️ [MARCA REFLETIDA] A Marca da Morte de ${player.name} refletiu no Espelho Amaldiçoado e marcou o próprio ${player.name} (${target.deathMarkTurns} rodadas)!`
+          );
+        } else {
+          addLog(
+            room,
+            'CURSE',
+            `☠️ [MARCA DA MORTE] ${player.name} amaldiçoou ${target.name}! Se ficar ${target.deathMarkTurns} rodadas sem tomar dano, morrerá instantaneamente!`
+          );
+        }
+      }
+
+      // 4.3 DESARMAR (Descarta 2 cartas aleatórias da mão do alvo)
+      for (const player of controlUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.DESARMAR)) {
         const action = player.selectedAction;
         const target = getPlayer(room, action.targetId);
         if (!target || !target.isAlive) continue;
@@ -449,8 +684,8 @@ async function runGame(io, room, token) {
           const randIdx = Math.floor(Math.random() * target.hand.length);
           const [removed] = target.hand.splice(randIdx, 1);
           if (removed) {
-            room.gameState.discardPile.push(removed);
-            discarded.push(removed);
+            discarded.push({ ...removed });
+            room.gameState.discardPile.push(normalizeCard(removed));
           }
         }
         target.visualEffect = 'DISARMED';
@@ -478,37 +713,20 @@ async function runGame(io, room, token) {
         }
       }
 
-      // 3.4 REVELAR (Revela as cartas da pessoa selecionada para toda a mesa)
-      for (const player of specialUsers.filter((p) => actionOf(p).cardType === CARD_TYPES.REVELAR)) {
-        const action = player.selectedAction;
-        const target = getPlayer(room, action.targetId);
-        if (!target || !target.isAlive) continue;
-
-        target.handRevealedUntilRound = room.gameState.round + 1;
-        target.visualEffect = 'REVEALED';
-        const cardsText =
-          target.hand.length > 0
-            ? target.hand.map((c) => CARD_NAMES[c.type] || c.type).join(', ')
-            : 'Mão Vazia';
-        addLog(
-          room,
-          'REVEAL',
-          `👁️ [REVELAR] ${player.name} expôs as cartas de ${target.name} para toda a mesa: [${cardsText}]!`
-        );
-      }
-
       checkDeaths(room);
       emitRoomState(io, room);
-      await wait(2600);
+      await wait(2500);
       if (aborted()) return;
     }
 
-    /* ---------------- 4. REVEAL_FACA ---------------- */
+    /* ================================================================== */
+    /* PRIORIDADE 5 — OFENSIVO: REVEAL_FACA + CONTAGEM DA MARCA DA MORTE  */
+    /* ================================================================== */
     room.gameState.phase = 'REVEAL_FACA';
     for (const p of room.players) p.visualEffect = null;
     const knives = alive().filter((p) => actionOf(p).cardType === CARD_TYPES.FACA);
 
-    // 4A: Auto-alvo intencional (não refletido)
+    // 5A: Auto-alvo intencional (não refletido)
     for (const player of knives) {
       const action = player.selectedAction;
       const dmg = player.knifeDamage || 1;
@@ -534,7 +752,7 @@ async function runGame(io, room, token) {
       }
     }
 
-    // 4B: Facas externas e refletidas/invertidas
+    // 5B: Facas externas e refletidas/invertidas
     for (const player of knives) {
       const action = player.selectedAction;
       if (action.processed) continue;
@@ -594,6 +812,9 @@ async function runGame(io, room, token) {
       }
       action.processed = true;
     }
+
+    // 5C: Processa a contagem da Marca da Morte ao fim dos ataques da rodada
+    processDeathMarksEndOfRound(room);
 
     checkDeaths(room);
     emitRoomState(io, room);
@@ -660,7 +881,11 @@ function startGame(io, room) {
 module.exports = {
   applyAction,
   passAction,
+  breakBloodPactsForPlayer,
+  inflictDeathMark,
   applyDamage,
+  processDeathMarksEndOfRound,
+  chargeSyringesInHand,
   checkDeaths,
   runGame,
   startGame,

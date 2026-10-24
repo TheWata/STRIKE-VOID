@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '../lib/cn';
-import { CARD_TYPES, CARD_META } from '../models/cardModel';
+import { CARD_TYPES, CARD_META, CARD_CATEGORIES } from '../models/cardModel';
 
 /* Espiral hipnótica gerada uma única vez (Usada na carta REVELAR - antigo Reverso do Olho) */
 const SPIRAL_PATH = (() => {
@@ -428,6 +428,171 @@ function BloodPactArt() {
   );
 }
 
+/* 8. MARCA DA MORTE (Caveira marcada com 5 entalhes de contagem regressiva e ampulheta) */
+function DeathMarkArt() {
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      {/* Halo ritualístico de 5 pontas */}
+      <circle
+        cx="50"
+        cy="48"
+        r="40"
+        fill="none"
+        stroke="#1a110b"
+        strokeWidth="2"
+        strokeDasharray="6 3"
+      />
+      {/* 5 marcas de contagem (Tally Marks: IIII com corte diagonal) no topo */}
+      <g stroke="#8b0000" strokeWidth="2.4" strokeLinecap="round">
+        <line x1="34" y1="8" x2="34" y2="20" />
+        <line x1="42" y1="7" x2="42" y2="19" />
+        <line x1="58" y1="7" x2="58" y2="19" />
+        <line x1="66" y1="8" x2="66" y2="20" />
+        <line x1="30" y1="18" x2="70" y2="9" stroke="#1a110b" strokeWidth="2.6" />
+      </g>
+
+      {/* Crânio entalhado */}
+      <path
+        d="M28 50 C 26 30, 74 30, 72 50 C 72 60, 65 65, 62 72 L 38 72 C 35 65, 28 60, 28 50 Z"
+        fill="#1a110b"
+        stroke="#2c1d12"
+        strokeWidth="2"
+      />
+      {/* Mandíbula / Dentes */}
+      <rect x="39" y="71" width="22" height="11" rx="2" fill="#1a110b" />
+      {[43, 48, 52, 57].map((x) => (
+        <line key={x} x1={x} y1="71" x2={x} y2="81" stroke="#cbb892" strokeWidth="1.5" />
+      ))}
+
+      {/* Órbitas oculares sombrias com brilho necrótico */}
+      <circle cx="41" cy="50" r="6.5" fill="#cbb892" />
+      <circle cx="59" cy="50" r="6.5" fill="#cbb892" />
+      <circle cx="41" cy="50" r="3.2" fill="#8b0000" />
+      <circle cx="59" cy="50" r="3.2" fill="#8b0000" />
+
+      {/* Símbolo de ampulheta / marca gravada na testa do crânio */}
+      <polygon points="44,34 56,34 50,41" fill="#8b0000" />
+      <polygon points="50,41 56,47 44,47" fill="#d4af37" />
+
+      {/* Cavidade nasal */}
+      <polygon points="50,55 46,63 54,63" fill="#cbb892" />
+
+      {/* Foice / Lâmina cruzando a base */}
+      <path
+        d="M16 88 Q 50 78 84 88"
+        fill="none"
+        stroke="#8b0000"
+        strokeWidth="3"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+/* 9. SERINGA (Seringa graduada de 0 a 4 cargas; enche a cada turno e brilha quando cheia) */
+function SyringeArt({ card }) {
+  const charges = Math.max(0, Math.min(4, Number(card?.charges) || 0));
+  // O barril vai de y=30 até y=70 (altura 40). Cada carga preenche 10 unidades.
+  const fillHeight = charges * 10;
+  const fillY = 70 - fillHeight;
+  // Quando tem 4 cargas, o fluido ganha tom mais intenso/carmesim-esmeralda de alerta de overdose
+  const fluidColor =
+    charges === 0
+      ? 'transparent'
+      : charges <= 2
+        ? '#15803d'
+        : charges === 3
+          ? '#16a34a'
+          : '#dc2626';
+
+  return (
+    <svg viewBox="0 0 100 100" className="w-full h-full">
+      <g transform="rotate(-35 50 50)">
+        {/* Agulha metálica no topo */}
+        <line x1="50" y1="4" x2="50" y2="24" stroke="#1a110b" strokeWidth="2.2" />
+        <polygon points="47,24 53,24 51.5,30 48.5,30" fill="#4a5568" stroke="#1a110b" strokeWidth="1" />
+
+        {/* Êmbolo traseiro (desce conforme vazia ou sobe conforme cheia) */}
+        <rect
+          x="48"
+          y={70}
+          width="4"
+          height="18"
+          fill="#2c1d12"
+          stroke="#1a110b"
+          strokeWidth="1"
+        />
+        <rect
+          x="39"
+          y="86"
+          width="22"
+          height="5"
+          rx="2"
+          fill="#1a110b"
+          stroke="#d4af37"
+          strokeWidth="1"
+        />
+
+        {/* Corpo de vidro da seringa (y=30 a y=70) */}
+        <rect
+          x="38"
+          y="30"
+          width="24"
+          height="40"
+          rx="2"
+          fill="#dfd1b4"
+          stroke="#1a110b"
+          strokeWidth="2.4"
+        />
+
+        {/* Fluido interno proporcional às cargas (0..4) */}
+        {charges > 0 && (
+          <rect
+            x="40"
+            y={fillY}
+            width="20"
+            height={fillHeight}
+            fill={fluidColor}
+            opacity="0.88"
+          />
+        )}
+
+        {/* Bolhas no fluido quando carregada */}
+        {charges >= 2 && (
+          <>
+            <circle cx="46" cy={70 - fillHeight * 0.4} r="2" fill="#cbb892" opacity="0.7" />
+            <circle cx="54" cy={70 - fillHeight * 0.7} r="1.5" fill="#cbb892" opacity="0.7" />
+          </>
+        )}
+
+        {/* Abas laterais de apoio dos dedos na base do cilindro */}
+        <rect x="31" y="68" width="38" height="4" rx="1.5" fill="#1a110b" />
+
+        {/* 4 Marcações graduadas no vidro (1, 2, 3, 4 cargas) */}
+        {[60, 50, 40, 32].map((y, idx) => (
+          <line
+            key={y}
+            x1="39"
+            x2={idx % 2 === 1 ? '50' : '47'}
+            y1={y}
+            y2={y}
+            stroke="#1a110b"
+            strokeWidth="1.6"
+          />
+        ))}
+      </g>
+
+      {/* Gotas na ponta da agulha quando tem carga */}
+      {charges > 0 && (
+        <path
+          d="M25 18 q-3.2 5.5 0 8 q3.2 -2.5 0 -8z"
+          fill={charges === 4 ? '#8b0000' : '#15803d'}
+        />
+      )}
+    </svg>
+  );
+}
+
 function CardBack() {
   return (
     <svg viewBox="0 0 100 100" className="w-3/4 h-3/4 opacity-90">
@@ -460,6 +625,8 @@ const ART_BY_TYPE = {
   [CARD_TYPES.DESARMAR]: DisarmArt,
   [CARD_TYPES.MANIPULAMENTO_ALMA]: SoulManipArt,
   [CARD_TYPES.PACTO_SANGUE]: BloodPactArt,
+  [CARD_TYPES.MARCA_MORTE]: DeathMarkArt,
+  [CARD_TYPES.SERINGA]: SyringeArt,
 };
 
 function InscryptionCardBase({
@@ -593,6 +760,14 @@ function InscryptionCardBase({
   if (!meta || !Art) return null;
   const interactive = !disabled && !!onClick;
   const displayName = small || mini || compact ? meta.shortName : meta.name;
+  const categoryInfo = CARD_CATEGORIES[meta.category];
+  const isSyringe = card?.type === CARD_TYPES.SERINGA;
+  const syringeCharges = isSyringe ? Math.max(0, Math.min(4, Number(card?.charges) || 0)) : 0;
+  const footerText = isSyringe
+    ? syringeCharges === 0
+      ? 'VAZIA (0/4) · +1/TURNO'
+      : `CURA ${syringeCharges} (${syringeCharges}/4) · OVERDOSE`
+    : meta.foot;
 
   return (
     <div
@@ -616,7 +791,7 @@ function InscryptionCardBase({
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       onClick={() => !disabled && onClick && onClick(card)}
-      title={`${meta.name}: ${meta.description}`}
+      title={`${meta.name} [${meta.badge}]: ${meta.description}`}
       style={{
         transformStyle: 'preserve-3d',
         transform: !small && !mini ? `perspective(800px) ${baseElevate}` : undefined,
@@ -663,11 +838,41 @@ function InscryptionCardBase({
       <div
         style={{ transform: !small && !mini ? 'translateZ(6px)' : undefined }}
         className={cn(
-          'flex-1 border-stone-900 bg-[#b9a47a] overflow-hidden shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)]',
+          'relative flex-1 border-stone-900 bg-[#b9a47a] overflow-hidden shadow-[inset_0_1px_4px_rgba(0,0,0,0.5)]',
           mini ? 'm-[1.5px] border p-[1px]' : 'm-[3px] border-2 p-[2px]'
         )}
       >
-        <Art />
+        {/* Selo de Prioridade e Tipo da Carta */}
+        {!mini && categoryInfo && (
+          <div
+            className={cn(
+              'pointer-events-none absolute top-0.5 left-0.5 z-10 rounded border px-1 font-typewriter font-extrabold uppercase tracking-tighter leading-none shadow-sm',
+              small ? 'text-[5px] py-[1px]' : 'text-[6.5px] py-[1.5px]',
+              categoryInfo.badgeCls
+            )}
+          >
+            {small ? `P${meta.priority}` : `P${meta.priority}·${meta.categoryLabel}`}
+          </div>
+        )}
+
+        {/* Medidor de Cargas da Seringa (0/4 a 4/4) */}
+        {isSyringe && !mini && (
+          <div
+            className={cn(
+              'pointer-events-none absolute bottom-0.5 right-0.5 z-10 flex items-center gap-0.5 rounded border px-1 py-[1px] font-typewriter font-extrabold leading-none shadow-sm',
+              syringeCharges === 0
+                ? 'border-stone-600 bg-stone-950/90 text-stone-300'
+                : syringeCharges === 4
+                  ? 'border-red-400 bg-red-950/95 text-red-200 animate-pulse'
+                  : 'border-emerald-400 bg-emerald-950/95 text-emerald-200',
+              small ? 'text-[5.5px]' : 'text-[7px]'
+            )}
+          >
+            <span>💉{syringeCharges}/4</span>
+          </div>
+        )}
+
+        <Art card={card} />
       </div>
 
       {/* Rodapé descritivo */}
@@ -676,10 +881,10 @@ function InscryptionCardBase({
           style={{ transform: !small ? 'translateZ(10px)' : undefined }}
           className={cn(
             'font-typewriter text-stone-900 text-center border-t-2 border-stone-900 leading-tight shrink-0 px-0.5 truncate',
-            small ? 'text-[5px] py-[1px]' : compact ? 'text-[6px] py-[1px]' : 'text-[8px] py-[2px]'
+            small ? 'text-[5px] py-[1px]' : compact ? 'text-[6px] py-[1px]' : 'text-[7.5px] py-[2px]'
           )}
         >
-          {meta.foot}
+          {footerText}
         </div>
       )}
     </div>

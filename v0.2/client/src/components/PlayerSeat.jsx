@@ -257,7 +257,10 @@ export function CardSlot({ player, phase, slotStyle }) {
           transition={{ duration: 0.7, ease: 'easeOut' }}
           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
         >
-          <InscryptionCard card={{ type: action.cardType }} small />
+          <InscryptionCard
+            card={{ type: action.cardType, charges: action.cardCharges ?? 0 }}
+            small
+          />
         </motion.div>
       );
     }
@@ -360,26 +363,43 @@ function PlayerSeatBase({
             ))}
           </div>
 
-          {/* Indicadores de Buff de Faca / Pacto de Sangue / Mão Revelada */}
-          {player.isAlive && (knifeDmg > 1 || hasPact || player.isHandRevealed) && (
-            <div className="flex flex-wrap items-center justify-center gap-0.5 mt-1">
-              {knifeDmg > 1 && (
-                <span className="px-1 rounded bg-teal-950 border border-teal-400 text-[7px] font-mono font-bold text-teal-200">
-                  🗡️{knifeDmg}x
-                </span>
-              )}
-              {hasPact && (
-                <span className="px-1 rounded bg-rose-950 border border-rose-500 text-[7px] font-mono font-bold text-rose-200">
-                  🩸PACTO
-                </span>
-              )}
-              {player.isHandRevealed && (
-                <span className="px-1 rounded bg-amber-950 border border-amber-400 text-[7px] font-mono font-bold text-amber-200">
-                  👁️REVELADO
-                </span>
-              )}
-            </div>
-          )}
+          {/* Indicadores de Buff de Faca / Pacto de Sangue / Mão Revelada / Marca da Morte */}
+          {player.isAlive &&
+            (knifeDmg > 1 ||
+              hasPact ||
+              player.isHandRevealed ||
+              player.deathMarkTurns != null) && (
+              <div className="flex flex-wrap items-center justify-center gap-0.5 mt-1">
+                {player.deathMarkTurns != null && (
+                  <span
+                    className={cn(
+                      'px-1 rounded border text-[7px] font-mono font-bold',
+                      player.deathMarkTurns <= 2
+                        ? 'bg-red-950 border-red-400 text-red-200 animate-pulse'
+                        : 'bg-lime-950 border-lime-400 text-lime-200'
+                    )}
+                    title={`Marca da Morte: ${player.deathMarkTurns} rodada(s) restante(s) sem tomar dano`}
+                  >
+                    ☠️{player.deathMarkTurns}T
+                  </span>
+                )}
+                {knifeDmg > 1 && (
+                  <span className="px-1 rounded bg-teal-950 border border-teal-400 text-[7px] font-mono font-bold text-teal-200">
+                    🗡️{knifeDmg}x
+                  </span>
+                )}
+                {hasPact && (
+                  <span className="px-1 rounded bg-rose-950 border border-rose-500 text-[7px] font-mono font-bold text-rose-200">
+                    🩸PACTO
+                  </span>
+                )}
+                {player.isHandRevealed && (
+                  <span className="px-1 rounded bg-amber-950 border border-amber-400 text-[7px] font-mono font-bold text-amber-200">
+                    👁️REVELADO
+                  </span>
+                )}
+              </div>
+            )}
 
           {!player.isAlive && (
             <div className="text-center text-[8px] sm:text-[9px] font-mono text-blood-bright font-bold mt-0.5">

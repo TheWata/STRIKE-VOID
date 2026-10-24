@@ -248,8 +248,9 @@ export default function PlayerSilhouette3D({
   const [over, setOver] = useState(false);
 
   const fx = player.visualEffect;
-  const shake = fx === 'DAMAGE' || fx === 'VACUUM';
+  const shake = fx === 'DAMAGE' || fx === 'VACUUM' || fx === 'DEATH_MARK_KILL';
   const knifeDmg = player.knifeDamage || 1;
+  const hasDeathMark = player.deathMarkTurns != null && player.isAlive;
   const pactPartners = (player.bloodPactWith || [])
     .map((pid) => allPlayers.find((p) => p.id === pid)?.name)
     .filter(Boolean);
@@ -362,6 +363,21 @@ export default function PlayerSilhouette3D({
             🃏 {player.handCount ?? 0}
           </div>
         )}
+
+        {/* Emblema flutuante de Marca da Morte acima da cabeça */}
+        {hasDeathMark && (
+          <div
+            className={cn(
+              'absolute -top-2 left-1/2 -translate-x-1/2 z-30 px-1.5 py-0.5 rounded border font-mono font-extrabold text-[8px] whitespace-nowrap shadow-[0_0_12px_rgba(163,230,53,0.7)]',
+              player.deathMarkTurns <= 1
+                ? 'bg-red-950/95 border-red-400 text-red-200 animate-bounce'
+                : 'bg-lime-950/95 border-lime-400 text-lime-200 animate-pulse'
+            )}
+            title={`Marca da Morte ativa: se ficar ${player.deathMarkTurns} rodada(s) sem tomar dano, morre instantaneamente!`}
+          >
+            ☠️ MARCA: {player.deathMarkTurns}T
+          </div>
+        )}
       </div>
 
       {/* 3. PLACA DE IDENTIFICAÇÃO + BARRA DE VIDA (CAVEIRAS) + STATUS */}
@@ -404,32 +420,46 @@ export default function PlayerSilhouette3D({
           ))}
         </div>
 
-        {/* Selos de Buff de Faca (Manipulamento de Alma) e Pacto de Sangue */}
-        {(knifeDmg > 1 || pactPartners.length > 0 || player.isWalled) && player.isAlive && (
-          <div className="flex flex-wrap items-center justify-center gap-1 mt-1 pt-0.5 border-t border-stone-800/80">
-            {knifeDmg > 1 && (
-              <span
-                className="px-1 py-[1px] rounded bg-teal-950/90 border border-teal-400 text-teal-200 font-mono font-bold text-[8px]"
-                title={`Faca fortalecida por Manipulamento de Alma: causa ${knifeDmg} de Dano`}
-              >
-                🗡️ FACA {knifeDmg}x
-              </span>
-            )}
-            {pactPartners.length > 0 && (
-              <span
-                className="px-1 py-[1px] rounded bg-rose-950/90 border border-rose-500 text-rose-200 font-mono font-bold text-[8px] truncate max-w-[120px]"
-                title={`Pacto de Sangue ativo com: ${pactPartners.join(', ')}`}
-              >
-                🩸 PACTO: {pactPartners.join(', ')}
-              </span>
-            )}
-            {player.isWalled && (
-              <span className="px-1 py-[1px] rounded bg-cyan-950/90 border border-cyan-400 text-cyan-200 font-mono font-bold text-[8px]">
-                🔒 EMPAREDADO
-              </span>
-            )}
-          </div>
-        )}
+        {/* Selos de Buff de Faca (Manipulamento de Alma), Marca da Morte e Pacto de Sangue */}
+        {(knifeDmg > 1 || pactPartners.length > 0 || player.isWalled || hasDeathMark) &&
+          player.isAlive && (
+            <div className="flex flex-wrap items-center justify-center gap-1 mt-1 pt-0.5 border-t border-stone-800/80">
+              {hasDeathMark && (
+                <span
+                  className={cn(
+                    'px-1 py-[1px] rounded border font-mono font-bold text-[8px]',
+                    player.deathMarkTurns <= 2
+                      ? 'bg-red-950/95 border-red-400 text-red-200 animate-pulse'
+                      : 'bg-lime-950/90 border-lime-400 text-lime-200'
+                  )}
+                  title={`Marca da Morte: morre em ${player.deathMarkTurns} rodada(s) se não sofrer dano!`}
+                >
+                  ☠️ {player.deathMarkTurns}T SEM DANO
+                </span>
+              )}
+              {knifeDmg > 1 && (
+                <span
+                  className="px-1 py-[1px] rounded bg-teal-950/90 border border-teal-400 text-teal-200 font-mono font-bold text-[8px]"
+                  title={`Faca fortalecida por Manipulamento de Alma: causa ${knifeDmg} de Dano`}
+                >
+                  🗡️ FACA {knifeDmg}x
+                </span>
+              )}
+              {pactPartners.length > 0 && (
+                <span
+                  className="px-1 py-[1px] rounded bg-rose-950/90 border border-rose-500 text-rose-200 font-mono font-bold text-[8px] truncate max-w-[120px]"
+                  title={`Pacto de Sangue ativo com: ${pactPartners.join(', ')}`}
+                >
+                  🩸 PACTO: {pactPartners.join(', ')}
+                </span>
+              )}
+              {player.isWalled && (
+                <span className="px-1 py-[1px] rounded bg-cyan-950/90 border border-cyan-400 text-cyan-200 font-mono font-bold text-[8px]">
+                  🔒 EMPAREDADO
+                </span>
+              )}
+            </div>
+          )}
 
         {!player.isAlive && (
           <div className="text-center text-[8px] font-mono text-blood-bright font-bold tracking-wider mt-0.5">

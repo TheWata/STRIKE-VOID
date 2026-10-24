@@ -98,6 +98,7 @@ function sanitizeStateForClients(room, viewerId) {
         isReflecting: p.isReflecting,
         knifeDamage: p.knifeDamage || 1,
         bloodPactWith: p.bloodPactWith || [],
+        deathMarkTurns: p.deathMarkTurns ?? null,
         isHandRevealed,
         revealedHand: isHandRevealed ? p.hand : null,
         hand: isMe ? p.hand : isHandRevealed ? p.hand : [],
@@ -178,6 +179,7 @@ function handlePlayerLeave(io, socket) {
     player.lives = 0;
     player.isWalled = false;
     player.bloodPactWith = [];
+    player.deathMarkTurns = null;
     room.players.forEach((other) => {
       if (other.bloodPactWith) {
         other.bloodPactWith = other.bloodPactWith.filter((id) => id !== player.id);

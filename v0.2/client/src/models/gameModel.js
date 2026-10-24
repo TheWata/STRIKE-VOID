@@ -2,10 +2,11 @@ export const PHASE_LABELS = {
   LOBBY: 'LOBBY',
   DEALING: 'EMBARALHANDO...',
   PLANNING: 'PLANEJAMENTO',
-  REVEAL_REVERSO: 'FASE 1 · ESPELHOS AMALDIÇOADOS',
-  REVEAL_PAREDE: 'FASE 2 · PAREDES',
-  REVEAL_ESPECIAIS: 'FASE 3 · RITUAIS & ARCANOS',
-  REVEAL_FACA: 'FASE 4 · FACAS',
+  REVEAL_REVERSO: 'P1 · REAÇÃO (ESPELHOS)',
+  REVEAL_PAREDE: 'P2 · DEFENSIVO (PAREDES)',
+  REVEAL_SUPORTE: 'P3 · SUPORTE (CURA & ALMA)',
+  REVEAL_ESPECIAIS: 'P4 · CONTROLE (PACTOS & MALDIÇÕES)',
+  REVEAL_FACA: 'P5 · OFENSIVO (FACAS)',
   ANALYSIS: 'ANÁLISE',
   GAME_OVER: 'FIM DE JOGO',
 };
@@ -13,29 +14,36 @@ export const PHASE_LABELS = {
 export const RESOLUTION_STEPS = [
   {
     key: 'REVEAL_REVERSO',
-    label: 'I. ESPELHOS',
+    label: 'P1 · REAÇÃO',
     subtitle: 'Espelhos amaldiçoados se estilhaçam. Refletir no vazio custa sangue!',
     color:
       'border-purple-500 text-purple-200 bg-purple-950/95 shadow-[0_0_20px_rgba(168,85,247,0.6)]',
   },
   {
     key: 'REVEAL_PAREDE',
-    label: 'II. PAREDES',
+    label: 'P2 · DEFENSIVO',
     subtitle: 'Barricadas de ferro e osso erguem-se ao redor dos assentos.',
     color:
       'border-cyan-400 text-cyan-200 bg-cyan-950/95 shadow-[0_0_20px_rgba(34,211,238,0.6)]',
   },
   {
+    key: 'REVEAL_SUPORTE',
+    label: 'P3 · SUPORTE',
+    subtitle: 'Seringas injetam cura (ou overdose!), almas são trocadas e mãos reveladas!',
+    color:
+      'border-emerald-400 text-emerald-200 bg-emerald-950/95 shadow-[0_0_20px_rgba(52,211,153,0.6)]',
+  },
+  {
     key: 'REVEAL_ESPECIAIS',
-    label: 'III. ARCANOS',
-    subtitle: 'Pactos de sangue, almas trocadas, desarmes e mãos reveladas!',
+    label: 'P4 · CONTROLE',
+    subtitle: 'Pactos de sangue, Marcas da Morte e Desarmes cobram seu tributo!',
     color:
       'border-amber-400 text-amber-200 bg-amber-950/95 shadow-[0_0_20px_rgba(245,158,11,0.6)]',
   },
   {
     key: 'REVEAL_FACA',
-    label: 'IV. FACAS',
-    subtitle: 'As lâminas cortam a mesa e cobram seu preço em sangue!',
+    label: 'P5 · OFENSIVO',
+    subtitle: 'As lâminas cortam a mesa e a Marca da Morte avança sobre quem não sangrou!',
     color:
       'border-blood-bright text-red-200 bg-red-950/95 shadow-[0_0_24px_rgba(220,38,38,0.7)]',
   },
@@ -82,6 +90,30 @@ export const VISUAL_EFFECT_BADGES = {
     label: '🩸 PACTO DE SANGUE ATIVO',
     cls: 'border-rose-500 bg-rose-950/95 text-rose-200',
   },
+  PACT_BROKEN: {
+    label: '⛓️‍💥 PACTO QUEBRADO!',
+    cls: 'border-amber-300 bg-amber-950/95 text-amber-100',
+  },
+  HEAL: {
+    label: '💉 CURADO!',
+    cls: 'border-emerald-400 bg-emerald-950/95 text-emerald-200',
+  },
+  SYRINGE_EMPTY: {
+    label: '💉 SERINGA VAZIA (0/4)',
+    cls: 'border-stone-400 bg-stone-900/95 text-stone-300',
+  },
+  OVERDOSE: {
+    label: '☣️ OVERDOSE! (MARCA DA MORTE)',
+    cls: 'border-lime-400 bg-lime-950/95 text-lime-200',
+  },
+  DEATH_MARKED: {
+    label: '☠️ MARCA DA MORTE!',
+    cls: 'border-lime-400 bg-lime-950/95 text-lime-200',
+  },
+  DEATH_MARK_KILL: {
+    label: '💀 MORTE INSTANTÂNEA (MARCA)',
+    cls: 'border-red-500 bg-black/95 text-red-300',
+  },
 };
 
 export const LOG_STYLES = {
@@ -96,6 +128,9 @@ export const LOG_STYLES = {
     'text-orange-300 font-medium bg-orange-950/30 border-l-2 border-orange-500 pl-2 py-0.5 rounded-r shadow-sm',
   DAMAGE:
     'text-red-300 font-semibold bg-red-950/35 border-l-2 border-blood-bright pl-2 py-0.5 rounded-r shadow-sm',
+  HEAL: 'text-emerald-200 font-semibold bg-emerald-950/35 border-l-2 border-emerald-400 pl-2 py-0.5 rounded-r shadow-sm',
+  CURSE:
+    'text-lime-200 font-bold bg-lime-950/40 border-l-2 border-lime-400 pl-2 py-0.5 rounded-r shadow-sm',
   PACT: 'text-rose-300 font-bold bg-rose-950/40 border-l-2 border-rose-500 pl-2 py-0.5 rounded-r shadow-sm',
   SOUL: 'text-teal-200 font-semibold bg-teal-950/35 border-l-2 border-teal-400 pl-2 py-0.5 rounded-r shadow-sm',
   DISARM:

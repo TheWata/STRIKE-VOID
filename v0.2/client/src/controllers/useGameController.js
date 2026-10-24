@@ -169,11 +169,24 @@ export function useGameController() {
         if (revealed('PAREDE')) audioService.play('flip');
         if (fxCount('WALLED')) audioService.play('wall', 0.55);
         break;
+      case 'REVEAL_SUPORTE':
+        audioService.play('flip');
+        if (fxCount('HEAL') || fxCount('SOUL_SWAP') || fxCount('SOUL_BUFF')) {
+          audioService.play('reflect', 0.45);
+        }
+        if (fxCount('OVERDOSE')) {
+          audioService.play('vacuum', 0.5);
+        }
+        if (fxCount('REVEALED') || fxCount('SYRINGE_EMPTY')) {
+          audioService.play('deal', 0.4);
+        }
+        break;
       case 'REVEAL_ESPECIAIS':
         audioService.play('flip');
         if (fxCount('BLOOD_PACT') || fxCount('DAMAGE')) audioService.play('damage', 0.5);
-        if (fxCount('SOUL_SWAP') || fxCount('SOUL_BUFF')) audioService.play('reflect', 0.45);
-        if (fxCount('DISARMED') || fxCount('REVEALED')) audioService.play('deal', 0.4);
+        if (fxCount('PACT_BROKEN')) audioService.play('wallBreak', 0.45);
+        if (fxCount('DEATH_MARKED')) audioService.play('vacuum', 0.5);
+        if (fxCount('DISARMED')) audioService.play('deal', 0.4);
         break;
       case 'REVEAL_FACA':
         if (revealed('FACA')) {
@@ -181,7 +194,7 @@ export function useGameController() {
           audioService.play('knife', 0.55);
         }
         if (fxCount('WALL_BROKEN')) audioService.play('wallBreak', 0.75);
-        if (fxCount('DAMAGE')) audioService.play('damage', 0.8);
+        if (fxCount('DAMAGE') || fxCount('DEATH_MARK_KILL')) audioService.play('damage', 0.8);
         if (aliveNow < audioPrev.current.alive) audioService.play('death', 1.5);
         break;
       case 'ANALYSIS':

@@ -9,7 +9,8 @@ const { registerRoomHandlers } = require('./src/controllers/roomController');
 const { registerGameHandlers } = require('./src/controllers/gameController');
 const { registerChatHandlers } = require('./src/controllers/chatController');
 
-const PORT = process.env.PORT || 3001;
+const cliPort = Number(process.argv[2]);
+const PORT = Number(process.env.PORT) || (Number.isFinite(cliPort) && cliPort > 0 ? cliPort : 3001);
 const app = express();
 app.use(cors({ origin: '*' }));
 
