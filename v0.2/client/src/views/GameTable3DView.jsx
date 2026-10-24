@@ -9,11 +9,6 @@ import {
   ChevronDown,
   ChevronUp,
   Ghost,
-  Eye,
-  Layers,
-  BookOpen,
-  Lock,
-  Unlock,
   Flame,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
@@ -31,6 +26,12 @@ import PlayerSilhouette3D from '../components/PlayerSilhouette3D';
 import TargetArrowsSVG from '../components/TargetArrowsSVG';
 import CentralClock from '../components/CentralClock';
 import UnderTableChat from '../components/UnderTableChat';
+import GameIcon from '../components/GameIcon';
+import {
+  BACKGROUND_ASSETS,
+  UI_ASSETS,
+  preloadCriticalTableAssets,
+} from '../models/assetCatalog';
 import { audio } from '../lib/audio';
 
 export default function GameTable3DView({
@@ -64,13 +65,18 @@ export default function GameTable3DView({
 }) {
   const {
     cameraZone,
-    cameraLocked,
-    toggleLock,
     selectZone,
     parallax,
     handleMouseMove,
+    handleBottomEdgeEnter,
+    handleBottomEdgeLeave,
+    setOverHandOrControls,
     setTypingChat,
   } = useCamera3DController({ inGame: true });
+
+  React.useEffect(() => {
+    preloadCriticalTableAssets();
+  }, []);
 
   const isResolving = phase.startsWith('REVEAL_');
   const activeStep = RESOLUTION_STEPS.find((s) => s.key === phase) || null;
@@ -78,33 +84,31 @@ export default function GameTable3DView({
     (p) => p.visualEffect && VISUAL_EFFECT_BADGES[p.visualEffect]
   );
 
-  // Parâmetros de inclinação 3D da câmera conforme a zona vertical do mouse
+  // Inclinação 3D suave e orgânica da mesa, posicionada para que todos os oponentes do topo fiquem 100% visíveis
   const tablePitch =
     cameraZone === CAMERA_ZONES.PLAYERS
-      ? 22
+      ? 25
       : cameraZone === CAMERA_ZONES.NOTEBOOK
-        ? 58
-        : 42;
+        ? 52
+        : 30;
 
   const tableTranslateY =
     cameraZone === CAMERA_ZONES.PLAYERS
       ? compact
-        ? 45
-        : 78
+        ? 64
+        : 92
       : cameraZone === CAMERA_ZONES.NOTEBOOK
-        ? -240
+        ? -210
         : compact
-          ? -6
-          : 12;
+          ? 52
+          : 78;
 
   const tableScale =
-    cameraZone === CAMERA_ZONES.PLAYERS
-      ? compact
-        ? 0.92
-        : 0.96
-      : cameraZone === CAMERA_ZONES.NOTEBOOK
-        ? 0.82
-        : 1;
+    cameraZone === CAMERA_ZONES.NOTEBOOK
+      ? 0.84
+      : compact
+        ? 0.88
+        : 0.92;
 
   // Verifica se a carta selecionada permite mirar em si mesmo
   const canSelfTarget =
@@ -118,217 +122,91 @@ export default function GameTable3DView({
       onMouseMove={handleMouseMove}
       className="flex-1 min-h-0 flex flex-col relative overflow-hidden select-none inscryption-3d-stage"
     >
-      {/* 1. FUNDO 3D DA SALA CERIMONIAL (Paredes de madeira escura, candelabro e névoa) */}
+      {/* 1. AMBIÊNCIA PROFUNDA DA SALA CERIMONIAL (Asset de fundo atmosférico + luz de vela) */}
       <div
-        className="pointer-events-none absolute inset-0 z-0 transition-transform duration-500 ease-out"
+        className="pointer-events-none absolute inset-0 z-0 transition-transform duration-700 ease-out"
         style={{
-          transform: `translate3d(${-parallax.x * 3}px, ${
+          transform: `translate3d(${-parallax.x * 2.5}px, ${
             cameraZone === CAMERA_ZONES.PLAYERS
-              ? 35
+              ? 18
               : cameraZone === CAMERA_ZONES.NOTEBOOK
-                ? -60
+                ? -45
                 : 0
           }px, 0)`,
         }}
       >
-        {/* Luz de candelabro oscilando no teto da cabana */}
-        <div className="candle absolute inset-0 bg-[radial-gradient(circle_at_50%_26%,rgba(255,165,60,0.18),rgba(139,0,0,0.08)_45%,transparent_75%)]" />
-        {/* Vigas verticais de madeira da sala ao fundo quando se olha para cima (PLAYERS) */}
         <div
-          className="absolute inset-x-0 top-0 h-[55%] opacity-35"
+          className="absolute inset-0 opacity-45 bg-cover bg-center"
           style={{
-            backgroundImage:
-              'repeating-linear-gradient(90deg, #140c07 0px, #140c07 48px, #090503 48px, #090503 52px)',
-            maskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
-            WebkitMaskImage: 'linear-gradient(to bottom, black 30%, transparent 100%)',
+            backgroundImage: `url(${BACKGROUND_ASSETS.ROOM_CANDLELIGHT})`,
+            maskImage: 'radial-gradient(ellipse at 50% 35%, black 35%, transparent 90%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at 50% 35%, black 35%, transparent 90%)',
           }}
         />
+        <div className="candle absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(255,165,60,0.16),rgba(139,0,0,0.07)_46%,transparent_76%)]" />
       </div>
 
-      {/* 2. HUD LATERAL DE CONTROLE DE OLHAR 3D (Cima: Jogadores | Meio: Cartas | Baixo: Caderno) */}
-      <aside
-        aria-label="Controle de Visão 3D"
-        className="fixed left-2 sm:left-3 top-1/2 -translate-y-1/2 z-[65] flex flex-col gap-1.5 bg-black/85 border border-gold-aged/50 p-1.5 rounded-xl shadow-[0_10px_30px_rgba(0,0,0,0.95)] backdrop-blur-md"
-      >
-        <div className="text-[8px] font-mono text-amber-300/80 text-center tracking-widest uppercase px-1 border-b border-stone-800 pb-1">
-          VISÃO 3D
-        </div>
-
-        <button
-          id="btn-cam-players"
-          type="button"
-          onClick={() => {
-            audio.play('select');
-            selectZone(CAMERA_ZONES.PLAYERS);
-          }}
-          className={cn(
-            'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all border',
-            cameraZone === CAMERA_ZONES.PLAYERS
-              ? 'bg-gold-aged/25 border-gold-aged text-amber-200 shadow-[0_0_12px_rgba(212,175,55,0.4)]'
-              : 'bg-stone-950/80 border-stone-800 text-stone-400 hover:text-parchment hover:border-stone-600'
-          )}
-          title="Olhar para Cima: Ver Silhuetas dos Jogadores [Mouse no Topo / Seta Cima]"
-        >
-          <Eye size={13} className="shrink-0 text-amber-300" />
-          <span className="hidden md:inline">JOGADORES</span>
-        </button>
-
-        <button
-          id="btn-cam-cards"
-          type="button"
-          onClick={() => {
-            audio.play('select');
-            selectZone(CAMERA_ZONES.CARDS);
-          }}
-          className={cn(
-            'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all border',
-            cameraZone === CAMERA_ZONES.CARDS
-              ? 'bg-blood/40 border-blood-bright text-red-200 shadow-[0_0_12px_rgba(220,38,38,0.4)]'
-              : 'bg-stone-950/80 border-stone-800 text-stone-400 hover:text-parchment hover:border-stone-600'
-          )}
-          title="Olhar para a Mesa e suas Cartas [Mouse no Meio]"
-        >
-          <Layers size={13} className="shrink-0 text-red-400" />
-          <span className="hidden md:inline">CARTAS</span>
-        </button>
-
-        <button
-          id="btn-cam-notebook"
-          type="button"
-          onClick={() => {
-            audio.play('select');
-            selectZone(CAMERA_ZONES.NOTEBOOK);
-          }}
-          className={cn(
-            'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[10px] font-mono font-bold transition-all border',
-            cameraZone === CAMERA_ZONES.NOTEBOOK
-              ? 'bg-amber-900/50 border-amber-400 text-amber-100 shadow-[0_0_12px_rgba(245,158,11,0.4)]'
-              : 'bg-stone-950/80 border-stone-800 text-stone-400 hover:text-parchment hover:border-stone-600'
-          )}
-          title="Olhar embaixo da mesa: Livro de Cartas, Caderno de Anotações e Chat [Mouse Embaixo / Seta Baixo]"
-        >
-          <BookOpen size={13} className="shrink-0 text-amber-400" />
-          <span className="hidden md:inline">LIVRO & CHAT</span>
-        </button>
-
-        <button
-          id="btn-cam-lock"
-          type="button"
-          onClick={() => {
-            audio.play('click');
-            toggleLock();
-          }}
-          className={cn(
-            'flex items-center justify-center gap-1 px-2 py-1 rounded text-[9px] font-mono border mt-0.5 transition-all',
-            cameraLocked
-              ? 'border-amber-500 bg-amber-950/80 text-amber-200'
-              : 'border-stone-800 bg-black/60 text-stone-500 hover:text-stone-300'
-          )}
-          title={
-            cameraLocked
-              ? 'Câmera travada. Clique para ativar movimento livre pelo mouse.'
-              : 'Câmera livre pelo mouse. Clique para travar o ângulo atual.'
-          }
-        >
-          {cameraLocked ? <Lock size={10} /> : <Unlock size={10} />}
-          <span className="hidden md:inline">{cameraLocked ? 'TRAVADA' : 'MOUSE'}</span>
-        </button>
-      </aside>
-
-      {/* 3. BARRA TÁTICA SUPERIOR DE RESOLUÇÃO E EFEITOS */}
-      <div className="relative z-40 flex flex-col items-center justify-center pt-1.5 sm:pt-2 px-2 pointer-events-none gap-1 shrink-0">
+      {/* 2. SUSSURRO CONTEXTUAL INTEGRADO AO CENÁRIO (Sem sobrepor os oponentes do topo) */}
+      <div className="pointer-events-none fixed bottom-[202px] sm:bottom-[215px] inset-x-0 z-40 flex flex-col items-center justify-center px-4 gap-1">
         <AnimatePresence mode="wait">
-          {isResolving ? (
+          {isResolving && activeStep ? (
             <motion.div
-              key="resolve-tracker"
-              initial={{ y: -20, opacity: 0, scale: 0.92 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: -15, opacity: 0 }}
-              className="flex flex-col items-center gap-1 bg-black/90 border border-gold-aged/60 px-3.5 py-1.5 rounded-xl shadow-[0_12px_35px_rgba(0,0,0,0.95)] backdrop-blur-md max-w-[95vw]"
+              key={activeStep.key}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="flex flex-col items-center text-center"
+              style={{ textShadow: '0 2px 12px rgba(0,0,0,0.98), 0 0 24px rgba(0,0,0,0.9)' }}
             >
-              <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-                {RESOLUTION_STEPS.map((step) => {
-                  const active = phase === step.key;
-                  return (
-                    <motion.div
-                      key={step.key}
-                      animate={
-                        active
-                          ? { scale: [1, 1.07, 1] }
-                          : { scale: 0.94, opacity: 0.4 }
-                      }
-                      transition={{ duration: 0.85, repeat: active ? Infinity : 0 }}
-                      className={cn(
-                        'px-2 py-0.5 rounded-full border text-[9.5px] sm:text-xs font-grimoire font-bold tracking-wider transition-all',
-                        active
-                          ? step.color
-                          : 'border-stone-800 text-stone-500 bg-stone-950/60'
-                      )}
-                    >
-                      {step.label}
-                    </motion.div>
-                  );
-                })}
-              </div>
-              {activeStep && (
-                <span className="text-[10px] sm:text-[11px] font-mono text-amber-200/90 text-center">
-                  {activeStep.subtitle}
-                </span>
-              )}
+              <span className="font-grimoire font-extrabold text-xs sm:text-sm tracking-[0.25em] text-amber-200/95 uppercase">
+                {activeStep.label}
+              </span>
+              <span className="font-typewriter text-[10.5px] sm:text-xs text-parchment/75 max-w-md">
+                {activeStep.subtitle}
+              </span>
             </motion.div>
           ) : canAct && selectedCard ? (
             <motion.div
-              key="aim-banner"
-              initial={{ y: -12, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: -12, opacity: 0 }}
-              className="px-3.5 py-1 rounded-full border border-blood-bright bg-gradient-to-r from-red-950/90 via-black/95 to-red-950/90 text-amber-200 font-mono text-[10px] sm:text-xs font-bold tracking-wider shadow-[0_0_25px_rgba(220,38,38,0.5)] flex items-center gap-2"
+              key="aim-whisper"
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="flex items-center gap-2 text-red-200/95 font-grimoire text-xs sm:text-sm tracking-[0.18em] uppercase"
+              style={{
+                textShadow: '0 0 16px rgba(220,38,38,0.85), 0 2px 8px rgba(0,0,0,0.98)',
+              }}
             >
-              <Crosshair size={14} className="text-blood-bright animate-spin shrink-0" />
+              <Crosshair size={13} className="text-red-400 animate-pulse shrink-0" />
               <span>
-                {CARD_META[selectedCard.type]?.name}: PASSE O MOUSE PARA CIMA E CLIQUE NA SILHUETA DO ALVO
+                {CARD_META[selectedCard.type]?.name} — Escolha uma presença na mesa
               </span>
             </motion.div>
-          ) : (
-            <motion.div
-              key="camera-hint"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="px-3 py-0.5 rounded-full bg-black/65 border border-stone-800/90 text-[9.5px] sm:text-[10.5px] font-mono text-amber-200/80 flex items-center gap-2"
-            >
-              <span>
-                {cameraZone === CAMERA_ZONES.PLAYERS
-                  ? '👁️ OLHANDO OS JOGADORES — Desça o mouse para focar nas suas Cartas'
-                  : cameraZone === CAMERA_ZONES.NOTEBOOK
-                    ? '📓 CADERNO & CHAT SOB A MESA — Suba o mouse para voltar às Cartas'
-                    : '🃏 OLHANDO A MESA & CARTAS — Suba o mouse p/ Jogadores · Desça p/ Caderno'}
-              </span>
-            </motion.div>
-          )}
+          ) : null}
         </AnimatePresence>
 
-        {/* Pílulas de feedback instantâneo dos efeitos da rodada */}
+        {/* Efeitos da rodada integrados como inscrições sutis no ar */}
         <AnimatePresence>
           {activeEffects.length > 0 && (
             <motion.div
-              key="active-fx-pills"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
+              key="active-fx-whispers"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-wrap items-center justify-center gap-1.5 max-w-[94vw]"
+              className="flex flex-wrap items-center justify-center gap-3 max-w-[92vw]"
             >
               {activeEffects.map((p) => {
                 const badge = VISUAL_EFFECT_BADGES[p.visualEffect];
                 return (
                   <span
                     key={`${p.id}-${p.visualEffect}`}
-                    className={cn(
-                      'px-2.5 py-0.5 rounded border text-[10px] font-mono font-bold shadow-lg',
-                      badge.cls
-                    )}
+                    className="inline-flex items-center gap-1.5 text-[11px] font-grimoire font-bold tracking-wider text-amber-100/95"
+                    style={{
+                      textShadow: '0 2px 8px rgba(0,0,0,0.98), 0 0 14px rgba(220,38,38,0.65)',
+                    }}
                   >
-                    {p.name}: {badge.label}
+                    <span>{p.name} ·</span>
+                    {badge.icon && <GameIcon name={badge.icon} size={13} />}
+                    <span>{badge.label}</span>
                   </span>
                 );
               })}
@@ -337,21 +215,21 @@ export default function GameTable3DView({
         </AnimatePresence>
       </div>
 
-      {/* 4. PALCO 3D CENTRAL (MESA OCTOGONAL 3D + SILHUETAS EM PÉ + RELÓGIO) */}
-      <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 sm:p-2 inscryption-perspective">
+      {/* 3. PALCO 3D CENTRAL (MESA OCTOGONAL + PRESENÇAS SOMBRIAS GRANDES + BARRAS DE VIDA SEMPRE VISÍVEIS) */}
+      <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 sm:p-2 inscryption-perspective overflow-visible">
         <motion.div
           animate={{
-            rotateX: tablePitch - parallax.y * 0.6,
-            rotateZ: -parallax.x * 0.45,
+            rotateX: tablePitch - parallax.y * 0.45,
+            rotateZ: -parallax.x * 0.35,
             y: tableTranslateY,
             scale: tableScale,
           }}
-          transition={{ type: 'spring', stiffness: 130, damping: 22, mass: 0.9 }}
+          transition={{ type: 'spring', stiffness: 120, damping: 24, mass: 0.95 }}
           style={{
             width: compact
-              ? 'min(94vw, calc(100dvh - 235px))'
-              : 'min(86vw, calc(100dvh - 205px))',
-            maxHeight: compact ? 'calc(100dvh - 235px)' : 'calc(100dvh - 205px)',
+              ? 'min(90vw, calc(100dvh - 240px))'
+              : 'min(76vw, calc(100dvh - 230px))',
+            maxHeight: compact ? 'calc(100dvh - 240px)' : 'calc(100dvh - 230px)',
             aspectRatio: '1 / 1',
             transformStyle: 'preserve-3d',
           }}
@@ -359,8 +237,8 @@ export default function GameTable3DView({
         >
           {/* Sombra projetada no chão da sala 3D */}
           <div
-            className="table-octagon absolute inset-0 bg-black/90 blur-2xl pointer-events-none"
-            style={{ transform: 'translateZ(-42px) scale(1.06)' }}
+            className="table-octagon absolute inset-0 bg-black/95 blur-2xl pointer-events-none"
+            style={{ transform: 'translateZ(-42px) scale(1.08)' }}
           />
 
           {/* Espessura 3D de madeira maciça sob o tampo da mesa */}
@@ -373,36 +251,61 @@ export default function GameTable3DView({
             style={{ transform: 'translateZ(-9px) translateY(7px)' }}
           />
 
-          {/* Camada 1: Tampo de madeira escura entalhada */}
-          <div className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.95)]" />
-          {/* Camada 2: Aro chanfrado de ouro velho/ferro */}
-          <div className="table-octagon table-rim absolute inset-[3.1%]" />
-          {/* Camada 3: Feltro ritualístico com anéis arcanos */}
-          <div className="table-octagon table-felt absolute inset-[4.1%]" />
-          <div className="rounded-full table-ritual-ring absolute inset-[19%] pointer-events-none" />
+          {/* Camada 1: Tampo de madeira escura entalhada (Z = 0) */}
+          <div
+            className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.95)] pointer-events-none"
+            style={{ transform: 'translateZ(0px)' }}
+          />
+          {/* Camada 2: Aro chanfrado de ouro velho/ferro (Z = 1px) */}
+          <div
+            className="table-octagon table-rim absolute inset-[3.1%] pointer-events-none"
+            style={{ transform: 'translateZ(1px)' }}
+          />
+          {/* Camada 3: Feltro ritualístico com anéis arcanos (Z = 2px) */}
+          <div
+            className="table-octagon table-felt absolute inset-[4.1%] pointer-events-none"
+            style={{ transform: 'translateZ(2px)' }}
+          />
+          <div
+            className="rounded-full table-ritual-ring absolute inset-[19%] pointer-events-none flex items-center justify-center"
+            style={{ transform: 'translateZ(3px)' }}
+          >
+            <img
+              src={UI_ASSETS.TABLE_RITUAL_MANDALA}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="pointer-events-none select-none w-full h-full object-contain opacity-65"
+            />
+          </div>
 
           {/* Pregos decorativos nos 8 vértices da mesa octogonal */}
           {TABLE_NAILS.map((pos, idx) => (
             <div
               key={idx}
-              className={`pointer-events-none absolute ${pos} -translate-x-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-amber-300 via-amber-700 to-stone-950 shadow-[0_2px_4px_rgba(0,0,0,0.9)]`}
+              style={{ transform: 'translate(-50%, -50%) translateZ(4px)' }}
+              className={`pointer-events-none absolute ${pos} w-2.5 h-2.5 rounded-full bg-gradient-to-br from-amber-300 via-amber-700 to-stone-950 shadow-[0_2px_4px_rgba(0,0,0,0.9)]`}
             />
           ))}
 
-          {/* Setas 3D e Fios de Pacto de Sangue sobre o feltro */}
-          <TargetArrowsSVG players={players} localIndex={localIndex} />
+          {/* Setas 3D e Fios de Pacto de Sangue sobre o feltro (Z = 6px) */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ transform: 'translateZ(6px)' }}
+          >
+            <TargetArrowsSVG players={players} localIndex={localIndex} />
+          </div>
 
           {/* SILHUETAS 3D DOS OPONENTES E ASSENTO DO JOGADOR LOCAL */}
           {players.map((p, i) => {
             const isMe = p.id === me?.id;
-            const { x, y, angle } = seatPosition(i, localIndex, players.length);
+            const { angle } = seatPosition(i, localIndex, players.length);
             const slotX = 50 + 20 * Math.cos(angle);
             const slotY = 50 + 19 * Math.sin(angle);
             const targetable = isTargetable(p);
             const dimmed = canAct && !!selectedCard && !targetable;
 
             if (isMe) {
-              // O jogador local está em 1ª pessoa: mostra sua placa de vida na borda inferior da mesa
               return (
                 <PlayerSeat
                   key={p.id}
@@ -416,23 +319,32 @@ export default function GameTable3DView({
                   dimmed={dimmed}
                   onSeatClick={onSeatClick}
                   onDropCard={onDropCard}
+                  allPlayers={players}
                 />
               );
             }
 
-            // Oponentes ao redor da mesa: Silhueta humana 3D erguida verticalmente na borda da mesa!
-            const silX = 50 + 43 * Math.cos(angle);
-            const silY = 50 + 41 * Math.sin(angle);
+            // Oponentes ao redor da mesa:
+            // Ajuste harmônico de posição conforme o assento para que os oponentes do topo
+            // nunca sejam cortados pelo limite superior da tela e as barras de vida fiquem 100% visíveis.
+            const sinA = Math.sin(angle);
+            const cosA = Math.cos(angle);
+            const radX = 43;
+            const radY = sinA < 0 ? 33 : 39;
+            const silX = 50 + radX * cosA;
+            const silY = 50 + radY * sinA;
+            const anchorY = sinA < -0.4 ? -76 : -88;
 
             return (
               <React.Fragment key={p.id}>
                 <div
-                  className="absolute z-30"
+                  className="absolute z-40"
                   style={{
                     left: `${silX}%`,
                     top: `${silY}%`,
                     transformStyle: 'preserve-3d',
-                    transform: `translate(-50%, -82%) translateZ(26px) rotateX(${-tablePitch}deg)`,
+                    transformOrigin: '50% 100%',
+                    transform: `translate(-50%, ${anchorY}%) translateZ(36px) rotateX(${-tablePitch}deg)`,
                   }}
                 >
                   <PlayerSilhouette3D
@@ -454,22 +366,22 @@ export default function GameTable3DView({
                   slotStyle={{
                     left: `${slotX}%`,
                     top: `${slotY}%`,
-                    transform: 'translate(-50%, -50%) translateZ(12px)',
+                    transform: 'translate(-50%, -50%) translateZ(16px)',
                   }}
                 />
               </React.Fragment>
             );
           })}
 
-          {/* Centro da mesa 3D: Relógio + Controles de Análise */}
+          {/* Centro da mesa 3D: Relógio + Controles discretos de Análise */}
           <div
-            className="absolute left-1/2 top-1/2 z-30 flex flex-col items-center gap-1 sm:gap-1.5"
+            className="absolute left-1/2 top-1/2 z-30 flex flex-col items-center gap-1.5"
             style={{
-              transform: 'translate(-50%, -50%) translateZ(18px)',
+              transform: 'translate(-50%, -50%) translateZ(22px)',
               transformStyle: 'preserve-3d',
             }}
           >
-            <div className="rounded-full p-1.5 bg-black/55 shadow-[0_10px_35px_rgba(0,0,0,0.95)] border border-gold-aged/30">
+            <div className="rounded-full p-1 bg-black/45 shadow-[0_10px_35px_rgba(0,0,0,0.95)]">
               <CentralClock
                 socket={socket}
                 myAllowedTime={me?.allowedTime}
@@ -480,68 +392,67 @@ export default function GameTable3DView({
 
             {phase === 'ANALYSIS' && (
               <motion.div
-                initial={{ scale: 0.85, opacity: 0 }}
+                initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="flex flex-col gap-1 sm:gap-1.5 mt-0.5"
+                className="flex items-center gap-2 mt-1"
               >
                 <button
                   id="btn-pause"
                   onClick={onTogglePause}
-                  className="artifact-btn flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-gold-aged bg-black/90 text-gold-aged text-[10px] font-mono font-bold hover:bg-gold-aged/20 active:scale-95 transition-all"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/75 border border-gold-aged/40 text-amber-200/90 text-[10px] font-mono hover:border-gold-aged hover:text-white active:scale-95 transition-all"
                 >
-                  <Pause size={11} /> {gameState.isPaused ? '▶️ CONTINUAR' : '⏸️ PAUSAR'}
+                  <Pause size={10} /> {gameState.isPaused ? 'Continuar' : 'Pausar'}
                 </button>
                 <button
                   id="btn-skip"
                   onClick={onSkipAnalysis}
-                  className="artifact-btn flex items-center justify-center gap-1 px-2.5 py-1 rounded border border-blood-bright bg-black/90 text-blood-bright text-[10px] font-mono font-bold hover:bg-blood/30 active:scale-95 transition-all"
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/75 border border-red-500/40 text-red-200/90 text-[10px] font-mono hover:border-red-400 hover:text-white active:scale-95 transition-all"
                 >
-                  <SkipForward size={11} /> ⏭️ PRÓXIMO
+                  <SkipForward size={10} /> Próximo
                 </button>
               </motion.div>
             )}
           </div>
 
-          {/* Aviso de parede */}
+          {/* Sussurro de parede sutil */}
           {walled && canAct && (
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: [1, 0.6, 1] }}
-              transition={{ duration: 1.2, repeat: Infinity }}
-              style={{ transform: 'translate(-50%, 0) translateZ(24px)' }}
-              className="absolute left-1/2 bottom-[2.5%] z-50 px-3 py-1 rounded border-2 border-cyan-400 bg-black/95 text-cyan-200 text-[10px] sm:text-[11px] font-mono font-bold text-center max-w-[85%] shadow-[0_0_25px_rgba(34,211,238,0.4)]"
+              animate={{ opacity: [0.95, 0.55, 0.95] }}
+              transition={{ duration: 1.6, repeat: Infinity }}
+              style={{
+                transform: 'translate(-50%, 0) translateZ(36px)',
+                textShadow: '0 2px 10px rgba(0,0,0,0.98)',
+              }}
+              className="pointer-events-none absolute left-1/2 bottom-[7%] z-50 inline-flex items-center gap-1.5 text-sky-300/95 text-[10.5px] sm:text-xs font-grimoire font-bold tracking-widest uppercase text-center whitespace-nowrap"
             >
-              🧱 EMPAREDADO: USE CARTAS EM SI MESMO, PACTO DE SANGUE OU PASSE/DESCARTE
+              <GameIcon name="iron-lock" size={13} />
+              <span>Emparedado · Aja em si mesmo, use Pacto de Sangue ou Passe a vez</span>
             </motion.div>
           )}
         </motion.div>
       </main>
 
-      {/* 5. MÃO DE CARTAS 3D EM PRIMEIRA PESSOA (Sobe quando o mouse olha para as cartas) */}
+      {/* 4. MÃO DE CARTAS EM PRIMEIRA PESSOA (100% estável durante a inspeção e uso das cartas; separada do gatilho do chat) */}
       <motion.footer
+        data-hand-zone="true"
+        onMouseEnter={() => setOverHandOrControls(true)}
+        onMouseLeave={() => setOverHandOrControls(false)}
         animate={{
-          y:
-            cameraZone === CAMERA_ZONES.NOTEBOOK
-              ? 220
-              : cameraZone === CAMERA_ZONES.PLAYERS
-                ? 42
-                : 0,
-          scale:
-            cameraZone === CAMERA_ZONES.PLAYERS
-              ? 0.91
-              : cameraZone === CAMERA_ZONES.CARDS
-                ? 1.03
-                : 0.85,
+          y: cameraZone === CAMERA_ZONES.NOTEBOOK ? 240 : 0,
           opacity: cameraZone === CAMERA_ZONES.NOTEBOOK ? 0 : 1,
         }}
-        transition={{ type: 'spring', stiffness: 170, damping: 22 }}
+        transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          'relative z-[45] h-[165px] sm:h-[205px] flex items-end justify-center pb-5 sm:pb-6 px-2 shrink-0',
+          'relative z-[45] h-[168px] sm:h-[198px] flex items-end justify-center pb-7 sm:pb-8 px-2 shrink-0',
           cameraZone === CAMERA_ZONES.NOTEBOOK && 'pointer-events-none'
         )}
       >
         {me && me.isAlive ? (
-          <div className="relative flex items-end justify-center max-w-full pb-1">
+          <div
+            data-hand-zone="true"
+            className="relative flex items-end justify-center max-w-full pb-1"
+          >
             <AnimatePresence>
               {me.hand.map((card, i) => {
                 const total = me.hand.length;
@@ -554,7 +465,8 @@ export default function GameTable3DView({
                 return (
                   <motion.div
                     key={card.id}
-                    initial={{ y: 180, opacity: 0, rotate: -16, scale: 0.75 }}
+                    data-hand-zone="true"
+                    initial={{ y: 160, opacity: 0, rotate: -14, scale: 0.8 }}
                     animate={{
                       y: isSel ? -28 : fanY,
                       rotate: isSel ? 0 : fanRotate,
@@ -565,16 +477,16 @@ export default function GameTable3DView({
                     whileHover={
                       canAct
                         ? {
-                            y: -32,
+                            y: -30,
                             rotate: 0,
                             scale: 1.14,
                             zIndex: 60,
-                            transition: { type: 'spring', stiffness: 320, damping: 20 },
+                            transition: { type: 'spring', stiffness: 320, damping: 22 },
                           }
                         : undefined
                     }
-                    exit={{ y: -80, opacity: 0, scale: 0.65 }}
-                    transition={{ type: 'spring', stiffness: 180, damping: 18 }}
+                    exit={{ y: -70, opacity: 0, scale: 0.7 }}
+                    transition={{ type: 'spring', stiffness: 190, damping: 20 }}
                     className={cn(
                       'transition-shadow duration-200 card-fan-item',
                       i > 0 && (compact ? '-ml-2.5' : '-ml-3.5'),
@@ -597,125 +509,132 @@ export default function GameTable3DView({
             </AnimatePresence>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-2 pb-4 sm:pb-6 text-center px-3 z-40 max-w-md mx-auto">
-            <div className="flex items-center gap-2 font-grimoire text-purple-300 tracking-widest text-xs sm:text-sm drop-shadow-md">
-              <Ghost size={16} className="text-purple-400 animate-pulse shrink-0" />
-              <span>
-                {me ? 'VOCÊ FOI ELIMINADO — MODO ESPECTADOR 3D' : 'MODO ESPECTADOR 3D'}
-              </span>
-              <Ghost size={16} className="text-purple-400 animate-pulse shrink-0" />
+          <div className="flex flex-col items-center justify-center gap-1.5 pb-5 text-center px-3 z-40 max-w-md mx-auto">
+            <div
+              className="flex items-center gap-2 font-grimoire text-purple-300/90 tracking-[0.2em] text-xs sm:text-sm uppercase"
+              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.95)' }}
+            >
+              <Ghost size={15} className="text-purple-400/80 animate-pulse shrink-0" />
+              <span>Espírito Espectador</span>
             </div>
-            <p className="text-[11px] font-mono text-stone-400 leading-tight">
-              Passe o mouse para cima para olhar as silhuetas ou para baixo para rabiscar no Caderno do Além!
-            </p>
           </div>
         )}
       </motion.footer>
 
-      {/* 6. PAINEL DE AÇÕES RÁPIDAS DO JOGADOR (Mirar em Mim / Fortalecer Faca / Descartar / Passar) */}
-      {me && me.isAlive && cameraZone !== CAMERA_ZONES.NOTEBOOK && (
-        <div className="absolute right-2 bottom-[172px] sm:bottom-8 sm:right-4 z-[50] flex flex-col gap-1.5 w-[156px] sm:w-[215px]">
+      {/* 5. CONTROLES DE AÇÃO DO TURNO (Passar a Vez / Descartar / Auto-Alvo) — Sempre acessíveis e separados da zona do chat */}
+      {me && me.isAlive && canAct && (
+        <div
+          id="turn-actions-cluster"
+          data-hand-zone="true"
+          onMouseEnter={() => setOverHandOrControls(true)}
+          onMouseLeave={() => setOverHandOrControls(false)}
+          className="fixed right-3 sm:right-7 bottom-10 sm:bottom-11 z-[65] flex flex-col items-end gap-2 pointer-events-auto"
+        >
           <AnimatePresence>
             {canSelfTarget && (
               <motion.button
                 key="self-target"
-                initial={{ x: 25, opacity: 0 }}
+                type="button"
+                initial={{ x: 16, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
-                exit={{ x: 25, opacity: 0 }}
+                exit={{ x: 16, opacity: 0 }}
                 id="btn-self-target"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   sendAction(selectedCard.id, me.id);
                   setSelectedCardIds([]);
                 }}
                 className={cn(
-                  'artifact-btn flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 rounded border-2 font-grimoire font-bold text-[10px] sm:text-xs shadow-md active:scale-95 transition-all',
+                  'flex items-center gap-1.5 py-2 px-3.5 rounded-full border font-grimoire font-bold text-[10.5px] sm:text-xs tracking-wider uppercase shadow-[0_8px_24px_rgba(0,0,0,0.9)] backdrop-blur-md active:scale-95 transition-all cursor-pointer',
                   selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA
-                    ? 'border-teal-400 bg-teal-950/90 text-teal-200 hover:bg-teal-900 shadow-[0_0_18px_rgba(45,212,191,0.35)]'
+                    ? 'border-teal-400/70 bg-teal-950/85 text-teal-100 hover:bg-teal-900'
                     : selectedCard.type === CARD_TYPES.PACTO_SANGUE
                       ? (me.bloodPactWith || []).length > 0
-                        ? 'border-amber-400 bg-amber-950/90 text-amber-100 hover:bg-amber-900 shadow-[0_0_18px_rgba(245,158,11,0.4)]'
-                        : 'border-rose-500 bg-rose-950/90 text-rose-200 hover:bg-rose-900 shadow-[0_0_18px_rgba(244,63,94,0.35)]'
+                        ? 'border-amber-400/75 bg-amber-950/85 text-amber-100 hover:bg-amber-900'
+                        : 'border-rose-500/75 bg-rose-950/85 text-rose-100 hover:bg-rose-900'
                       : selectedCard.type === CARD_TYPES.SERINGA
-                        ? 'border-emerald-400 bg-emerald-950/90 text-emerald-200 hover:bg-emerald-900 shadow-[0_0_18px_rgba(52,211,153,0.35)]'
-                        : 'border-gold-aged bg-black/90 text-gold-aged hover:bg-gold-aged/20'
+                        ? 'border-emerald-400/75 bg-emerald-950/85 text-emerald-100 hover:bg-emerald-900'
+                        : 'border-gold-aged/65 bg-[#160d08]/90 text-amber-100 hover:border-gold-aged hover:bg-[#24150d]'
                 )}
               >
                 {selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA ? (
                   <>
-                    <Flame size={13} className="text-teal-300" /> +1 DANO NA MINHA FACA
+                    <Flame size={13} className="text-teal-300" /> +1 Dano na Faca
                   </>
                 ) : selectedCard.type === CARD_TYPES.PACTO_SANGUE ? (
                   (me.bloodPactWith || []).length > 0 ? (
-                    <>⛓️‍💥 QUEBRAR MEU PACTO</>
+                    <>
+                      <GameIcon name="broken-chain" size={13} /> Quebrar Meu Pacto
+                    </>
                   ) : (
-                    <>🩸 PACTO EM MIM (-1 VIDA)</>
+                    <>
+                      <GameIcon name="blood-drop" size={13} /> Pacto em Mim (-1 Vida)
+                    </>
                   )
                 ) : selectedCard.type === CARD_TYPES.SERINGA ? (
                   <>
-                    💉 USAR EM MIM ({selectedCard.charges || 0}/4
-                    {(selectedCard.charges || 0) > (me.maxLives - me.lives) ? ' · OVERDOSE!' : ''})
+                    <GameIcon name="syringe-vial" size={13} /> Usar em Mim (
+                    {selectedCard.charges || 0}/4
+                    {(selectedCard.charges || 0) > me.maxLives - me.lives ? ' · Overdose' : ''})
                   </>
                 ) : (
                   <>
-                    <Crosshair size={13} /> USAR EM MIM MESMO
+                    <Crosshair size={13} className="text-amber-300" /> Usar em Mim
                   </>
                 )}
               </motion.button>
             )}
           </AnimatePresence>
 
-          {canAct &&
-            (discardLimit > 0 ? (
-              selectedCardIds.length > 0 ? (
-                <button
-                  id="btn-discard"
-                  onClick={handleDiscard}
-                  className="artifact-btn flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 rounded border-2 border-amber-500 bg-amber-950/90 text-amber-200 font-grimoire font-bold text-[10px] sm:text-xs hover:bg-amber-900 shadow-[0_0_18px_rgba(245,158,11,0.3)] active:scale-95 transition-all"
-                >
-                  <Trash2 size={13} className="text-amber-400" /> DESCARTAR ({selectedCardIds.length})
-                </button>
-              ) : (
-                <button
-                  id="btn-pass"
-                  onClick={handlePassTurn}
-                  className="artifact-btn flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 rounded border-2 border-iron bg-black/90 text-parchment-dark font-grimoire font-bold text-[10px] sm:text-xs hover:border-gold-aged hover:text-amber-200 shadow-md active:scale-95 transition-all"
-                >
-                  <Hand size={13} /> PASSAR A VEZ
-                </button>
-              )
-            ) : (
+          {discardLimit > 0 && selectedCardIds.length > 0 ? (
+            <div className="flex items-center gap-2">
+              <button
+                id="btn-discard"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDiscard();
+                }}
+                className="flex items-center gap-1.5 py-2 px-4 rounded-full border border-amber-500/70 bg-[#241409]/90 text-amber-100 font-grimoire font-bold text-[10.5px] sm:text-xs tracking-wider uppercase hover:border-amber-400 hover:bg-amber-950 shadow-[0_8px_24px_rgba(0,0,0,0.9)] backdrop-blur-md active:scale-95 transition-all cursor-pointer"
+              >
+                <Trash2 size={13} className="text-amber-400" /> Descartar ({selectedCardIds.length})
+              </button>
               <button
                 id="btn-pass"
-                onClick={handlePassTurn}
-                className="artifact-btn flex items-center justify-center gap-1.5 py-1.5 sm:py-2 px-2.5 rounded border-2 border-iron bg-black/90 text-parchment-dark font-grimoire font-bold text-[10px] sm:text-xs hover:border-gold-aged hover:text-amber-200 shadow-md active:scale-95 transition-all"
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handlePassTurn();
+                }}
+                className="flex items-center gap-1.5 py-2 px-3.5 rounded-full border border-stone-600/70 bg-[#120b07]/90 text-parchment/85 font-grimoire font-bold text-[10.5px] sm:text-xs tracking-wider uppercase hover:border-gold-aged/80 hover:text-amber-100 shadow-[0_8px_24px_rgba(0,0,0,0.9)] backdrop-blur-md active:scale-95 transition-all cursor-pointer"
+                title="Passar a vez sem jogar carta"
               >
-                <Hand size={13} /> PASSAR A VEZ
+                <Hand size={13} /> Passar a Vez
               </button>
-            ))}
-
-          <div className="px-2 py-1 rounded bg-black/80 border border-stone-800/90 text-[9px] sm:text-[10px] font-mono text-parchment-dark text-center leading-tight shadow-inner">
-            {canAct
-              ? selectedCard
-                ? CARD_META[selectedCard.type]?.requiresOtherPlayer
-                  ? 'Olhe p/ cima e clique na silhueta de outro jogador'
-                  : 'Clique numa silhueta ou use em si mesmo'
-                : selectedCardIds.length > 0
-                  ? `${selectedCardIds.length} selecionada(s) p/ descarte`
-                  : 'Selecione uma carta para agir'
-              : phase === 'PLANNING'
-                ? '🔔 Jogada travada. Aguardando...'
-                : '👁️ Observando o ritual...'}
-          </div>
+            </div>
+          ) : (
+            <button
+              id="btn-pass"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePassTurn();
+              }}
+              className="flex items-center gap-1.5 py-2 px-4 rounded-full border border-gold-aged/55 bg-[#140c07]/90 text-[#e8d5b5] font-grimoire font-bold text-[11px] sm:text-xs tracking-[0.14em] uppercase hover:border-gold-aged hover:text-white hover:bg-[#23140b] shadow-[0_8px_24px_rgba(0,0,0,0.92)] backdrop-blur-md active:scale-95 transition-all cursor-pointer"
+            >
+              <Hand size={13} className="text-gold-aged" /> Passar a Vez
+            </button>
+          )}
         </div>
       )}
 
-      {/* 7. GATILHO INFERIOR DE SENSOR 3D PARA ABRIR O CADERNO SOB A MESA */}
+      {/* 6. ZONA INTENCIONAL NO EXTREMO INFERIOR DA TELA PARA ACESSAR O CHAT & GRIMÓRIO */}
       {cameraZone !== CAMERA_ZONES.NOTEBOOK && (
         <div
-          onMouseEnter={() => {
-            if (!cameraLocked) selectZone(CAMERA_ZONES.NOTEBOOK);
-          }}
-          className="fixed inset-x-0 bottom-0 z-[55] h-7 flex items-center justify-center bg-gradient-to-t from-black via-[#1a0f08]/95 to-transparent border-t border-gold-aged/30"
+          id="under-table-trigger"
+          onMouseEnter={handleBottomEdgeEnter}
+          onMouseLeave={handleBottomEdgeLeave}
+          className="fixed inset-x-0 bottom-0 z-[55] h-[16px] flex items-center justify-center bg-gradient-to-t from-black/90 to-transparent"
         >
           <button
             id="btn-scroll-under-table"
@@ -724,40 +643,35 @@ export default function GameTable3DView({
               audio.play('select');
               selectZone(CAMERA_ZONES.NOTEBOOK);
             }}
-            className="flex items-center gap-2 text-[10px] sm:text-[11px] font-mono text-amber-300 hover:text-white px-4 py-0.5 rounded-full transition-all"
+            className="flex items-center gap-1.5 text-[9.5px] font-mono tracking-widest uppercase text-parchment/45 hover:text-amber-200 px-3 py-0.5 transition-colors cursor-pointer"
           >
-            <ChevronDown size={13} className="animate-bounce text-gold-aged" />
-            <span className="font-bold tracking-wider">
-              📖 PASSE O MOUSE AQUI EMBAIXO PARA ABRIR O LIVRO DE CARTAS & CADERNO DE CHAT ({logs.length})
-            </span>
-            <ChevronDown size={13} className="animate-bounce text-gold-aged" />
+            <ChevronDown size={11} className="text-gold-aged/70" />
+            <span>Grimório & Caderno ({logs.length})</span>
+            <ChevronDown size={11} className="text-gold-aged/70" />
           </button>
         </div>
       )}
 
-      {/* 8. GAVETA 3D DO CADERNO DE ANOTAÇÕES E CHAT SOB A MESA (Quando olha para baixo) */}
+      {/* 7. GAVETA SOB A MESA: LIVRO DE CARTAS & CADERNO DE CHAT */}
       <AnimatePresence>
         {cameraZone === CAMERA_ZONES.NOTEBOOK && (
           <motion.div
             key="notebook-3d-overlay"
-            initial={{ y: '100%', rotateX: 25, opacity: 0 }}
-            animate={{ y: 0, rotateX: 0, opacity: 1 }}
-            exit={{ y: '100%', rotateX: 20, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 180, damping: 24 }}
-            className="fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center justify-end bg-gradient-to-t from-black/95 via-black/80 to-transparent pt-6 pb-2 px-2 max-h-[88dvh] overflow-y-auto"
+            initial={{ y: '100%', opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: '100%', opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 190, damping: 25 }}
+            className="fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center justify-end bg-gradient-to-t from-black/95 via-black/85 to-transparent pt-6 pb-2 px-2 max-h-[86dvh] overflow-y-auto"
           >
-            {/* Faixa superior para voltar o olhar para as cartas apenas subindo o mouse */}
-            <div
-              onMouseEnter={() => {
-                if (!cameraLocked) selectZone(CAMERA_ZONES.CARDS);
-              }}
+            <button
+              id="btn-return-to-table"
+              type="button"
               onClick={() => selectZone(CAMERA_ZONES.CARDS)}
-              className="w-full max-w-2xl mb-1.5 py-1 rounded-full bg-black/80 border border-gold-aged/50 flex items-center justify-center gap-2 text-[10px] sm:text-xs font-mono text-amber-200 cursor-pointer hover:bg-gold-aged/20 transition-all"
+              className="mb-2 px-4 py-1 rounded-full bg-black/75 border border-gold-aged/40 flex items-center justify-center gap-1.5 text-[10px] font-mono tracking-widest uppercase text-amber-200/85 hover:text-white hover:border-gold-aged cursor-pointer transition-all"
             >
-              <ChevronUp size={14} className="animate-bounce text-gold-aged" />
-              <span>SUBA O MOUSE OU CLIQUE AQUI PARA VOLTAR O OLHAR ÀS CARTAS E À MESA</span>
-              <ChevronUp size={14} className="animate-bounce text-gold-aged" />
-            </div>
+              <ChevronUp size={13} className="text-gold-aged" />
+              <span>Voltar à Mesa</span>
+            </button>
 
             <UnderTableChat
               logs={logs}

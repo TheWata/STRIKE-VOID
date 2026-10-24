@@ -85,136 +85,169 @@ export default function App() {
       >
         <div className="candle pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
 
-        {/* Barra superior */}
-        <header className="relative z-[70] flex items-center justify-between gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 border-b-2 border-stone-700/80 bg-gradient-to-r from-[#2c1d12] via-[#241710] to-[#1e130c] shadow-[0_4px_25px_rgba(0,0,0,0.85),inset_0_1px_0_rgba(212,175,55,0.22)]">
-          <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
-            <div className="font-grimoire font-extrabold tracking-[0.18em] sm:tracking-[0.25em] text-amber-100 text-sm sm:text-base whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center">
-              STRIKE
-              <span className="text-blood-bright font-black mx-0.5 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]">
-                /
-              </span>
-              VOID
+        {/* Em partida (inGame): Sem barra de aplicativo — apenas controles discretos e orgânicos nos cantos */}
+        {inGame ? (
+          <div className="pointer-events-none fixed top-0 inset-x-0 z-[70] flex items-center justify-between px-3 sm:px-5 py-2.5">
+            {/* Canto superior esquerdo: Sussurro discreto da rodada e código da mesa */}
+            <div
+              className="pointer-events-auto flex items-center gap-2.5 text-[11px] font-grimoire tracking-[0.18em] text-parchment/55 hover:text-parchment/90 transition-colors"
+              style={{ textShadow: '0 2px 6px rgba(0,0,0,0.95)' }}
+            >
+              <span>R{gameState.round}</span>
+              <span className="text-stone-600">·</span>
+              <button
+                type="button"
+                onClick={handleCopyHeaderCode}
+                className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-amber-200/50 hover:text-amber-200 transition-colors cursor-pointer"
+                title="Copiar código da mesa"
+              >
+                <span>#{gameState.roomCode}</span>
+                {copiedCode && <Check size={11} className="text-emerald-400" />}
+              </button>
             </div>
 
-            {inAnyRoom && (
+            {/* Canto superior direito: Ícones discretos sem caixas pesadas */}
+            <div className="pointer-events-auto flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+              <AudioControls minimal />
               <button
-                onClick={handleCopyHeaderCode}
-                className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md border border-gold-aged/80 bg-[#160e08]/90 font-mono text-[11px] sm:text-xs text-amber-300 font-bold hover:bg-gold-aged/25 hover:border-gold-aged transition-all shadow-[0_0_12px_rgba(212,175,55,0.25)]"
-                title="Clique para copiar código da sala"
+                id="btn-guide"
+                type="button"
+                onClick={() => {
+                  audioService.play('click');
+                  setShowGuide(true);
+                }}
+                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/45 hover:bg-black/80 text-parchment/70 hover:text-amber-200 transition-all active:scale-95"
+                aria-label="Grimório e Regras"
+                title="Grimório e Regras"
               >
-                <strong className="tracking-wider">{gameState.roomCode}</strong>
-                {copiedCode ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                <HelpCircle size={15} />
               </button>
-            )}
-          </div>
-
-          <div className="hidden sm:flex font-mono text-xs tracking-wider items-center gap-3">
-            {inGame && (
-              <span className="text-amber-100 bg-stone-900/90 border border-stone-700 px-2.5 py-0.5 rounded shadow-inner font-bold">
-                ROUND {gameState.round}
-              </span>
-            )}
-            {inAnyRoom && (
-              <span className="text-amber-300 bg-gold-aged/20 border border-gold-aged/60 px-2.5 py-0.5 rounded shadow-sm font-bold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-gold-aged animate-pulse" />
-                {PHASE_LABELS[phase] || phase}
-              </span>
-            )}
-          </div>
-
-          {/* AÇÕES NO DESKTOP */}
-          <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
-            <AudioControls />
-            <button
-              id="btn-guide"
-              onClick={() => {
-                audioService.play('click');
-                setShowGuide(true);
-              }}
-              className={cn(
-                HEADER_ICON_BTN,
-                'border-blood-bright bg-blood/60 text-white hover:bg-blood hover:border-red-500 shadow-[0_0_15px_rgba(220,38,38,0.45)]'
-              )}
-              aria-label="Como Jogar / Guia de Regras"
-              title="Como Jogar / Guia de Regras"
-            >
-              <HelpCircle size={16} className="text-red-300 shrink-0" />
-              <span className="hidden sm:inline font-bold">GUIA</span>
-            </button>
-            {inAnyRoom && (
               <button
                 id="btn-settings"
+                type="button"
                 onClick={() => setShowSettings(true)}
-                className={cn(
-                  HEADER_ICON_BTN,
-                  'border-gold-aged/80 bg-gold-aged/20 text-amber-300 hover:bg-gold-aged/35 hover:text-white shadow-[0_0_12px_rgba(212,175,55,0.25)]'
-                )}
-                aria-label="Ajustar tempos da partida"
-                title="Ajustar tempos da partida"
+                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/45 hover:bg-black/80 text-parchment/70 hover:text-amber-200 transition-all active:scale-95"
+                aria-label="Tempos da Partida"
+                title="Tempos da Partida"
               >
-                <Settings size={16} /> <span className="hidden sm:inline">TEMPOS</span>
+                <Settings size={15} />
               </button>
-            )}
-            {inAnyRoom && (
               <button
+                id="btn-leave-room"
+                type="button"
                 onClick={handleLeaveRoom}
-                className={cn(
-                  HEADER_ICON_BTN,
-                  'border-stone-600 bg-stone-900/90 text-stone-200 hover:text-white hover:bg-blood/70 hover:border-blood-bright'
-                )}
-                title="Sair da sala"
-                aria-label="Sair da sala"
+                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/45 hover:bg-red-950/80 text-parchment/70 hover:text-red-300 transition-all active:scale-95"
+                title="Deixar a mesa"
+                aria-label="Deixar a mesa"
               >
-                <LogOut size={16} /> <span className="hidden sm:inline">SAIR</span>
+                <LogOut size={15} />
               </button>
-            )}
+            </div>
           </div>
+        ) : (
+          /* Fora da partida (Menu / Lobby): Cabeçalho padrão */
+          <header className="relative z-[70] flex items-center justify-between gap-2 px-2.5 sm:px-5 py-2 sm:py-2.5 border-b border-stone-800/70 bg-gradient-to-r from-[#24170e] via-[#1c110b] to-[#160d08] shadow-[0_4px_25px_rgba(0,0,0,0.85)]">
+            <div className="flex items-center gap-2 sm:gap-3.5 min-w-0">
+              <div className="font-grimoire font-extrabold tracking-[0.18em] sm:tracking-[0.25em] text-amber-100 text-sm sm:text-base whitespace-nowrap drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] flex items-center">
+                STRIKE
+                <span className="text-blood-bright font-black mx-0.5 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)]">
+                  /
+                </span>
+                VOID
+              </div>
 
-          {/* AÇÕES NO MOBILE */}
-          <div className="flex sm:hidden items-center gap-2 shrink-0">
-            {inAnyRoom && (
-              <button
-                id="btn-mobile-leave"
-                onClick={handleLeaveRoom}
-                className="flex items-center justify-center gap-1 h-9 px-2.5 rounded-md border border-blood-bright/70 bg-blood/30 hover:bg-blood/50 text-red-200 text-xs font-mono font-bold active:scale-95 shadow-sm"
-                title="Sair da sala"
-                aria-label="Sair da sala"
-              >
-                <LogOut size={14} />
-                <span>SAIR</span>
-              </button>
-            )}
-
-            <button
-              id="btn-mobile-menu"
-              onClick={() => {
-                audioService.play('click');
-                setShowMobileMenu((v) => !v);
-              }}
-              className={cn(
-                'flex items-center justify-center h-9 w-9 rounded-md border transition-all active:scale-95 shadow-sm',
-                showMobileMenu
-                  ? 'border-gold-aged bg-gold-aged/30 text-white shadow-[0_0_10px_rgba(212,175,55,0.4)]'
-                  : 'border-stone-600 bg-stone-900/90 text-amber-200 hover:border-gold-aged'
+              {inAnyRoom && (
+                <button
+                  onClick={handleCopyHeaderCode}
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-md border border-gold-aged/80 bg-[#160e08]/90 font-mono text-[11px] sm:text-xs text-amber-300 font-bold hover:bg-gold-aged/25 hover:border-gold-aged transition-all"
+                  title="Clique para copiar código da sala"
+                >
+                  <strong className="tracking-wider">{gameState.roomCode}</strong>
+                  {copiedCode ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
+                </button>
               )}
-              title="Menu de Opções"
-              aria-label="Menu de Opções"
-            >
-              {showMobileMenu ? <X size={18} /> : <Menu size={18} />}
-            </button>
-          </div>
-        </header>
+            </div>
 
-        {/* Faixa de fase/round no mobile */}
-        {inGame && (
-          <div className="sm:hidden relative z-30 flex items-center justify-center gap-3 px-2 py-1 border-b border-stone-700/80 bg-gradient-to-r from-[#22150e] via-[#2c1b12] to-[#22150e] font-mono text-[11px] tracking-wider text-amber-100 shadow-sm">
-            <span className="font-bold text-amber-200">ROUND {gameState.round}</span>
-            <span className="text-stone-500">·</span>
-            <span className="text-amber-400 font-bold flex items-center gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-gold-aged animate-pulse" />
-              {PHASE_LABELS[phase] || phase}
-            </span>
-          </div>
+            <div className="hidden sm:flex items-center gap-1.5 sm:gap-2 shrink-0">
+              <AudioControls />
+              <button
+                id="btn-guide"
+                onClick={() => {
+                  audioService.play('click');
+                  setShowGuide(true);
+                }}
+                className={cn(
+                  HEADER_ICON_BTN,
+                  'border-blood-bright bg-blood/60 text-white hover:bg-blood hover:border-red-500'
+                )}
+                aria-label="Como Jogar / Guia de Regras"
+                title="Como Jogar / Guia de Regras"
+              >
+                <HelpCircle size={16} className="text-red-300 shrink-0" />
+                <span className="hidden sm:inline font-bold">GUIA</span>
+              </button>
+              {inAnyRoom && (
+                <button
+                  id="btn-settings"
+                  onClick={() => setShowSettings(true)}
+                  className={cn(
+                    HEADER_ICON_BTN,
+                    'border-gold-aged/80 bg-gold-aged/20 text-amber-300 hover:bg-gold-aged/35 hover:text-white'
+                  )}
+                  aria-label="Ajustar tempos da partida"
+                  title="Ajustar tempos da partida"
+                >
+                  <Settings size={16} /> <span className="hidden sm:inline">TEMPOS</span>
+                </button>
+              )}
+              {inAnyRoom && (
+                <button
+                  onClick={handleLeaveRoom}
+                  className={cn(
+                    HEADER_ICON_BTN,
+                    'border-stone-600 bg-stone-900/90 text-stone-200 hover:text-white hover:bg-blood/70 hover:border-blood-bright'
+                  )}
+                  title="Sair da sala"
+                  aria-label="Sair da sala"
+                >
+                  <LogOut size={16} /> <span className="hidden sm:inline">SAIR</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex sm:hidden items-center gap-2 shrink-0">
+              {inAnyRoom && (
+                <button
+                  id="btn-mobile-leave"
+                  onClick={handleLeaveRoom}
+                  className="flex items-center justify-center gap-1 h-9 px-2.5 rounded-md border border-blood-bright/70 bg-blood/30 hover:bg-blood/50 text-red-200 text-xs font-mono font-bold active:scale-95"
+                  title="Sair da sala"
+                  aria-label="Sair da sala"
+                >
+                  <LogOut size={14} />
+                  <span>SAIR</span>
+                </button>
+              )}
+
+              <button
+                id="btn-mobile-menu"
+                onClick={() => {
+                  audioService.play('click');
+                  setShowMobileMenu((v) => !v);
+                }}
+                className={cn(
+                  'flex items-center justify-center h-9 w-9 rounded-md border transition-all active:scale-95',
+                  showMobileMenu
+                    ? 'border-gold-aged bg-gold-aged/30 text-white'
+                    : 'border-stone-600 bg-stone-900/90 text-amber-200 hover:border-gold-aged'
+                )}
+                title="Menu de Opções"
+                aria-label="Menu de Opções"
+              >
+                {showMobileMenu ? <X size={18} /> : <Menu size={18} />}
+              </button>
+            </div>
+          </header>
         )}
 
         {/* Roteamento MVC de Views */}
@@ -269,7 +302,7 @@ export default function App() {
           onOpenSettings={() => setShowSettings(true)}
           onLeaveRoom={handleLeaveRoom}
           onScrollToUnderTable={() => {
-            const btn = document.getElementById('btn-cam-notebook');
+            const btn = document.getElementById('btn-scroll-under-table');
             if (btn) btn.click();
           }}
         />

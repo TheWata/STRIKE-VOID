@@ -3,6 +3,7 @@ import { BookOpen, Sparkles, Shield, Crosshair, Flame, Layers } from 'lucide-rea
 import { cn } from '../lib/cn';
 import { audio } from '../lib/audio';
 import InscryptionCard from './InscryptionCard';
+import GameIcon from './GameIcon';
 import { CARD_TYPES, CARD_META, CARD_CATEGORIES } from '../models/cardModel';
 
 /**
@@ -317,8 +318,9 @@ export default function CardGrimoireBook({ compact = false, className }) {
             {/* Controle interativo de cargas para testar a Seringa no próprio livro */}
             {activeEntry.type === CARD_TYPES.SERINGA && (
               <div className="mt-2 p-1.5 rounded bg-[#e2ceaa] border border-[#9e7f56] flex items-center justify-between gap-2">
-                <span className="font-mono text-[9.5px] font-bold text-[#2b180a]">
-                  💉 Simular Cargas na Mão:
+                <span className="inline-flex items-center gap-1 font-mono text-[9.5px] font-bold text-[#2b180a]">
+                  <GameIcon name="syringe-vial" size={12} />
+                  <span>Simular Cargas na Mão:</span>
                 </span>
                 <div className="flex items-center gap-1">
                   {[0, 1, 2, 3, 4].map((c) => (

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import InscryptionCard from './InscryptionCard';
+import { StylizedLifeBar } from './PlayerSilhouette3D';
 import { cn } from '../lib/cn';
 import { seatAngle, seatPosition } from '../helpers/math3d';
 
@@ -24,195 +25,34 @@ export function Skull({ alive, className = 'w-6 h-6' }) {
       <circle cx="15.2" cy="10.5" r="2.2" fill="#0a0705" />
       <path d="M12 13 l-1.3 2.4 h2.6z" fill="#0a0705" />
       <path d="M9 17.5v2.5M12 17.5v2.5M15 17.5v2.5" stroke="#0a0705" strokeWidth="0.9" />
-      {!alive && (
-        <path
-          d="M13.5 2.5 L11.5 7 L14 9 L11 13"
-          fill="none"
-          stroke="#0a0705"
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-      )}
     </svg>
-  );
-}
-
-function WallOverlay() {
-  return (
-    <motion.div
-      className="absolute inset-0 z-20 pointer-events-none"
-      initial={{ y: -40, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      transition={{ type: 'spring', stiffness: 220, damping: 18 }}
-    >
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-full">
-        {[10, 30, 50, 70, 90].map((x) => (
-          <rect
-            key={x}
-            x={x - 2}
-            y="0"
-            width="4"
-            height="100"
-            fill="#1a110b"
-            stroke="#4a5568"
-            strokeWidth="0.6"
-          />
-        ))}
-        {[30, 70].map((y) => (
-          <g key={y}>
-            <path
-              d={`M0 ${y} Q 12 ${y - 6} 25 ${y} T 50 ${y} T 75 ${y} T 100 ${y}`}
-              fill="none"
-              stroke="#6b7685"
-              strokeWidth="1.6"
-            />
-            {[12, 37, 62, 87].map((x) => (
-              <path
-                key={x}
-                d={`M${x - 3} ${y - 3} L${x + 3} ${y + 3} M${x + 3} ${y - 3} L${x - 3} ${y + 3}`}
-                stroke="#9aa5b4"
-                strokeWidth="1"
-              />
-            ))}
-          </g>
-        ))}
-      </svg>
-      <motion.div
-        className="absolute left-1/2 -translate-x-1/2 bottom-1 px-2 py-[2px] rounded text-[10px] font-bold font-mono text-white whitespace-nowrap border border-black"
-        animate={{ backgroundColor: ['#8b0000', '#1e3a5f', '#8b0000'], opacity: [1, 0.55, 1] }}
-        transition={{ duration: 1, repeat: Infinity }}
-      >
-        🔒 EMPAREDADO
-      </motion.div>
-    </motion.div>
-  );
-}
-
-function BrokenWallOverlay() {
-  return (
-    <motion.div
-      className="absolute inset-0 z-30 pointer-events-none"
-      initial={{ opacity: 1 }}
-      animate={{ opacity: 1 }}
-    >
-      {[-1, 1].map((dir) => (
-        <motion.div
-          key={dir}
-          className="absolute top-0 h-full w-1/2 overflow-hidden"
-          style={{ left: dir === -1 ? 0 : '50%' }}
-          initial={{ x: 0, rotate: 0, opacity: 1 }}
-          animate={{ x: dir * 50, rotate: dir * 18, opacity: 0 }}
-          transition={{ duration: 1.3, ease: 'easeOut' }}
-        >
-          <svg
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            className="w-[200%] h-full"
-            style={{ marginLeft: dir === -1 ? 0 : '-100%' }}
-          >
-            {[10, 30, 50, 70, 90].map((x) => (
-              <rect
-                key={x}
-                x={x - 2}
-                y="0"
-                width="4"
-                height="100"
-                fill="#1a110b"
-                stroke="#4a5568"
-                strokeWidth="0.6"
-              />
-            ))}
-          </svg>
-        </motion.div>
-      ))}
-      <motion.div
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 font-grimoire font-extrabold text-orange-400 text-xs whitespace-nowrap drop-shadow-[0_0_6px_#000]"
-        initial={{ y: 10, opacity: 0 }}
-        animate={{ y: -34, opacity: [0, 1, 1, 0] }}
-        transition={{ duration: 2.2 }}
-      >
-        PAREDE QUEBRADA!
-      </motion.div>
-    </motion.div>
   );
 }
 
 function DamageOverlay() {
   return (
-    <>
-      <motion.div
-        className="absolute inset-0 z-30 rounded bg-blood-bright pointer-events-none"
-        initial={{ opacity: 0.85 }}
-        animate={{ opacity: [0.85, 0.1, 0.35, 0.05] }}
-        transition={{ duration: 1.1 }}
-      />
-      <svg
-        viewBox="0 0 100 100"
-        preserveAspectRatio="none"
-        className="absolute inset-0 z-30 w-full h-full pointer-events-none"
-      >
-        <motion.path
-          d="M8 4 L94 96"
-          stroke="#fff"
-          strokeWidth="3"
-          strokeLinecap="round"
-          fill="none"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 0.25 }}
-        />
-        <motion.path
-          d="M8 4 L94 96"
-          stroke="#dc2626"
-          strokeWidth="6"
-          strokeLinecap="round"
-          fill="none"
-          opacity="0.75"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 0.3 }}
-        />
-        <motion.path
-          d="M22 2 L100 76"
-          stroke="#8b0000"
-          strokeWidth="3"
-          strokeLinecap="round"
-          fill="none"
-          initial={{ pathLength: 0 }}
-          animate={{ pathLength: 1 }}
-          transition={{ duration: 0.3, delay: 0.12 }}
-        />
-      </svg>
-    </>
+    <motion.div
+      className="absolute -inset-4 z-30 rounded-full bg-blood-bright/40 blur-md pointer-events-none"
+      initial={{ opacity: 0.85 }}
+      animate={{ opacity: [0.85, 0.15, 0.4, 0] }}
+      transition={{ duration: 0.9 }}
+    />
   );
 }
 
 function ReflectOverlay() {
   return (
-    <>
-      <motion.div
-        className="absolute -inset-1 z-20 rounded pointer-events-none"
-        animate={{
-          boxShadow: ['0 0 10px #d4af37', '0 0 38px #fde68a', '0 0 10px #d4af37'],
-        }}
-        transition={{ duration: 0.9, repeat: Infinity }}
-      />
-      <motion.svg
-        viewBox="0 0 40 48"
-        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-30 w-12 h-14 pointer-events-none"
-        animate={{ scale: [1, 1.25, 1], opacity: [0.9, 1, 0.9] }}
-        transition={{ duration: 0.9, repeat: Infinity }}
-      >
-        <path
-          d="M20 2 L37 9 V24 C37 35 29 43 20 46 C11 43 3 35 3 24 V9Z"
-          fill="rgba(253,230,138,0.35)"
-          stroke="#d4af37"
-          strokeWidth="2.5"
-        />
-        <path d="M20 2 V46" stroke="#fde68a" strokeWidth="1.2" opacity="0.8" />
-        <path d="M9 14 L16 30 M31 14 L24 30" stroke="#fff" strokeWidth="1.5" opacity="0.7" />
-      </motion.svg>
-    </>
+    <motion.div
+      className="absolute -inset-4 z-20 rounded-full pointer-events-none"
+      animate={{
+        boxShadow: [
+          '0 0 10px rgba(212,175,55,0.4)',
+          '0 0 28px rgba(253,230,138,0.75)',
+          '0 0 10px rgba(212,175,55,0.4)',
+        ],
+      }}
+      transition={{ duration: 0.9, repeat: Infinity }}
+    />
   );
 }
 
@@ -230,10 +70,11 @@ export function CardSlot({ player, phase, slotStyle }) {
         <motion.div
           key="none"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="w-[64px] h-[92px] flex items-center justify-center border-2 border-dashed border-iron/60 bg-black/65 rounded-md text-[9px] text-iron text-center font-mono"
+          animate={{ opacity: 0.7 }}
+          className="px-2 py-1 text-[9px] text-parchment/60 text-center font-mono tracking-widest uppercase"
+          style={{ textShadow: '0 2px 6px rgba(0,0,0,0.95)' }}
         >
-          PASSOU
+          Passou
         </motion.div>
       );
     } else if (action.cardType === 'DISCARD') {
@@ -241,11 +82,11 @@ export function CardSlot({ player, phase, slotStyle }) {
         <motion.div
           key="discard"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="w-[64px] h-[92px] flex flex-col items-center justify-center border-2 border-dashed border-amber-500/60 bg-black/75 rounded-md text-[8px] text-amber-300 text-center font-mono px-1"
+          animate={{ opacity: 0.8 }}
+          className="px-2 py-1 text-[9px] text-amber-300/75 text-center font-mono tracking-wider uppercase"
+          style={{ textShadow: '0 2px 6px rgba(0,0,0,0.95)' }}
         >
-          <span>DESCARTOU</span>
-          <span className="font-bold text-[10px]">{action.discardedCount || 1}</span>
+          Descartou {action.discardedCount || 1}
         </motion.div>
       );
     } else if (action.cardType) {
@@ -267,7 +108,7 @@ export function CardSlot({ player, phase, slotStyle }) {
   }
 
   return (
-    <div className="absolute z-[15] pointer-events-none" style={slotStyle}>
+    <div className="absolute z-[20] pointer-events-none" style={slotStyle}>
       <div style={{ perspective: 600 }}>{content}</div>
     </div>
   );
@@ -284,6 +125,7 @@ function PlayerSeatBase({
   dimmed,
   onSeatClick,
   onDropCard,
+  allPlayers = [],
 }) {
   const [over, setOver] = useState(false);
   const { x, y, angle } = seatPosition(index, localIndex, totalPlayers);
@@ -292,16 +134,18 @@ function PlayerSeatBase({
   const fx = player.visualEffect;
   const shake = fx === 'DAMAGE' || fx === 'VACUUM';
   const knifeDmg = player.knifeDamage || 1;
-  const hasPact = (player.bloodPactWith || []).length > 0;
+  const pactPartners = (player.bloodPactWith || [])
+    .map((pid) => allPlayers.find((p) => p.id === pid)?.name)
+    .filter(Boolean);
 
   return (
     <>
       <div
-        className="absolute z-10"
+        className="absolute z-30"
         style={{
           left: `${x}%`,
           top: `${y}%`,
-          transform: 'translate(-50%, -50%) translateZ(8px)',
+          transform: 'translate(-50%, -50%) translateZ(26px)',
         }}
         onDragOver={(e) => {
           if (!player.isAlive) return;
@@ -317,128 +161,34 @@ function PlayerSeatBase({
         onClick={() => onSeatClick && onSeatClick(player)}
       >
         <motion.div
-          animate={shake ? { x: [0, -12, 12, -8, 8, 0] } : { x: 0 }}
-          transition={{ duration: 0.6 }}
+          animate={shake ? { x: [0, -10, 10, -6, 6, 0] } : { x: 0 }}
+          transition={{ duration: 0.5 }}
           className={cn(
-            'relative w-[clamp(74px,11vw,142px)] rounded-md border-2 px-1.5 sm:px-2 pt-1 sm:pt-1.5 pb-1.5 sm:pb-2 bg-gradient-to-b from-wood-mid to-wood-dark shadow-[0_8px_18px_rgba(0,0,0,0.85)] transition-opacity',
-            isMe ? 'border-gold-aged' : 'border-iron/70',
-            targetable && 'aim-blink cursor-crosshair border-blood-bright',
-            over && 'scale-110 border-blood-bright',
+            'relative px-3 py-1.5 rounded-full transition-all',
+            targetable ? 'cursor-crosshair scale-105' : 'cursor-pointer',
+            over && 'scale-110',
             !player.isAlive && 'opacity-40 grayscale',
-            dimmed && player.isAlive && 'opacity-50'
+            dimmed && player.isAlive && 'opacity-55'
           )}
         >
-          {/* Placa de identificação enferrujada */}
-          <div className="flex items-center justify-between gap-0.5 sm:gap-1 rounded-sm px-1 sm:px-1.5 py-[1px] sm:py-[2px] mb-0.5 sm:mb-1 bg-gradient-to-r from-[#5a3b27] via-[#8a5a36] to-[#5a3b27] border border-[#2a1810] shadow-inner">
-            <span className="font-typewriter text-[9px] sm:text-[11px] text-[#f1e2bd] truncate max-w-[75%]">
-              {player.name}
-            </span>
-            <span
-              className={cn(
-                'text-[7px] sm:text-[8px] font-mono font-bold px-0.5 sm:px-1 rounded-sm',
-                isMe
-                  ? 'bg-gold-aged text-black'
-                  : player.isBot
-                    ? 'bg-iron text-white'
-                    : 'bg-parchment-dark text-black'
-              )}
-            >
-              {isMe ? 'VOCÊ' : player.isBot ? 'BOT' : 'HUMANO'}
-            </span>
-          </div>
-
-          {/* Caveiras */}
-          <div
-            className={cn(
-              'flex flex-wrap justify-center',
-              player.maxLives >= 5 ? 'gap-0.5' : 'gap-0.5 sm:gap-1'
-            )}
-          >
-            {Array.from({ length: player.maxLives }).map((_, i) => (
-              <Skull
-                key={i}
-                alive={i < player.lives}
-                className={cn('w-3 h-3 sm:w-4 sm:h-4 md:w-5 md:h-5')}
-              />
-            ))}
-          </div>
-
-          {/* Indicadores de Buff de Faca / Pacto de Sangue / Mão Revelada / Marca da Morte */}
-          {player.isAlive &&
-            (knifeDmg > 1 ||
-              hasPact ||
-              player.isHandRevealed ||
-              player.deathMarkTurns != null) && (
-              <div className="flex flex-wrap items-center justify-center gap-0.5 mt-1">
-                {player.deathMarkTurns != null && (
-                  <span
-                    className={cn(
-                      'px-1 rounded border text-[7px] font-mono font-bold',
-                      player.deathMarkTurns <= 2
-                        ? 'bg-red-950 border-red-400 text-red-200 animate-pulse'
-                        : 'bg-lime-950 border-lime-400 text-lime-200'
-                    )}
-                    title={`Marca da Morte: ${player.deathMarkTurns} rodada(s) restante(s) sem tomar dano`}
-                  >
-                    ☠️{player.deathMarkTurns}T
-                  </span>
-                )}
-                {knifeDmg > 1 && (
-                  <span className="px-1 rounded bg-teal-950 border border-teal-400 text-[7px] font-mono font-bold text-teal-200">
-                    🗡️{knifeDmg}x
-                  </span>
-                )}
-                {hasPact && (
-                  <span className="px-1 rounded bg-rose-950 border border-rose-500 text-[7px] font-mono font-bold text-rose-200">
-                    🩸PACTO
-                  </span>
-                )}
-                {player.isHandRevealed && (
-                  <span className="px-1 rounded bg-amber-950 border border-amber-400 text-[7px] font-mono font-bold text-amber-200">
-                    👁️REVELADO
-                  </span>
-                )}
-              </div>
-            )}
-
-          {!player.isAlive && (
-            <div className="text-center text-[8px] sm:text-[9px] font-mono text-blood-bright font-bold mt-0.5">
-              ELIMINADO
-            </div>
-          )}
-
-          {/* Mira vermelha quando é alvo válido */}
-          {targetable && (
-            <svg
-              viewBox="0 0 40 40"
-              className="absolute inset-0 m-auto w-10 h-10 z-40 pointer-events-none animate-pulse"
-            >
-              <circle cx="20" cy="20" r="12" fill="none" stroke="#dc2626" strokeWidth="1.6" />
-              <path
-                d="M20 2 V12 M20 28 V38 M2 20 H12 M28 20 H38"
-                stroke="#dc2626"
-                strokeWidth="1.8"
-              />
-            </svg>
-          )}
-
-          {player.isWalled && player.isAlive && <WallOverlay />}
+          <StylizedLifeBar
+            name={player.name}
+            lives={player.lives}
+            maxLives={player.maxLives}
+            isAlive={player.isAlive}
+            isMe={isMe}
+            targetable={targetable}
+            lockedIn={player.lockedIn}
+            knifeDmg={knifeDmg}
+            pactPartners={pactPartners}
+            isWalled={player.isWalled}
+            deathMarkTurns={player.deathMarkTurns}
+          />
 
           <AnimatePresence>
             {(fx === 'DAMAGE' || fx === 'VACUUM') && <DamageOverlay key={'dmg-' + fx} />}
             {fx === 'REFLECT' && <ReflectOverlay key="reflect" />}
-            {fx === 'WALL_BROKEN' && <BrokenWallOverlay key="broken" />}
           </AnimatePresence>
-          {fx === 'VACUUM' && (
-            <motion.div
-              className="absolute left-1/2 -top-5 -translate-x-1/2 z-40 text-[10px] font-mono font-bold text-fuchsia-400 whitespace-nowrap"
-              initial={{ y: 6, opacity: 0 }}
-              animate={{ y: -8, opacity: [0, 1, 1, 0] }}
-              transition={{ duration: 2 }}
-            >
-              ☠ VÁCUO
-            </motion.div>
-          )}
         </motion.div>
       </div>
 
@@ -448,7 +198,7 @@ function PlayerSeatBase({
         slotStyle={{
           left: `${slotX}%`,
           top: `${slotY}%`,
-          transform: 'translate(-50%, -50%) translateZ(14px)',
+          transform: 'translate(-50%, -50%) translateZ(16px)',
         }}
       />
     </>

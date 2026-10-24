@@ -1,239 +1,355 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import InscryptionCard from './InscryptionCard';
-import { Skull } from './PlayerSeat';
+import GameIcon from './GameIcon';
+import {
+  EFFECT_ASSETS,
+  getCharacterPresenceAsset,
+} from '../models/assetCatalog';
 import { cn } from '../lib/cn';
 
 /**
- * Desenha silhuetas humanas sombrias estilo Inscryption sentadas ao redor da mesa.
- * Cada assento (0..7) possui traços sutis distintos (capuz, cartola, chifres, máscara, correntes, coroa).
+ * Barra de vida estilizada, sem bordas ou caixas de interface administrativa.
+ * Usa preenchimento arterial, contraste, transparência, geometria sutil e
+ * ícones SVG dedicados para comunicar vida e estados.
  */
-function SilhouetteFigure({ variant = 0, isBot, isAlive, isWalled, isReflecting, targetable }) {
-  const eyeColor = !isAlive
-    ? '#44403c'
-    : targetable
-      ? '#ef4444'
-      : isReflecting
-        ? '#e879f9'
-        : isWalled
-          ? '#38bdf8'
-          : isBot
-            ? '#f97316'
-            : '#fbbf24';
-
-  const rimColor = targetable
-    ? '#dc2626'
-    : isReflecting
-      ? '#c084fc'
-      : isWalled
-        ? '#38bdf8'
-        : 'rgba(212,175,55,0.38)';
-
-  const v = variant % 6;
+export function StylizedLifeBar({
+  name,
+  lives = 0,
+  maxLives = 3,
+  isAlive = true,
+  isMe = false,
+  targetable = false,
+  lockedIn = false,
+  handCount = null,
+  knifeDmg = 1,
+  pactPartners = [],
+  isWalled = false,
+  deathMarkTurns = null,
+  compact = false,
+}) {
+  const safeMax = Math.max(1, Number(maxLives) || 3);
+  const safeLives = Math.max(0, Math.min(safeMax, Number(lives) || 0));
+  const hasDeathMark = deathMarkTurns != null && isAlive;
 
   return (
-    <svg
-      viewBox="0 0 120 150"
-      className="w-full h-full overflow-visible drop-shadow-[0_14px_22px_rgba(0,0,0,0.95)]"
+    <div
+      className={cn(
+        'flex flex-col items-center pointer-events-none select-none transition-transform duration-300',
+        targetable && 'scale-105'
+      )}
     >
-      <defs>
-        <radialGradient id={`aura-${variant}`} cx="50%" cy="38%" r="52%">
-          <stop offset="0%" stopColor={eyeColor} stopOpacity="0.28" />
-          <stop offset="100%" stopColor="#000000" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={`body-${variant}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#17100c" />
-          <stop offset="65%" stopColor="#0a0604" />
-          <stop offset="100%" stopColor="#030201" />
-        </linearGradient>
-      </defs>
+      {/* Linha 1: Nome do personagem integrado à atmosfera (sem caixa ou moldura) */}
+      <div className="flex items-center gap-1.5 mb-1">
+        <span
+          className={cn(
+            'font-grimoire tracking-[0.14em] uppercase transition-colors',
+            compact ? 'text-[11px]' : 'text-xs sm:text-[13px]',
+            !isAlive
+              ? 'text-stone-500/70 line-through'
+              : targetable
+                ? 'text-red-200 font-extrabold'
+                : isMe
+                  ? 'text-[#f6e7c8] font-extrabold'
+                  : 'text-[#e5d4b3]/95 font-bold'
+          )}
+          style={{
+            textShadow: targetable
+              ? '0 0 12px rgba(220,38,38,0.9), 0 2px 6px rgba(0,0,0,0.98)'
+              : '0 2px 8px rgba(0,0,0,0.98), 0 0 18px rgba(0,0,0,0.9)',
+          }}
+        >
+          {name}
+        </span>
 
-      {/* Halo de luz de vela atrás da silhueta */}
-      <ellipse cx="60" cy="64" rx="52" ry="58" fill={`url(#aura-${variant})`} />
+        {/* Indicador discreto de cartas na mão ou jogada pronta */}
+        {isAlive && !isMe && handCount != null && (
+          <span
+            className="font-mono text-[9.5px] text-amber-200/60 tracking-tight"
+            style={{ textShadow: '0 1px 4px rgba(0,0,0,0.95)' }}
+          >
+            · {handCount}
+          </span>
+        )}
+        {isAlive && lockedIn && (
+          <span
+            className="w-1.5 h-1.5 rounded-full bg-amber-300/90 shadow-[0_0_8px_rgba(251,191,36,0.95)]"
+            title="Jogada escolhida"
+          />
+        )}
+      </div>
 
-      {/* Tronco e ombros da pessoa sentada à mesa */}
-      <path
-        d="M12 146 C 14 102, 30 84, 60 84 C 90 84, 106 102, 108 146 Z"
-        fill={`url(#body-${variant})`}
-        stroke={rimColor}
-        strokeWidth="1.8"
-      />
-
-      {/* Gola / Manto escuro */}
-      <path
-        d="M32 90 L60 116 L88 90"
-        fill="none"
-        stroke="rgba(212,175,55,0.22)"
-        strokeWidth="1.4"
-      />
-
-      {/* Silhueta da Cabeça / Acessório por variante */}
-      {v === 0 && (
-        /* Capuz de Cultista */
-        <path
-          d="M34 86 C 30 56, 40 24, 60 16 C 80 24, 90 56, 86 86 Z"
-          fill={`url(#body-${variant})`}
-          stroke={rimColor}
-          strokeWidth="1.8"
-        />
-      )}
-      {v === 1 && (
-        /* Cartola Sombria + Cabeça */
-        <g>
-          <ellipse
-            cx="60"
-            cy="58"
-            rx="21"
-            ry="25"
-            fill={`url(#body-${variant})`}
-            stroke={rimColor}
-            strokeWidth="1.6"
-          />
-          <ellipse cx="60" cy="36" rx="32" ry="5" fill="#090604" stroke={rimColor} strokeWidth="1.5" />
-          <path
-            d="M42 36 L45 10 L75 10 L78 36 Z"
-            fill="#0c0806"
-            stroke={rimColor}
-            strokeWidth="1.5"
-          />
-        </g>
-      )}
-      {v === 2 && (
-        /* Condenado com Chifres / Galhos Estilo Leshy */
-        <g>
-          <path
-            d="M40 34 C 24 22, 18 10, 26 4 M32 20 L20 18 M80 34 C 96 22, 102 10, 94 4 M88 20 L100 18"
-            fill="none"
-            stroke={rimColor}
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
-          <ellipse
-            cx="60"
-            cy="56"
-            rx="22"
-            ry="26"
-            fill={`url(#body-${variant})`}
-            stroke={rimColor}
-            strokeWidth="1.8"
-          />
-        </g>
-      )}
-      {v === 3 && (
-        /* Coroa de Espinhos / Rei Condenado */
-        <g>
-          <ellipse
-            cx="60"
-            cy="58"
-            rx="22"
-            ry="25"
-            fill={`url(#body-${variant})`}
-            stroke={rimColor}
-            strokeWidth="1.8"
-          />
-          <polygon
-            points="38,38 43,20 51,33 60,15 69,33 77,20 82,38"
-            fill="#140d09"
-            stroke="#d4af37"
-            strokeWidth="1.4"
-          />
-        </g>
-      )}
-      {v === 4 && (
-        /* Gola Alta de Inquisidor + Chapéu Largo */
-        <g>
-          <path
-            d="M24 94 L32 62 L88 62 L96 94 Z"
-            fill="#0c0806"
-            stroke={rimColor}
-            strokeWidth="1.4"
-          />
-          <ellipse
-            cx="60"
-            cy="56"
-            rx="21"
-            ry="24"
-            fill={`url(#body-${variant})`}
-            stroke={rimColor}
-            strokeWidth="1.6"
-          />
-          <ellipse cx="60" cy="34" rx="35" ry="6" fill="#090604" stroke={rimColor} strokeWidth="1.5" />
-          <polygon points="44,34 60,12 76,34" fill="#0c0806" stroke={rimColor} strokeWidth="1.5" />
-        </g>
-      )}
-      {v === 5 && (
-        /* Silhueta Espectral / Ceifador */
-        <g>
-          <path
-            d="M30 90 C 26 50, 38 18, 60 14 C 82 18, 94 50, 90 90 Z"
-            fill={`url(#body-${variant})`}
-            stroke={rimColor}
-            strokeWidth="1.8"
-          />
-          <ellipse cx="60" cy="56" rx="16" ry="20" fill="#040201" />
-        </g>
-      )}
-
-      {/* Olhos Brilhantes na Escuridão */}
+      {/* Linha 2: Barra de vida estilizada em fragmentos de sangue (sem contornos pesados) */}
       {isAlive ? (
-        <g>
-          <ellipse
-            cx="51"
-            cy="56"
-            rx="3.8"
-            ry="2.3"
-            fill={eyeColor}
-            style={{ filter: `drop-shadow(0 0 6px ${eyeColor})` }}
-          />
-          <ellipse
-            cx="69"
-            cy="56"
-            rx="3.8"
-            ry="2.3"
-            fill={eyeColor}
-            style={{ filter: `drop-shadow(0 0 6px ${eyeColor})` }}
-          />
-          <circle cx="51" cy="56" r="1.1" fill="#fff" />
-          <circle cx="69" cy="56" r="1.1" fill="#fff" />
-        </g>
+        <div className="flex items-center gap-1.5">
+          <div
+            className="flex items-center gap-1 px-1.5 py-1 rounded-full"
+            style={{
+              background:
+                'radial-gradient(ellipse at center, rgba(12, 6, 4, 0.72) 0%, rgba(6, 3, 2, 0.25) 85%, transparent 100%)',
+            }}
+          >
+            {Array.from({ length: safeMax }).map((_, i) => {
+              const filled = i < safeLives;
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'relative transition-all duration-500',
+                    compact
+                      ? 'w-5 h-[7px] sm:w-6 sm:h-[8px]'
+                      : 'w-6 h-[8px] sm:w-7 sm:h-[9px]'
+                  )}
+                  style={{
+                    clipPath:
+                      'polygon(12% 0%, 88% 0%, 100% 50%, 88% 100%, 12% 100%, 0% 50%)',
+                    background: filled
+                      ? 'linear-gradient(90deg, #991b1b 0%, #ef4444 48%, #b91c1c 100%)'
+                      : 'rgba(28, 16, 12, 0.68)',
+                    boxShadow: filled
+                      ? 'inset 0 1px 1px rgba(255, 220, 220, 0.38), 0 0 10px rgba(220, 38, 38, 0.55)'
+                      : 'inset 0 1px 3px rgba(0, 0, 0, 0.92)',
+                    opacity: filled ? 1 : 0.45,
+                  }}
+                >
+                  {filled && (
+                    <div
+                      className="absolute inset-x-[18%] top-[15%] h-[28%] rounded-full"
+                      style={{
+                        background:
+                          'linear-gradient(90deg, transparent, rgba(255,240,240,0.45), transparent)',
+                      }}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          <span
+            className="font-mono text-[10px] tracking-tighter text-[#e5d4b3]/75"
+            style={{ textShadow: '0 2px 5px rgba(0,0,0,0.98)' }}
+          >
+            {safeLives}/{safeMax}
+          </span>
+        </div>
       ) : (
-        /* Olhos apagados em X quando eliminado */
-        <g stroke="#7f1d1d" strokeWidth="2" strokeLinecap="round">
-          <path d="M47 53 L55 59 M55 53 L47 59" />
-          <path d="M65 53 L73 59 M73 53 L65 59" />
-        </g>
+        <span
+          className="font-grimoire text-[10px] tracking-[0.2em] text-red-500/70 uppercase"
+          style={{ textShadow: '0 2px 6px rgba(0,0,0,0.98)' }}
+        >
+          Eliminado
+        </span>
       )}
 
-      {/* Grades 3D na frente da silhueta quando EMPAREDADO */}
-      {isWalled && isAlive && (
-        <g opacity="0.92">
-          {[24, 42, 60, 78, 96].map((x) => (
-            <rect
-              key={x}
-              x={x - 2}
-              y="14"
-              width="4"
-              height="132"
-              fill="#1e293b"
-              stroke="#38bdf8"
-              strokeWidth="0.8"
-            />
-          ))}
-          <path
-            d="M16 55 Q 38 48 60 55 T 104 55 M16 105 Q 38 98 60 105 T 104 105"
-            fill="none"
-            stroke="#94a3b8"
-            strokeWidth="2"
-          />
-        </g>
+      {/* Linha 3: Sinais contextuais orgânicos com ícones SVG dedicados */}
+      {isAlive && (hasDeathMark || knifeDmg > 1 || pactPartners.length > 0 || isWalled) && (
+        <div
+          className="flex flex-wrap items-center justify-center gap-2 mt-0.5 text-[10px] font-mono font-bold"
+          style={{ textShadow: '0 2px 6px rgba(0,0,0,0.98)' }}
+        >
+          {hasDeathMark && (
+            <span
+              className={cn(
+                'inline-flex items-center gap-0.5 tracking-tight',
+                deathMarkTurns <= 2 ? 'text-red-400 animate-pulse' : 'text-lime-300/95'
+              )}
+            >
+              <GameIcon name="death-mark" size={11} />
+              <span>{deathMarkTurns}t</span>
+            </span>
+          )}
+          {knifeDmg > 1 && (
+            <span className="inline-flex items-center gap-0.5 text-teal-300/95">
+              <GameIcon name="dagger-buff" size={11} />
+              <span>{knifeDmg}x</span>
+            </span>
+          )}
+          {pactPartners.length > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-rose-400/95 truncate max-w-[125px]">
+              <GameIcon name="blood-drop" size={11} />
+              <span>{pactPartners.join(', ')}</span>
+            </span>
+          )}
+          {isWalled && (
+            <span className="inline-flex items-center text-sky-300/90">
+              <GameIcon name="iron-lock" size={11} />
+            </span>
+          )}
+        </div>
       )}
-    </svg>
+    </div>
   );
 }
 
 /**
- * Silhueta 3D de um jogador sentado ao redor da mesa octogonal.
- * Fica posicionada em pé no espaço 3D (compensando a inclinação rotateX da mesa).
+ * Overlay de efeito visual de combate reutilizável baseado nos assets em `public/assets/effects/*.svg`.
+ */
+function CharacterCombatVfx({ visualEffect }) {
+  if (!visualEffect) return null;
+
+  let vfxSrc = null;
+  if (visualEffect === 'DAMAGE' || visualEffect === 'DEATH_MARK_KILL') {
+    vfxSrc = EFFECT_ASSETS.SLASH_IMPACT;
+  } else if (visualEffect === 'REFLECT' || visualEffect === 'VACUUM') {
+    vfxSrc = EFFECT_ASSETS.MIRROR_SHATTER;
+  } else if (visualEffect === 'BLOOD_PACT' || visualEffect === 'PACT_BROKEN') {
+    vfxSrc = EFFECT_ASSETS.BLOOD_PACT_RING;
+  } else if (
+    visualEffect === 'SOUL_SWAP' ||
+    visualEffect === 'SOUL_BUFF' ||
+    visualEffect === 'HEAL'
+  ) {
+    vfxSrc = EFFECT_ASSETS.SOUL_SPIRAL;
+  }
+
+  if (!vfxSrc) return null;
+
+  return (
+    <motion.img
+      key={visualEffect}
+      src={vfxSrc}
+      alt=""
+      aria-hidden="true"
+      draggable={false}
+      initial={{ opacity: 0, scale: 0.72 }}
+      animate={{ opacity: [0, 1, 0.85, 0], scale: [0.75, 1.08, 1.02, 1.12] }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 1.15, ease: 'easeOut' }}
+      className="pointer-events-none select-none absolute inset-0 w-full h-full object-contain z-30"
+    />
+  );
+}
+
+/**
+ * Renderiza o asset artístico real de silhueta com transparência (PNG/WebP RGBA),
+ * contra-luz atmosférica e olhos dinâmicos controlados pelo estado do jogo.
+ */
+function SilhouetteFigure({
+  variant = 0,
+  isAlive,
+  isWalled,
+  isReflecting,
+  targetable,
+  visualEffect,
+}) {
+  const [imgFailed, setImgFailed] = useState(false);
+  const presence = getCharacterPresenceAsset(variant);
+
+  const eyeColor = !isAlive
+    ? 'transparent'
+    : targetable
+      ? '#f87171'
+      : isReflecting
+        ? '#d8b4fe'
+        : isWalled
+          ? '#7dd3fc'
+          : '#fbbf24';
+
+  const backlightCore = targetable
+    ? 'rgba(220, 38, 38, 0.45)'
+    : isReflecting
+      ? 'rgba(192, 132, 252, 0.38)'
+      : isWalled
+        ? 'rgba(56, 189, 248, 0.32)'
+        : 'rgba(215, 135, 55, 0.28)';
+
+  const backlightMid = targetable
+    ? 'rgba(139, 0, 0, 0.22)'
+    : 'rgba(110, 52, 20, 0.15)';
+
+  return (
+    <div
+      className="relative w-full h-full flex items-center justify-center pointer-events-none select-none"
+      style={{
+        filter: 'drop-shadow(0 20px 26px rgba(0, 0, 0, 0.96))',
+      }}
+    >
+      {/* 1. Contra-luz atmosférica quente de vela atrás da presença */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-[4%] top-[8%] bottom-[6%] rounded-full"
+        style={{
+          background: `radial-gradient(ellipse at 50% 42%, ${backlightCore} 0%, ${backlightMid} 48%, transparent 76%)`,
+        }}
+      />
+
+      {/* 2. Asset artístico real da presença sombria com canal alpha transparente */}
+      {!imgFailed ? (
+        <picture className="w-full h-full flex items-center justify-center pointer-events-none select-none">
+          <source srcSet={presence.webp} type="image/webp" />
+          <img
+            src={presence.png}
+            alt=""
+            aria-hidden="true"
+            decoding="async"
+            draggable={false}
+            onError={() => setImgFailed(true)}
+            className="w-full h-full object-contain object-bottom pointer-events-none select-none"
+          />
+        </picture>
+      ) : (
+        /* Fallback limpo caso o arquivo de imagem não seja encontrado */
+        <svg viewBox="0 0 160 210" className="w-full h-full overflow-visible">
+          <path
+            d="M 12 210 C 14 148, 30 110, 54 98 C 65 92, 65 80, 62 66 C 58 48, 66 26, 80 26 C 94 26, 102 46, 98 66 C 95 80, 95 93, 106 100 C 130 114, 144 150, 148 210 Z"
+            fill="#0d0705"
+          />
+        </svg>
+      )}
+
+      {/* 3. Olhos dinâmicos sutis na escuridão do capuz */}
+      {isAlive && (
+        <svg
+          viewBox="0 0 160 210"
+          className="pointer-events-none absolute inset-0 w-full h-full overflow-visible z-10"
+        >
+          <g opacity={targetable ? '1' : '0.9'}>
+            <ellipse
+              cx={presence.eyes.lx}
+              cy={presence.eyes.y}
+              rx="3.2"
+              ry="1.65"
+              fill={eyeColor}
+              style={{ filter: `drop-shadow(0 0 6px ${eyeColor})` }}
+            />
+            <ellipse
+              cx={presence.eyes.rx}
+              cy={presence.eyes.y}
+              rx="3.2"
+              ry="1.65"
+              fill={eyeColor}
+              style={{ filter: `drop-shadow(0 0 6px ${eyeColor})` }}
+            />
+            <circle cx={presence.eyes.lx} cy={presence.eyes.y} r="0.8" fill="#fff" opacity="0.85" />
+            <circle cx={presence.eyes.rx} cy={presence.eyes.y} r="0.8" fill="#fff" opacity="0.85" />
+          </g>
+        </svg>
+      )}
+
+      {/* 4. Asset de grades de ferro quando Emparedado */}
+      {isWalled && isAlive && (
+        <img
+          src={EFFECT_ASSETS.IRON_CAGE}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          className="pointer-events-none select-none absolute inset-0 w-full h-full object-contain z-20 opacity-80"
+        />
+      )}
+
+      {/* 5. Efeitos visuais de combate sobre a presença */}
+      <AnimatePresence>
+        {visualEffect && <CharacterCombatVfx visualEffect={visualEffect} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * Silhueta 3D de um oponente sentado ao redor da mesa.
+ * A barra de vida estilizada posiciona-se ACIMA da silhueta, garantindo
+ * que nunca fique escondida atrás da mesa em nenhum ângulo ou resolução.
  */
 export default function PlayerSilhouette3D({
   player,
@@ -250,7 +366,6 @@ export default function PlayerSilhouette3D({
   const fx = player.visualEffect;
   const shake = fx === 'DAMAGE' || fx === 'VACUUM' || fx === 'DEATH_MARK_KILL';
   const knifeDmg = player.knifeDamage || 1;
-  const hasDeathMark = player.deathMarkTurns != null && player.isAlive;
   const pactPartners = (player.bloodPactWith || [])
     .map((pid) => allPlayers.find((p) => p.id === pid)?.name)
     .filter(Boolean);
@@ -259,13 +374,13 @@ export default function PlayerSilhouette3D({
     <motion.div
       animate={
         shake
-          ? { x: [0, -10, 10, -6, 6, 0], scale: [1, 1.06, 0.96, 1] }
-          : { y: [0, -3, 0] }
+          ? { x: [0, -10, 10, -6, 6, 0], scale: [1, 1.05, 0.97, 1] }
+          : { y: [0, -2.5, 0] }
       }
       transition={
         shake
-          ? { duration: 0.55 }
-          : { duration: 3.2 + (index % 3) * 0.5, repeat: Infinity, ease: 'easeInOut' }
+          ? { duration: 0.5 }
+          : { duration: 3.6 + (index % 3) * 0.5, repeat: Infinity, ease: 'easeInOut' }
       }
       onDragOver={(e) => {
         if (!player.isAlive) return;
@@ -282,189 +397,88 @@ export default function PlayerSilhouette3D({
         e.stopPropagation();
         if (onSeatClick) onSeatClick(player);
       }}
+      style={{ transformStyle: 'preserve-3d' }}
       className={cn(
         'relative flex flex-col items-center select-none group transition-all',
-        targetable ? 'cursor-crosshair scale-105' : 'cursor-pointer',
+        targetable ? 'cursor-crosshair scale-[1.04]' : 'cursor-pointer',
         over && 'scale-110',
-        !player.isAlive && 'opacity-45 grayscale',
-        dimmed && player.isAlive && 'opacity-55'
+        !player.isAlive && 'opacity-35 grayscale',
+        dimmed && player.isAlive && 'opacity-60'
       )}
     >
-      {/* 1. CARTAS REVELADAS (Carta REVELAR) flutuando acima da silhueta */}
+      {/* 1. CARTAS REVELADAS (Carta REVELAR) flutuando no topo */}
       <AnimatePresence>
         {player.isHandRevealed && player.revealedHand && player.isAlive && (
           <motion.div
             key="revealed-hand"
-            initial={{ opacity: 0, y: 12, scale: 0.8 }}
+            initial={{ opacity: 0, y: 10, scale: 0.85 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 8, scale: 0.8 }}
-            className="mb-1 flex flex-col items-center z-40 pointer-events-none"
+            exit={{ opacity: 0, y: 6, scale: 0.85 }}
+            style={{ transform: 'translateZ(36px)' }}
+            className="mb-1.5 flex items-center justify-center -space-x-1.5 z-50 pointer-events-none"
           >
-            <span className="px-1.5 py-0.5 mb-0.5 rounded bg-amber-950/95 border border-amber-400 text-[8px] font-mono font-bold text-amber-200 shadow-[0_0_12px_rgba(245,158,11,0.5)] whitespace-nowrap">
-              👁️ MÃO REVELADA
-            </span>
-            <div className="flex items-center justify-center -space-x-1.5 bg-black/80 p-1 rounded border border-gold-aged/60 shadow-xl">
-              {player.revealedHand.length > 0 ? (
-                player.revealedHand.map((c, idx) => (
-                  <div
-                    key={c.id || idx}
-                    style={{ transform: `rotate(${(idx - (player.revealedHand.length - 1) / 2) * 6}deg)` }}
-                  >
-                    <InscryptionCard card={c} mini />
-                  </div>
-                ))
-              ) : (
-                <span className="text-[8px] font-mono text-stone-400 px-1.5">Sem cartas</span>
-              )}
-            </div>
+            {player.revealedHand.length > 0 ? (
+              player.revealedHand.map((c, idx) => (
+                <div
+                  key={c.id || idx}
+                  style={{
+                    transform: `rotate(${(idx - (player.revealedHand.length - 1) / 2) * 6}deg)`,
+                  }}
+                >
+                  <InscryptionCard card={c} mini />
+                </div>
+              ))
+            ) : (
+              <span className="text-[9px] font-mono text-stone-400/80">Mão vazia</span>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 2. CORPO DA SILHUETA 3D */}
-      <div className="relative w-[86px] h-[106px] sm:w-[114px] sm:h-[138px] flex items-center justify-center">
+      {/* 2. BARRA DE VIDA ESTILIZADA SEMPRE VISÍVEL ACIMA DA SILHUETA E DA MESA */}
+      <div
+        className="relative z-40 -mb-3"
+        style={{
+          transform: 'translateZ(32px)',
+        }}
+      >
+        <StylizedLifeBar
+          name={player.name}
+          lives={player.lives}
+          maxLives={player.maxLives}
+          isAlive={player.isAlive}
+          isMe={isMe}
+          targetable={targetable}
+          lockedIn={player.lockedIn}
+          handCount={player.handCount}
+          knifeDmg={knifeDmg}
+          pactPartners={pactPartners}
+          isWalled={player.isWalled}
+          deathMarkTurns={player.deathMarkTurns}
+        />
+      </div>
+
+      {/* 3. PRESENÇA SOMBRIA GRANDE E ATMOSFÉRICA (Asset Transparente RGBA) */}
+      <div className="relative w-[136px] h-[176px] sm:w-[184px] sm:h-[232px] flex items-center justify-center -mt-2">
         <SilhouetteFigure
           variant={index}
-          isBot={player.isBot}
           isAlive={player.isAlive}
           isWalled={player.isWalled}
           isReflecting={player.isReflecting}
           targetable={targetable}
+          visualEffect={fx}
         />
 
-        {/* Mira vermelha pulsante quando é alvo válido */}
+        {/* Foco de mira sutil e orgânico no peito da sombra quando é alvo válido */}
         {targetable && (
-          <svg
-            viewBox="0 0 40 40"
-            className="absolute inset-0 m-auto w-14 h-14 z-30 pointer-events-none animate-pulse drop-shadow-[0_0_10px_#dc2626]"
-          >
-            <circle cx="20" cy="20" r="14" fill="none" stroke="#dc2626" strokeWidth="2" />
-            <circle cx="20" cy="20" r="3" fill="#dc2626" />
-            <path d="M20 2 V10 M20 30 V38 M2 20 H10 M30 20 H38" stroke="#dc2626" strokeWidth="2" />
-          </svg>
-        )}
-
-        {/* Indicador de jogada travada (Carta pronta na mão da silhueta) */}
-        {player.isAlive && player.lockedIn && (
           <div
-            className="absolute -right-1 bottom-3 z-20 px-1.5 py-0.5 rounded bg-gold-aged text-black font-mono font-extrabold text-[8px] shadow-[0_0_10px_rgba(212,175,55,0.8)] border border-black"
-            title="Jogada travada nesta rodada"
-          >
-            🔒 PRONTO
-          </div>
-        )}
-
-        {/* Quantidade de cartas ocultas na mão (se não reveladas) */}
-        {player.isAlive && !player.isHandRevealed && !isMe && (
-          <div
-            className="absolute -left-1 bottom-3 z-20 px-1.5 py-0.5 rounded bg-stone-950/90 border border-gold-aged/60 text-amber-200 font-mono font-bold text-[8px] shadow"
-            title={`${player.handCount ?? 0} carta(s) na mão`}
-          >
-            🃏 {player.handCount ?? 0}
-          </div>
-        )}
-
-        {/* Emblema flutuante de Marca da Morte acima da cabeça */}
-        {hasDeathMark && (
-          <div
-            className={cn(
-              'absolute -top-2 left-1/2 -translate-x-1/2 z-30 px-1.5 py-0.5 rounded border font-mono font-extrabold text-[8px] whitespace-nowrap shadow-[0_0_12px_rgba(163,230,53,0.7)]',
-              player.deathMarkTurns <= 1
-                ? 'bg-red-950/95 border-red-400 text-red-200 animate-bounce'
-                : 'bg-lime-950/95 border-lime-400 text-lime-200 animate-pulse'
-            )}
-            title={`Marca da Morte ativa: se ficar ${player.deathMarkTurns} rodada(s) sem tomar dano, morre instantaneamente!`}
-          >
-            ☠️ MARCA: {player.deathMarkTurns}T
-          </div>
-        )}
-      </div>
-
-      {/* 3. PLACA DE IDENTIFICAÇÃO + BARRA DE VIDA (CAVEIRAS) + STATUS */}
-      <div
-        className={cn(
-          'relative -mt-3 z-30 min-w-[104px] sm:min-w-[132px] max-w-[155px] rounded-md border-2 px-2 py-1 bg-gradient-to-b from-[#2b1b11] via-[#1a100a] to-[#0d0805] shadow-[0_10px_24px_rgba(0,0,0,0.95)]',
-          isMe
-            ? 'border-gold-aged shadow-[0_0_18px_rgba(212,175,55,0.4)]'
-            : targetable
-              ? 'border-blood-bright aim-blink'
-              : 'border-stone-700/90'
-        )}
-      >
-        <div className="flex items-center justify-between gap-1 border-b border-stone-800 pb-0.5 mb-1">
-          <span className="font-typewriter font-bold text-[10px] sm:text-xs text-[#f5e7c6] truncate">
-            {player.name}
-          </span>
-          <span
-            className={cn(
-              'text-[7px] sm:text-[8px] font-mono font-extrabold px-1 rounded-sm shrink-0',
-              isMe
-                ? 'bg-gold-aged text-black'
-                : player.isBot
-                  ? 'bg-stone-700 text-stone-200'
-                  : 'bg-amber-900/70 text-amber-200'
-            )}
-          >
-            {isMe ? 'VOCÊ' : player.isBot ? 'BOT' : 'HUMANO'}
-          </span>
-        </div>
-
-        {/* Barra de Vidas em Caveiras */}
-        <div className="flex items-center justify-center gap-0.5 sm:gap-1 py-0.5">
-          {Array.from({ length: player.maxLives }).map((_, i) => (
-            <Skull
-              key={i}
-              alive={i < player.lives}
-              className="w-3.5 h-3.5 sm:w-4 sm:h-4"
-            />
-          ))}
-        </div>
-
-        {/* Selos de Buff de Faca (Manipulamento de Alma), Marca da Morte e Pacto de Sangue */}
-        {(knifeDmg > 1 || pactPartners.length > 0 || player.isWalled || hasDeathMark) &&
-          player.isAlive && (
-            <div className="flex flex-wrap items-center justify-center gap-1 mt-1 pt-0.5 border-t border-stone-800/80">
-              {hasDeathMark && (
-                <span
-                  className={cn(
-                    'px-1 py-[1px] rounded border font-mono font-bold text-[8px]',
-                    player.deathMarkTurns <= 2
-                      ? 'bg-red-950/95 border-red-400 text-red-200 animate-pulse'
-                      : 'bg-lime-950/90 border-lime-400 text-lime-200'
-                  )}
-                  title={`Marca da Morte: morre em ${player.deathMarkTurns} rodada(s) se não sofrer dano!`}
-                >
-                  ☠️ {player.deathMarkTurns}T SEM DANO
-                </span>
-              )}
-              {knifeDmg > 1 && (
-                <span
-                  className="px-1 py-[1px] rounded bg-teal-950/90 border border-teal-400 text-teal-200 font-mono font-bold text-[8px]"
-                  title={`Faca fortalecida por Manipulamento de Alma: causa ${knifeDmg} de Dano`}
-                >
-                  🗡️ FACA {knifeDmg}x
-                </span>
-              )}
-              {pactPartners.length > 0 && (
-                <span
-                  className="px-1 py-[1px] rounded bg-rose-950/90 border border-rose-500 text-rose-200 font-mono font-bold text-[8px] truncate max-w-[120px]"
-                  title={`Pacto de Sangue ativo com: ${pactPartners.join(', ')}`}
-                >
-                  🩸 PACTO: {pactPartners.join(', ')}
-                </span>
-              )}
-              {player.isWalled && (
-                <span className="px-1 py-[1px] rounded bg-cyan-950/90 border border-cyan-400 text-cyan-200 font-mono font-bold text-[8px]">
-                  🔒 EMPAREDADO
-                </span>
-              )}
-            </div>
-          )}
-
-        {!player.isAlive && (
-          <div className="text-center text-[8px] font-mono text-blood-bright font-bold tracking-wider mt-0.5">
-            💀 ELIMINADO
-          </div>
+            className="absolute inset-0 m-auto w-14 h-14 rounded-full pointer-events-none animate-pulse"
+            style={{
+              background:
+                'radial-gradient(circle, rgba(220,38,38,0.35) 0%, rgba(220,38,38,0.08) 55%, transparent 75%)',
+              boxShadow: '0 0 24px rgba(220,38,38,0.45)',
+            }}
+          />
         )}
       </div>
     </motion.div>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" fill="none">
+    <polygon points="80,22 96,58 64,52" fill="#c084fc" fill-opacity="0.45" stroke="#f3e8ff" stroke-width="1.2"/>
+    <polygon points="124,48 98,78 112,42" fill="#a855f7" fill-opacity="0.4" stroke="#d8b4fe" stroke-width="1.2"/>
+    <polygon points="34,54 66,74 44,88" fill="#e9d5ff" fill-opacity="0.35" stroke="#f3e8ff" stroke-width="1.2"/>
+    <polygon points="84,96 118,108 92,132" fill="#9333ea" fill-opacity="0.45" stroke="#e9d5ff" stroke-width="1.2"/>
+    <polygon points="48,104 76,94 62,128" fill="#d8b4fe" fill-opacity="0.35" stroke="#f3e8ff" stroke-width="1.2"/>
+    <circle cx="80" cy="80" r="44" stroke="#d4af37" stroke-width="1.4" stroke-dasharray="6 4" opacity="0.7"/>
+  </svg>

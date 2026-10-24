@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { audio } from '../lib/audio';
 import { cn } from '../lib/cn';
 import { PHASE_LABELS } from '../lib/constants';
+import { UI_ASSETS } from '../models/assetCatalog';
 
 /* ------------------------------------------------------------------ */
 /* Relógio isolado: só ele escuta timer_tick (não re-renderiza a mesa) */
@@ -64,21 +65,14 @@ const CentralClock = React.memo(function CentralClock({ socket, myAllowedTime, p
       id="central-clock"
       className={cn('relative aspect-square shrink-0', compact ? 'w-[84px]' : 'w-[clamp(96px,10vw,128px)]')}
     >
-      <svg viewBox="0 0 100 100" className="absolute inset-0 w-full h-full">
-        <circle cx="50" cy="50" r="48" fill="#1a110b" stroke="#d4af37" strokeWidth="2" opacity="0.9" />
-        {Array.from({ length: 12 }).map((_, i) => (
-          <line
-            key={i}
-            x1="50"
-            y1="4"
-            x2="50"
-            y2={i % 3 === 0 ? 12 : 9}
-            stroke="#9e8a63"
-            strokeWidth="1.5"
-            transform={`rotate(${i * 30} 50 50)`}
-          />
-        ))}
-        <circle cx="50" cy="50" r={R - 6} fill="#0d0906" stroke="#2c1d12" strokeWidth="2" />
+      <img
+        src={UI_ASSETS.CLOCK_DIAL}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        className="pointer-events-none select-none absolute inset-0 w-full h-full object-contain"
+      />
+      <svg viewBox="0 0 100 100" className="pointer-events-none absolute inset-0 w-full h-full">
         <circle
           cx="50"
           cy="50"

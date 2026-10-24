@@ -11,6 +11,7 @@ import {
 import { cn } from '../lib/cn';
 import { audio } from '../lib/audio';
 import CardGrimoireBook from './CardGrimoireBook';
+import GameIcon from './GameIcon';
 
 /**
  * Registros formatados com tinta autêntica sobre a folha pautada amarelada do caderno.
@@ -135,8 +136,8 @@ function NotebookChatInput({ onSendChat, isDead, onFocusChange }) {
           maxLength={140}
           placeholder={
             isDead
-              ? '💀 Sussurrar do além com tinta espectral...'
-              : '✍️ Rabiscar bilhete clandestino a tinta no caderno...'
+              ? 'Sussurrar do além com tinta espectral...'
+              : 'Rabiscar bilhete clandestino a tinta no caderno...'
           }
           className={cn(
             'w-full min-h-[38px] px-3 py-1.5 rounded-sm bg-[#fbf5e6] border-2 font-typewriter text-xs text-[#1e1107] placeholder:text-[#8f7b5f] outline-none transition-all shadow-[inset_0_2px_4px_rgba(0,0,0,0.1)]',
@@ -241,13 +242,14 @@ export default function UnderTableChat({
               setUnderTableView('both');
             }}
             className={cn(
-              'px-2.5 py-1 rounded text-[10px] font-mono font-bold border transition-all',
+              'px-2.5 py-1 rounded text-[10px] font-mono font-bold border transition-all inline-flex items-center gap-1',
               underTableView === 'both'
                 ? 'bg-gold-aged text-black border-gold-aged shadow-[0_0_10px_rgba(212,175,55,0.5)]'
                 : 'bg-stone-900/90 text-amber-200/80 border-stone-700 hover:border-gold-aged/60'
             )}
           >
-            📖 LIVRO + 📓 CHAT
+            <GameIcon name="grimoire-book" size={12} />
+            <span>LIVRO + CHAT</span>
           </button>
           <button
             type="button"
@@ -288,7 +290,7 @@ export default function UnderTableChat({
       {canAct && phase === 'PLANNING' && (
         <div className="relative z-20 mx-2 mb-2 px-3 py-1.5 rounded bg-gradient-to-r from-red-900 via-blood to-red-950 border-2 border-[#d4af37] text-white flex items-center justify-between gap-2 shadow-[0_4px_16px_rgba(0,0,0,0.8)] animate-pulse">
           <div className="flex items-center gap-2 font-typewriter text-xs font-bold text-amber-100">
-            <span>📎</span>
+            <GameIcon name="notebook-quill" size={13} />
             <span>SUA VEZ DE JOGAR! SUBA O OLHAR PARA AS CARTAS!</span>
           </div>
           {onScrollToTable && (
@@ -373,13 +375,14 @@ export default function UnderTableChat({
                     setFilter('all');
                   }}
                   className={cn(
-                    'px-3 py-1 rounded-t-sm text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2 shadow-sm',
+                    'px-3 py-1 rounded-t-sm text-[11px] font-typewriter font-bold transition-all border-t-2 border-x-2 shadow-sm inline-flex items-center gap-1',
                     filter === 'all'
                       ? 'bg-[#f4e8cb] text-[#1c1208] border-[#9c8462] -mb-[1px] z-10'
                       : 'bg-[#ab9776]/70 text-[#2b1c11] border-[#7d694b] hover:bg-[#c2b090]'
                   )}
                 >
-                  📜 TODAS ({logs.length})
+                  <GameIcon name="scroll-log" size={12} />
+                  <span>TODAS ({logs.length})</span>
                 </button>
 
                 <button

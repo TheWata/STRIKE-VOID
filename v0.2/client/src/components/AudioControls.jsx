@@ -102,7 +102,7 @@ export function AudioSettingsPanel({ className }) {
   );
 }
 
-export default function AudioControls() {
+export default function AudioControls({ minimal = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const prefs = audio.getPrefs();
@@ -121,17 +121,26 @@ export default function AudioControls() {
       <button
         id="btn-audio"
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 rounded-md border border-stone-600 bg-stone-900/90 text-[11px] font-mono font-medium text-amber-100 hover:text-gold-aged hover:border-gold-aged hover:bg-stone-800 transition-all shadow-sm active:scale-95"
+        className={
+          minimal
+            ? 'flex items-center justify-center h-8 w-8 rounded-full bg-black/45 hover:bg-black/80 text-parchment/70 hover:text-amber-200 transition-all active:scale-95'
+            : 'flex items-center justify-center gap-1.5 h-10 w-10 sm:h-auto sm:w-auto sm:px-3 sm:py-1.5 rounded-md border border-stone-600 bg-stone-900/90 text-[11px] font-mono font-medium text-amber-100 hover:text-gold-aged hover:border-gold-aged hover:bg-stone-800 transition-all shadow-sm active:scale-95'
+        }
         title="Configurações de Áudio"
         aria-label="Configurações de Áudio"
       >
-        {prefs.muted ? <VolumeX size={16} className="text-red-400" /> : <Volume2 size={16} className="text-amber-300" />} <span className="hidden sm:inline">SOM</span>
+        {prefs.muted ? (
+          <VolumeX size={15} className="text-red-400" />
+        ) : (
+          <Volume2 size={15} className="text-amber-300/90" />
+        )}
+        {!minimal && <span className="hidden sm:inline">SOM</span>}
       </button>
 
       {open && (
         <div
           id="audio-panel"
-          className="fixed left-2 right-2 top-14 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64 z-[250] rounded border-2 border-stone-900 bg-stone-950/95 p-3.5 shadow-[0_10px_35px_#000]"
+          className="fixed left-2 right-2 top-12 sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-64 z-[250] rounded border-2 border-stone-900 bg-stone-950/95 p-3.5 shadow-[0_10px_35px_#000]"
         >
           <AudioSettingsPanel />
         </div>

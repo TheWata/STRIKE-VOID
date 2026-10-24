@@ -51,67 +51,83 @@ export const RESOLUTION_STEPS = [
 
 export const VISUAL_EFFECT_BADGES = {
   VACUUM: {
-    label: '🩸 VÁCUO (-1 VIDA)',
+    icon: 'blood-drop',
+    label: 'VÁCUO (-1 VIDA)',
     cls: 'border-purple-400 bg-purple-950/95 text-purple-200',
   },
   REFLECT: {
-    label: '🪞 ESPELHO AMALDIÇOADO!',
+    icon: 'cursed-mirror',
+    label: 'ESPELHO AMALDIÇOADO!',
     cls: 'border-fuchsia-400 bg-fuchsia-950/95 text-fuchsia-200',
   },
   WALLED: {
-    label: '🧱 EMPAREDADO',
+    icon: 'iron-wall',
+    label: 'EMPAREDADO',
     cls: 'border-cyan-400 bg-cyan-950/95 text-cyan-200',
   },
   WALL_BROKEN: {
-    label: '💥 PAREDE QUEBRADA',
+    icon: 'wall-shatter',
+    label: 'PAREDE QUEBRADA',
     cls: 'border-amber-400 bg-amber-950/95 text-amber-200',
   },
   DAMAGE: {
-    label: '🔪 FERIDO',
+    icon: 'dagger-strike',
+    label: 'FERIDO',
     cls: 'border-red-500 bg-red-950/95 text-red-200',
   },
   REVEALED: {
-    label: '👁️ MÃO REVELADA',
+    icon: 'abyssal-eye',
+    label: 'MÃO REVELADA',
     cls: 'border-amber-400 bg-amber-950/95 text-amber-200',
   },
   DISARMED: {
-    label: '🧤 DESARMADO (-2 CARTAS)',
+    icon: 'disarm-slash',
+    label: 'DESARMADO (-2 CARTAS)',
     cls: 'border-orange-400 bg-orange-950/95 text-orange-200',
   },
   SOUL_SWAP: {
-    label: '👻 VIDA TROCADA!',
+    icon: 'soul-wisp',
+    label: 'VIDA TROCADA!',
     cls: 'border-teal-400 bg-teal-950/95 text-teal-200',
   },
   SOUL_BUFF: {
-    label: '🔥 FACA FORTALECIDA (+1 DANO)',
+    icon: 'soul-flame',
+    label: 'FACA FORTALECIDA (+1 DANO)',
     cls: 'border-emerald-400 bg-emerald-950/95 text-emerald-200',
   },
   BLOOD_PACT: {
-    label: '🩸 PACTO DE SANGUE ATIVO',
+    icon: 'blood-drop',
+    label: 'PACTO DE SANGUE ATIVO',
     cls: 'border-rose-500 bg-rose-950/95 text-rose-200',
   },
   PACT_BROKEN: {
-    label: '⛓️‍💥 PACTO QUEBRADO!',
+    icon: 'broken-chain',
+    label: 'PACTO QUEBRADO!',
     cls: 'border-amber-300 bg-amber-950/95 text-amber-100',
   },
   HEAL: {
-    label: '💉 CURADO!',
+    icon: 'syringe-vial',
+    label: 'CURADO!',
     cls: 'border-emerald-400 bg-emerald-950/95 text-emerald-200',
   },
   SYRINGE_EMPTY: {
-    label: '💉 SERINGA VAZIA (0/4)',
+    icon: 'syringe-vial',
+    label: 'SERINGA VAZIA (0/4)',
     cls: 'border-stone-400 bg-stone-900/95 text-stone-300',
   },
   OVERDOSE: {
-    label: '☣️ OVERDOSE! (MARCA DA MORTE)',
+    icon: 'overdose-bio',
+    label: 'OVERDOSE! (MARCA DA MORTE)',
     cls: 'border-lime-400 bg-lime-950/95 text-lime-200',
   },
   DEATH_MARKED: {
-    label: '☠️ MARCA DA MORTE!',
+    icon: 'death-mark',
+    label: 'MARCA DA MORTE!',
     cls: 'border-lime-400 bg-lime-950/95 text-lime-200',
   },
   DEATH_MARK_KILL: {
-    label: '💀 MORTE INSTANTÂNEA (MARCA)',
+    icon: 'skull-kill',
+    label: 'MORTE INSTANTÂNEA (MARCA)',
     cls: 'border-red-500 bg-black/95 text-red-300',
   },
 };

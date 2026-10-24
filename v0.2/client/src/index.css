@@ -45,7 +45,7 @@ textarea {
 body::after {
   content: '';
   position: fixed;
-  top: 54px;
+  top: 0;
   bottom: 0;
   left: 0;
   right: 0;
@@ -76,31 +76,25 @@ body::after {
   clip-path: polygon(28% 0, 72% 0, 100% 28%, 100% 72%, 72% 100%, 28% 100%, 0 72%, 0 28%);
 }
 
-/* Borda externa de madeira escura marcada a faca */
+/* Borda externa de madeira escura marcada a faca com textura artística real */
 .table-wood {
-  background:
-    repeating-linear-gradient(
-      94deg,
-      rgba(0, 0, 0, 0.35) 0px,
-      rgba(0, 0, 0, 0.35) 2px,
-      transparent 2px,
-      transparent 11px
-    ),
-    repeating-linear-gradient(
-      4deg,
-      rgba(212, 175, 55, 0.03) 0px,
-      transparent 3px,
-      rgba(0, 0, 0, 0.25) 6px
-    ),
-    radial-gradient(circle at 50% 45%, #472d18 0%, #2a190d 55%, #120a05 100%);
+  background-image:
+    radial-gradient(circle at 50% 45%, rgba(71, 45, 24, 0.35) 0%, rgba(18, 10, 5, 0.82) 100%),
+    url('/assets/textures/table-wood.webp');
+  background-size: cover;
+  background-position: center;
+  background-color: #1f1209;
   filter: drop-shadow(0 25px 50px rgba(0, 0, 0, 0.95));
 }
 
-/* Feltro ritualístico escuro com gravuras sutis */
+/* Feltro ritualístico escuro com gravuras arcanas em textura artística real */
 .table-felt {
-  background:
-    radial-gradient(circle at 50% 50%, rgba(212, 175, 55, 0.12) 0%, rgba(139, 0, 0, 0.08) 38%, transparent 65%),
-    radial-gradient(circle at 50% 50%, #1b120c 0%, #0e0906 72%, #060403 100%);
+  background-image:
+    radial-gradient(circle at 50% 50%, rgba(212, 175, 55, 0.08) 0%, rgba(6, 4, 3, 0.68) 85%),
+    url('/assets/textures/table-felt.webp');
+  background-size: cover;
+  background-position: center;
+  background-color: #0e0906;
   box-shadow:
     inset 0 0 70px rgba(0, 0, 0, 0.95),
     inset 0 0 18px rgba(212, 175, 55, 0.18);
