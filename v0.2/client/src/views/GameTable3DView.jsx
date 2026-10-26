@@ -251,23 +251,66 @@ export default function GameTable3DView({
             style={{ transform: 'translateZ(-9px) translateY(7px)' }}
           />
 
+          {/* CAMADA 0: SILHUETAS DOS OPONENTES SENTADOS ATRÁS DA MESA (Z negativo: o tampo de madeira da mesa oclui o corpo) */}
+          {players.map((p, i) => {
+            if (p.id === me?.id) return null;
+            const { angle } = seatPosition(i, localIndex, players.length);
+            const sinA = Math.sin(angle);
+            const cosA = Math.cos(angle);
+            // Raio polar ao redor do perímetro externo do octógono da mesa
+            const radX = sinA < -0.3 ? 47 : 49;
+            const radY = sinA < -0.3 ? 47 : 44;
+            const silX = 50 + radX * cosA;
+            const silY = 50 + radY * sinA;
+            // Ancoragem precisa: cabeça, olhos e barra de vida erguem-se acima da mesa,
+            // enquanto o tronco/manto fica atrás da borda de madeira da mesa
+            const anchorY = sinA < -0.7 ? -70 : sinA < -0.3 ? -72 : -74;
+            const targetable = isTargetable(p);
+            const dimmed = canAct && !!selectedCard && !targetable;
+
+            return (
+              <div
+                key={`silhouette-${p.id}`}
+                className="absolute z-10"
+                style={{
+                  left: `${silX}%`,
+                  top: `${silY}%`,
+                  transformStyle: 'preserve-3d',
+                  transformOrigin: '50% 85%',
+                  transform: `translate(-50%, ${anchorY}%) translateZ(-24px) rotateX(${-tablePitch * 0.7}deg)`,
+                }}
+              >
+                <PlayerSilhouette3D
+                  player={p}
+                  index={i}
+                  isMe={false}
+                  targetable={targetable}
+                  dimmed={dimmed}
+                  onSeatClick={onSeatClick}
+                  onDropCard={onDropCard}
+                  allPlayers={players}
+                />
+              </div>
+            );
+          })}
+
           {/* Camada 1: Tampo de madeira escura entalhada (Z = 0) */}
           <div
-            className="table-octagon table-wood absolute inset-0 shadow-[0_0_80px_rgba(0,0,0,0.95)] pointer-events-none"
+            className="table-octagon table-wood absolute inset-0 z-20 shadow-[0_0_80px_rgba(0,0,0,0.95)] pointer-events-none"
             style={{ transform: 'translateZ(0px)' }}
           />
           {/* Camada 2: Aro chanfrado de ouro velho/ferro (Z = 1px) */}
           <div
-            className="table-octagon table-rim absolute inset-[3.1%] pointer-events-none"
+            className="table-octagon table-rim absolute inset-[3.1%] z-20 pointer-events-none"
             style={{ transform: 'translateZ(1px)' }}
           />
           {/* Camada 3: Feltro ritualístico com anéis arcanos (Z = 2px) */}
           <div
-            className="table-octagon table-felt absolute inset-[4.1%] pointer-events-none"
+            className="table-octagon table-felt absolute inset-[4.1%] z-20 pointer-events-none"
             style={{ transform: 'translateZ(2px)' }}
           />
           <div
-            className="rounded-full table-ritual-ring absolute inset-[19%] pointer-events-none flex items-center justify-center"
+            className="rounded-full table-ritual-ring absolute inset-[19%] z-20 pointer-events-none flex items-center justify-center"
             style={{ transform: 'translateZ(3px)' }}
           >
             <img
@@ -284,19 +327,19 @@ export default function GameTable3DView({
             <div
               key={idx}
               style={{ transform: 'translate(-50%, -50%) translateZ(4px)' }}
-              className={`pointer-events-none absolute ${pos} w-2.5 h-2.5 rounded-full bg-gradient-to-br from-amber-300 via-amber-700 to-stone-950 shadow-[0_2px_4px_rgba(0,0,0,0.9)]`}
+              className={`pointer-events-none absolute ${pos} z-20 w-2.5 h-2.5 rounded-full bg-gradient-to-br from-amber-300 via-amber-700 to-stone-950 shadow-[0_2px_4px_rgba(0,0,0,0.9)]`}
             />
           ))}
 
           {/* Setas 3D e Fios de Pacto de Sangue sobre o feltro (Z = 6px) */}
           <div
-            className="pointer-events-none absolute inset-0"
+            className="pointer-events-none absolute inset-0 z-[22]"
             style={{ transform: 'translateZ(6px)' }}
           >
             <TargetArrowsSVG players={players} localIndex={localIndex} />
           </div>
 
-          {/* SILHUETAS 3D DOS OPONENTES E ASSENTO DO JOGADOR LOCAL */}
+          {/* SLOTS DE CARTAS NA MESA E ASSENTO DO JOGADOR LOCAL */}
           {players.map((p, i) => {
             const isMe = p.id === me?.id;
             const { angle } = seatPosition(i, localIndex, players.length);
@@ -324,52 +367,17 @@ export default function GameTable3DView({
               );
             }
 
-            // Oponentes ao redor da mesa:
-            // Ajuste harmônico de posição conforme o assento para que os oponentes do topo
-            // nunca sejam cortados pelo limite superior da tela e as barras de vida fiquem 100% visíveis.
-            const sinA = Math.sin(angle);
-            const cosA = Math.cos(angle);
-            const radX = 43;
-            const radY = sinA < 0 ? 33 : 39;
-            const silX = 50 + radX * cosA;
-            const silY = 50 + radY * sinA;
-            const anchorY = sinA < -0.4 ? -76 : -88;
-
             return (
-              <React.Fragment key={p.id}>
-                <div
-                  className="absolute z-40"
-                  style={{
-                    left: `${silX}%`,
-                    top: `${silY}%`,
-                    transformStyle: 'preserve-3d',
-                    transformOrigin: '50% 100%',
-                    transform: `translate(-50%, ${anchorY}%) translateZ(36px) rotateX(${-tablePitch}deg)`,
-                  }}
-                >
-                  <PlayerSilhouette3D
-                    player={p}
-                    index={i}
-                    isMe={false}
-                    targetable={targetable}
-                    dimmed={dimmed}
-                    onSeatClick={onSeatClick}
-                    onDropCard={onDropCard}
-                    allPlayers={players}
-                  />
-                </div>
-
-                {/* Slot da carta jogada pelo oponente sobre o feltro da mesa */}
-                <CardSlot
-                  player={p}
-                  phase={phase}
-                  slotStyle={{
-                    left: `${slotX}%`,
-                    top: `${slotY}%`,
-                    transform: 'translate(-50%, -50%) translateZ(16px)',
-                  }}
-                />
-              </React.Fragment>
+              <CardSlot
+                key={`slot-${p.id}`}
+                player={p}
+                phase={phase}
+                slotStyle={{
+                  left: `${slotX}%`,
+                  top: `${slotY}%`,
+                  transform: 'translate(-50%, -50%) translateZ(16px)',
+                }}
+              />
             );
           })}
 
