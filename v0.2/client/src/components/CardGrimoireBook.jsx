@@ -208,7 +208,7 @@ export default function CardGrimoireBook({ compact = false, className }) {
             </span>
           </div>
 
-          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 max-h-[290px] sm:max-h-[340px] overflow-y-auto pr-1 scrollbar-thin">
+          <div className="grid grid-cols-2 min-[460px]:grid-cols-3 gap-2 sm:gap-2.5 max-h-[420px] sm:max-h-[520px] overflow-y-auto pr-1 scrollbar-thin">
             {filteredCards.map((entry) => {
               const meta = CARD_META[entry.type];
               const cat = CARD_CATEGORIES[meta.category];
@@ -244,15 +244,15 @@ export default function CardGrimoireBook({ compact = false, className }) {
                   <div className="my-0.5 pointer-events-none">
                     <InscryptionCard
                       card={{ type: entry.type, charges }}
-                      small
+                      large
                     />
                   </div>
 
                   {/* Nome + Resumo rápido do que faz */}
-                  <div className="mt-1 font-grimoire font-extrabold text-[9.5px] sm:text-[10.5px] text-amber-100 leading-tight truncate w-full">
+                  <div className="mt-1.5 font-grimoire font-extrabold text-[11px] sm:text-[12.5px] text-amber-100 leading-tight truncate w-full">
                     {meta.name}
                   </div>
-                  <p className="mt-0.5 font-typewriter text-[8.5px] sm:text-[9.5px] text-[#d8c39e] leading-snug line-clamp-2">
+                  <p className="mt-0.5 font-typewriter text-[10px] sm:text-[11.5px] text-[#e6d3ae] leading-snug line-clamp-3">
                     {entry.shortEffect}
                   </p>
                 </button>
@@ -278,7 +278,7 @@ export default function CardGrimoireBook({ compact = false, className }) {
                     charges:
                       activeEntry.type === CARD_TYPES.SERINGA ? previewSyringeCharges : 0,
                   }}
-                  small
+                  xlarge
                 />
               </div>
 
@@ -286,7 +286,7 @@ export default function CardGrimoireBook({ compact = false, className }) {
                 <div className="flex flex-wrap items-center gap-1 mb-1">
                   <span
                     className={cn(
-                      'px-1.5 py-0.5 rounded border font-mono text-[9px] font-extrabold uppercase',
+                      'px-1.5 py-0.5 rounded border font-mono text-[10.5px] font-extrabold uppercase',
                       activeCat?.badgeCls
                     )}
                   >
@@ -294,11 +294,11 @@ export default function CardGrimoireBook({ compact = false, className }) {
                   </span>
                 </div>
 
-                <h4 className="font-grimoire font-black text-sm sm:text-base text-[#2b1408] tracking-wide leading-tight">
+                <h4 className="font-grimoire font-black text-base sm:text-lg text-[#2b1408] tracking-wide leading-tight">
                   {activeMeta.name}
                 </h4>
 
-                <div className="mt-1.5 space-y-0.5 font-mono text-[9.5px] text-[#4a2e18]">
+                <div className="mt-2 space-y-1 font-mono text-[11.5px] sm:text-xs text-[#3a210f]">
                   <div className="flex items-center gap-1">
                     <Crosshair size={11} className="text-[#8b0000] shrink-0" />
                     <span>
@@ -347,10 +347,10 @@ export default function CardGrimoireBook({ compact = false, className }) {
 
             {/* Lista detalhada do que a carta faz */}
             <div className="mt-2.5">
-              <div className="font-grimoire font-extrabold text-[10.5px] uppercase tracking-wider text-[#6b1d1d] mb-1 flex items-center gap-1">
+              <div className="font-grimoire font-extrabold text-xs sm:text-[13px] uppercase tracking-wider text-[#6b1d1d] mb-1.5 flex items-center gap-1">
                 <Flame size={12} className="text-[#8b0000]" /> O QUE ESTA CARTA FAZ:
               </div>
-              <ul className="space-y-1.5 font-typewriter text-[11px] sm:text-[11.5px] leading-snug text-[#231409]">
+              <ul className="space-y-2 font-typewriter text-[13px] sm:text-sm leading-snug text-[#1a0f06]">
                 {activeEntry.bullets.map((bullet, idx) => (
                   <li key={idx} className="flex items-start gap-1.5">
                     <span className="text-[#8b0000] font-bold shrink-0">❖</span>

@@ -139,18 +139,26 @@ function InscryptionCardBase({
   small,
   mini,
   compact,
+  large,
+  xlarge,
 }) {
   const cardRef = React.useRef(null);
   const glareRef = React.useRef(null);
   const isHoveringRef = React.useRef(false);
 
+  const tight = compact || large;
+
   const size = mini
     ? 'w-[44px] h-[64px]'
-    : small
-      ? 'w-[64px] h-[92px]'
-      : compact
-        ? 'w-[clamp(58px,min(17vw,21dvh),106px)] aspect-[118/168]'
-        : 'w-[118px] h-[168px]';
+    : xlarge
+      ? 'w-[146px] h-[208px]'
+      : large
+        ? 'w-[112px] h-[160px]'
+        : small
+          ? 'w-[64px] h-[92px]'
+          : compact
+            ? 'w-[clamp(68px,min(19vw,24dvh),128px)] aspect-[118/168]'
+            : 'w-[150px] h-[214px]';
 
   const baseElevate = isSelected
     ? compact
@@ -258,7 +266,7 @@ function InscryptionCardBase({
   if (!meta) return null;
 
   const interactive = !disabled && !!onClick;
-  const displayName = small || mini || compact ? meta.shortName : meta.name;
+  const displayName = small || mini || tight ? meta.shortName : meta.name;
   const categoryInfo = CARD_CATEGORIES[meta.category];
   const isSyringe = card?.type === CARD_TYPES.SERINGA;
   const syringeCharges = isSyringe ? Math.max(0, Math.min(4, Number(card?.charges) || 0)) : 0;
@@ -300,7 +308,7 @@ function InscryptionCardBase({
       }}
       className={cn(
         'relative flex flex-col rounded-md bg-[#cbb892] border-stone-900 select-none will-change-transform',
-        mini ? 'border-2' : compact ? 'border-[3px] touch-manipulation' : 'border-4',
+        mini ? 'border-2' : tight ? 'border-[3px] touch-manipulation' : 'border-4',
         'shadow-[inset_0_0_20px_rgba(44,29,18,0.65)]',
         size,
         interactive && 'cursor-pointer',
@@ -328,9 +336,11 @@ function InscryptionCardBase({
             ? 'text-[6px] py-[1px]'
             : small
               ? 'text-[7px] py-[1px]'
-              : compact
-                ? 'text-[9.5px] py-[1px]'
-                : 'text-[10.5px] py-[2px]'
+              : xlarge
+                ? 'text-[13px] py-[3px]'
+                : tight
+                  ? 'text-[11px] py-[1px]'
+                  : 'text-[12.5px] py-[2px]'
         )}
       >
         {displayName}
@@ -349,7 +359,11 @@ function InscryptionCardBase({
           <div
             className={cn(
               'pointer-events-none absolute top-0.5 left-0.5 z-10 rounded border px-1 font-typewriter font-extrabold uppercase tracking-tighter leading-none shadow-sm',
-              small ? 'text-[5px] py-[1px]' : 'text-[6.5px] py-[1.5px]',
+              small
+                ? 'text-[5px] py-[1px]'
+                : tight
+                  ? 'text-[7.5px] py-[1.5px]'
+                  : 'text-[9px] py-[1.5px]',
               categoryInfo.badgeCls
             )}
           >
@@ -383,8 +397,14 @@ function InscryptionCardBase({
         <div
           style={{ transform: !small ? 'translateZ(10px)' : undefined }}
           className={cn(
-            'pointer-events-none font-typewriter text-stone-950 bg-[#d5c39f]/45 text-center border-t-2 border-stone-900 leading-tight shrink-0 px-0.5 truncate',
-            small ? 'text-[5px] py-[1px]' : compact ? 'text-[6px] py-[1px]' : 'text-[7.5px] py-[2px]'
+            'pointer-events-none font-typewriter font-bold text-stone-950 bg-[#d5c39f]/45 text-center border-t-2 border-stone-900 leading-tight shrink-0 px-1',
+            small
+              ? 'text-[5px] py-[1px] truncate'
+              : xlarge
+                ? 'text-[11.5px] py-[3px] line-clamp-2 min-h-[2.4em]'
+                : tight
+                  ? 'text-[8.5px] py-[2px] line-clamp-2 min-h-[2.4em]'
+                  : 'text-[10.5px] py-[2px] line-clamp-2 min-h-[2.4em]'
           )}
         >
           {footerText}

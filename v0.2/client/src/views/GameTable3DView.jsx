@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Pause,
@@ -17,7 +18,7 @@ import {
   RESOLUTION_STEPS,
   VISUAL_EFFECT_BADGES,
 } from '../models/gameModel';
-import { CARD_TYPES, CARD_META } from '../models/cardModel';
+import { CARD_TYPES, CARD_META, CARD_CATEGORIES } from '../models/cardModel';
 import { seatPosition, TABLE_NAILS } from '../helpers/math3d';
 import { useCamera3DController } from '../controllers/useCamera3DController';
 import InscryptionCard from '../components/InscryptionCard';
@@ -33,6 +34,9 @@ import {
   preloadCriticalTableAssets,
 } from '../models/assetCatalog';
 import { audio } from '../lib/audio';
+
+const ACTION_BTN =
+  'flex items-center justify-center gap-2 py-3 px-5 rounded-lg border-2 font-grimoire font-extrabold text-sm sm:text-base tracking-wider uppercase whitespace-nowrap shadow-[0_0_22px_rgba(212,175,55,0.5),0_8px_24px_rgba(0,0,0,0.95)] active:scale-95 transition-all cursor-pointer min-h-[48px] sm:min-h-[52px]';
 
 export default function GameTable3DView({
   socket,
@@ -92,16 +96,17 @@ export default function GameTable3DView({
         ? 52
         : 30;
 
+  // Mesa ~1cm (≈38px) mais alta que antes para dar espaço à mão ampliada
   const tableTranslateY =
     cameraZone === CAMERA_ZONES.PLAYERS
       ? compact
-        ? 64
-        : 92
+        ? 26
+        : 54
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? -210
         : compact
-          ? 52
-          : 78;
+          ? 14
+          : 40;
 
   const tableScale =
     cameraZone === CAMERA_ZONES.NOTEBOOK
@@ -109,6 +114,55 @@ export default function GameTable3DView({
       : compact
         ? 0.88
         : 0.92;
+
+  const [hoveredCard, setHoveredCard] = React.useState(null);
+
+  // Dock de ações: mede a mão em tela para ancorar botões e descrição colados ao deck
+  const handRef = React.useRef(null);
+  const [dock, setDock] = React.useState({
+    side: false,
+    left: 0,
+    right: 0,
+    bottom: 40,
+    top: 262,
+    leftRoom: 0,
+  });
+  React.useLayoutEffect(() => {
+    const measure = () => {
+      const el = handRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+      const rightRoom = vw - r.right;
+      const leftRoom = r.left;
+      const next = {
+        side: rightRoom >= 250 && leftRoom >= 290,
+        left: Math.round(r.right + 20),
+        right: Math.round(vw - r.left + 20),
+        bottom: Math.round(vh - r.bottom + 6),
+        top: Math.round(vh - r.top),
+        leftRoom: Math.round(leftRoom),
+      };
+      setDock((prev) =>
+        Object.keys(next).every((k) => prev[k] === next[k]) ? prev : next
+      );
+    };
+    measure();
+    const t = setTimeout(measure, 450);
+    window.addEventListener('resize', measure);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (ro && handRef.current) ro.observe(handRef.current);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener('resize', measure);
+      ro && ro.disconnect();
+    };
+  }, [cameraZone, compact, me?.hand?.length, me?.isAlive]);
+
+  const infoCard = selectedCard || hoveredCard;
+  const infoMeta = infoCard ? CARD_META[infoCard.type] : null;
+  const infoCategory = infoMeta ? CARD_CATEGORIES[infoMeta.category] : null;
 
   // Verifica se a carta selecionada permite mirar em si mesmo
   const canSelfTarget =
@@ -147,7 +201,10 @@ export default function GameTable3DView({
       </div>
 
       {/* 2. SUSSURRO CONTEXTUAL INTEGRADO AO CENÁRIO (Sem sobrepor os oponentes do topo) */}
-      <div className="pointer-events-none fixed bottom-[202px] sm:bottom-[215px] inset-x-0 z-40 flex flex-col items-center justify-center px-4 gap-1">
+      <div
+        className="pointer-events-none fixed inset-x-0 z-40 flex flex-col items-center justify-center px-4 gap-1"
+        style={{ bottom: dock.side ? dock.top + 62 : dock.top + (canAct ? 130 : 66) }}
+      >
         <AnimatePresence mode="wait">
           {isResolving && activeStep ? (
             <motion.div
@@ -227,9 +284,9 @@ export default function GameTable3DView({
           transition={{ type: 'spring', stiffness: 120, damping: 24, mass: 0.95 }}
           style={{
             width: compact
-              ? 'min(90vw, calc(100dvh - 240px))'
-              : 'min(76vw, calc(100dvh - 230px))',
-            maxHeight: compact ? 'calc(100dvh - 240px)' : 'calc(100dvh - 230px)',
+              ? 'min(92vw, calc(100dvh - 250px))'
+              : 'min(80vw, calc(100dvh - 270px))',
+            maxHeight: compact ? 'calc(100dvh - 250px)' : 'calc(100dvh - 270px)',
             aspectRatio: '1 / 1',
             transformStyle: 'preserve-3d',
           }}
@@ -258,7 +315,8 @@ export default function GameTable3DView({
             const sinA = Math.sin(angle);
             const cosA = Math.cos(angle);
             // Raio polar ao redor do perímetro externo do octógono da mesa
-            const radX = sinA < -0.3 ? 47 : 49;
+            // Raios ampliados horizontalmente para espaçar melhor as presenças ao redor da mesa
+            const radX = sinA < -0.3 ? 53 : 56;
             const radY = sinA < -0.3 ? 47 : 44;
             const silX = 50 + radX * cosA;
             const silY = 50 + radY * sinA;
@@ -343,8 +401,8 @@ export default function GameTable3DView({
           {players.map((p, i) => {
             const isMe = p.id === me?.id;
             const { angle } = seatPosition(i, localIndex, players.length);
-            const slotX = 50 + 20 * Math.cos(angle);
-            const slotY = 50 + 19 * Math.sin(angle);
+            const slotX = 50 + 22 * Math.cos(angle);
+            const slotY = 50 + 20 * Math.sin(angle);
             const targetable = isTargetable(p);
             const dimmed = canAct && !!selectedCard && !targetable;
 
@@ -452,12 +510,13 @@ export default function GameTable3DView({
         }}
         transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          'relative z-[45] h-[168px] sm:h-[198px] flex items-end justify-center pb-7 sm:pb-8 px-2 shrink-0',
+          'relative z-[45] h-[214px] sm:h-[262px] flex items-end justify-center pb-7 sm:pb-8 px-2 shrink-0',
           cameraZone === CAMERA_ZONES.NOTEBOOK && 'pointer-events-none'
         )}
       >
         {me && me.isAlive ? (
           <div
+            ref={handRef}
             data-hand-zone="true"
             className="relative flex items-end justify-center max-w-full pb-1"
           >
@@ -474,6 +533,8 @@ export default function GameTable3DView({
                   <motion.div
                     key={card.id}
                     data-hand-zone="true"
+                    onMouseEnter={() => setHoveredCard(card)}
+                    onMouseLeave={() => setHoveredCard(null)}
                     initial={{ y: 160, opacity: 0, rotate: -14, scale: 0.8 }}
                     animate={{
                       y: isSel ? -28 : fanY,
@@ -497,7 +558,7 @@ export default function GameTable3DView({
                     transition={{ type: 'spring', stiffness: 190, damping: 20 }}
                     className={cn(
                       'transition-shadow duration-200 card-fan-item',
-                      i > 0 && (compact ? '-ml-2.5' : '-ml-3.5'),
+                      i > 0 && (compact ? '-ml-3' : '-ml-4'),
                       isSel && 'drop-shadow-[0_0_25px_rgba(212,175,55,0.75)]'
                     )}
                     style={{ transformOrigin: 'bottom center' }}
@@ -529,112 +590,183 @@ export default function GameTable3DView({
         )}
       </motion.footer>
 
-      {/* 5. CONTROLES DE AÇÃO DO TURNO (Passar a Vez / Descartar / Auto-Alvo) — Sempre acessíveis e separados da zona do chat */}
-      {me && me.isAlive && canAct && (
-        <div
-          id="turn-actions-cluster"
-          data-hand-zone="true"
-          onMouseEnter={() => setOverHandOrControls(true)}
-          onMouseLeave={() => setOverHandOrControls(false)}
-          className="fixed right-3 sm:right-7 bottom-10 sm:bottom-11 z-[65] flex flex-col items-end gap-2 pointer-events-auto"
-        >
-          <AnimatePresence>
-            {canSelfTarget && (
-              <motion.button
-                key="self-target"
-                type="button"
-                initial={{ x: 16, opacity: 0 }}
-                animate={{ x: 0, opacity: 1 }}
-                exit={{ x: 16, opacity: 0 }}
-                id="btn-self-target"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  sendAction(selectedCard.id, me.id);
-                  setSelectedCardIds([]);
-                }}
-                className={cn(
-                  'flex items-center gap-1.5 py-2 px-3.5 rounded-full border font-grimoire font-bold text-[10.5px] sm:text-xs tracking-wider uppercase shadow-[0_8px_24px_rgba(0,0,0,0.9)] backdrop-blur-md active:scale-95 transition-all cursor-pointer',
-                  selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA
-                    ? 'border-teal-400/70 bg-teal-950/85 text-teal-100 hover:bg-teal-900'
-                    : selectedCard.type === CARD_TYPES.PACTO_SANGUE
-                      ? (me.bloodPactWith || []).length > 0
-                        ? 'border-amber-400/75 bg-amber-950/85 text-amber-100 hover:bg-amber-900'
-                        : 'border-rose-500/75 bg-rose-950/85 text-rose-100 hover:bg-rose-900'
-                      : selectedCard.type === CARD_TYPES.SERINGA
-                        ? 'border-emerald-400/75 bg-emerald-950/85 text-emerald-100 hover:bg-emerald-900'
-                        : 'border-gold-aged/65 bg-[#160d08]/90 text-amber-100 hover:border-gold-aged hover:bg-[#24150d]'
-                )}
-              >
-                {selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA ? (
-                  <>
-                    <Flame size={13} className="text-teal-300" /> +1 Dano na Faca
-                  </>
-                ) : selectedCard.type === CARD_TYPES.PACTO_SANGUE ? (
-                  (me.bloodPactWith || []).length > 0 ? (
-                    <>
-                      <GameIcon name="broken-chain" size={13} /> Quebrar Meu Pacto
-                    </>
-                  ) : (
-                    <>
-                      <GameIcon name="blood-drop" size={13} /> Pacto em Mim (-1 Vida)
-                    </>
-                  )
-                ) : selectedCard.type === CARD_TYPES.SERINGA ? (
-                  <>
-                    <GameIcon name="syringe-vial" size={13} /> Usar em Mim (
-                    {selectedCard.charges || 0}/4
-                    {(selectedCard.charges || 0) > me.maxLives - me.lives ? ' · Overdose' : ''})
-                  </>
-                ) : (
-                  <>
-                    <Crosshair size={13} className="text-amber-300" /> Usar em Mim
-                  </>
-                )}
-              </motion.button>
-            )}
-          </AnimatePresence>
+      {/* DOCK DA MÃO (portal no body → fica ACIMA da vinheta/grão que escurecia os botões).
+          Descrição da carta à esquerda do deck e botões de ação à direita; em telas estreitas
+          ambos empilham logo acima da mão. */}
+      {me &&
+        me.isAlive &&
+        cameraZone !== CAMERA_ZONES.NOTEBOOK &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <>
+            <AnimatePresence>
+              {infoMeta && (
+                <motion.div
+                  key="card-info-panel"
+                  id="card-info-panel"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 8 }}
+                  transition={{ duration: 0.15 }}
+                  style={
+                    dock.side
+                      ? {
+                          right: dock.right,
+                          bottom: dock.bottom,
+                          width: Math.min(340, dock.leftRoom - 36),
+                        }
+                      : {
+                          left: '50%',
+                          x: '-50%',
+                          bottom: dock.top + 64 + (canAct ? 62 : 0),
+                          width: 'min(440px, 94vw)',
+                        }
+                  }
+                  className="pointer-events-none fixed z-[200] rounded-lg border-2 border-gold-aged/80 bg-[#0d0704] px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.95)]"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="font-grimoire font-extrabold text-sm sm:text-base tracking-wider text-amber-100 uppercase">
+                      {infoMeta.name}
+                    </span>
+                    {infoCategory && (
+                      <span
+                        className={cn(
+                          'shrink-0 rounded border px-1.5 py-0.5 font-typewriter font-extrabold text-[10px] sm:text-xs uppercase',
+                          infoCategory.badgeCls
+                        )}
+                      >
+                        P{infoMeta.priority} · {infoMeta.categoryLabel}
+                      </span>
+                    )}
+                  </div>
+                  <p className="font-typewriter text-[12.5px] sm:text-sm leading-snug text-parchment">
+                    {infoMeta.description.replace(/^Prioridade \d \([^)]*\):\s*/, '')}
+                  </p>
+                  <p className="mt-1.5 font-typewriter font-bold text-[11px] sm:text-xs uppercase tracking-wide text-gold-aged">
+                    {infoMeta.foot}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
 
-          {discardLimit > 0 && selectedCardIds.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <button
-                id="btn-discard"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDiscard();
-                }}
-                className="flex items-center gap-1.5 py-2 px-4 rounded-full border border-amber-500/70 bg-[#241409]/90 text-amber-100 font-grimoire font-bold text-[10.5px] sm:text-xs tracking-wider uppercase hover:border-amber-400 hover:bg-amber-950 shadow-[0_8px_24px_rgba(0,0,0,0.9)] backdrop-blur-md active:scale-95 transition-all cursor-pointer"
+            {/* CONTROLES DE AÇÃO DO TURNO (Usar em Mim / Descartar / Passar a Vez) */}
+            {canAct && (
+              <div
+                id="turn-actions-cluster"
+                data-hand-zone="true"
+                onMouseEnter={() => setOverHandOrControls(true)}
+                onMouseLeave={() => setOverHandOrControls(false)}
+                style={
+                  dock.side
+                    ? { left: dock.left, bottom: dock.bottom }
+                    : { left: '50%', transform: 'translateX(-50%)', bottom: dock.top + 64 }
+                }
+                className={cn(
+                  'fixed z-[200] flex gap-2.5 pointer-events-auto',
+                  dock.side
+                    ? 'flex-col items-stretch w-[220px]'
+                    : 'flex-row flex-wrap items-center justify-center w-[96vw] max-w-[640px]'
+                )}
               >
-                <Trash2 size={13} className="text-amber-400" /> Descartar ({selectedCardIds.length})
-              </button>
-              <button
-                id="btn-pass"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handlePassTurn();
-                }}
-                className="flex items-center gap-1.5 py-2 px-3.5 rounded-full border border-stone-600/70 bg-[#120b07]/90 text-parchment/85 font-grimoire font-bold text-[10.5px] sm:text-xs tracking-wider uppercase hover:border-gold-aged/80 hover:text-amber-100 shadow-[0_8px_24px_rgba(0,0,0,0.9)] backdrop-blur-md active:scale-95 transition-all cursor-pointer"
-                title="Passar a vez sem jogar carta"
-              >
-                <Hand size={13} /> Passar a Vez
-              </button>
-            </div>
-          ) : (
-            <button
-              id="btn-pass"
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handlePassTurn();
-              }}
-              className="flex items-center gap-1.5 py-2 px-4 rounded-full border border-gold-aged/55 bg-[#140c07]/90 text-[#e8d5b5] font-grimoire font-bold text-[11px] sm:text-xs tracking-[0.14em] uppercase hover:border-gold-aged hover:text-white hover:bg-[#23140b] shadow-[0_8px_24px_rgba(0,0,0,0.92)] backdrop-blur-md active:scale-95 transition-all cursor-pointer"
-            >
-              <Hand size={13} className="text-gold-aged" /> Passar a Vez
-            </button>
-          )}
-        </div>
-      )}
+                <AnimatePresence>
+                  {canSelfTarget && (
+                    <motion.button
+                      key="self-target"
+                      type="button"
+                      initial={{ y: 10, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: 10, opacity: 0 }}
+                      id="btn-self-target"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        sendAction(selectedCard.id, me.id);
+                        setSelectedCardIds([]);
+                      }}
+                      className={cn(
+                        ACTION_BTN,
+                        selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA
+                          ? 'border-teal-300 bg-teal-900 text-teal-50 hover:bg-teal-800'
+                          : selectedCard.type === CARD_TYPES.PACTO_SANGUE
+                            ? (me.bloodPactWith || []).length > 0
+                              ? 'border-amber-300 bg-amber-900 text-amber-50 hover:bg-amber-800'
+                              : 'border-rose-400 bg-rose-900 text-rose-50 hover:bg-rose-800'
+                            : selectedCard.type === CARD_TYPES.SERINGA
+                              ? 'border-emerald-300 bg-emerald-900 text-emerald-50 hover:bg-emerald-800'
+                              : 'border-gold-aged bg-[#3a2212] text-amber-50 hover:bg-[#4d2e18]'
+                      )}
+                    >
+                      {selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA ? (
+                        <>
+                          <Flame size={16} className="text-teal-200" /> +1 Dano na Faca
+                        </>
+                      ) : selectedCard.type === CARD_TYPES.PACTO_SANGUE ? (
+                        (me.bloodPactWith || []).length > 0 ? (
+                          <>
+                            <GameIcon name="broken-chain" size={16} /> Quebrar Meu Pacto
+                          </>
+                        ) : (
+                          <>
+                            <GameIcon name="blood-drop" size={16} /> Pacto em Mim (-1 Vida)
+                          </>
+                        )
+                      ) : selectedCard.type === CARD_TYPES.SERINGA ? (
+                        <>
+                          <GameIcon name="syringe-vial" size={16} /> Usar em Mim (
+                          {selectedCard.charges || 0}/4
+                          {(selectedCard.charges || 0) > me.maxLives - me.lives
+                            ? ' · Overdose'
+                            : ''}
+                          )
+                        </>
+                      ) : (
+                        <>
+                          <Crosshair size={16} className="text-amber-300" /> Usar em Mim
+                        </>
+                      )}
+                    </motion.button>
+                  )}
+                </AnimatePresence>
+
+                {discardLimit > 0 && selectedCardIds.length > 0 && (
+                  <button
+                    id="btn-discard"
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDiscard();
+                    }}
+                    className={cn(
+                      ACTION_BTN,
+                      'border-amber-300 bg-amber-900 text-amber-50 hover:bg-amber-800'
+                    )}
+                  >
+                    <Trash2 size={16} className="text-amber-300" /> Descartar (
+                    {selectedCardIds.length})
+                  </button>
+                )}
+
+                <button
+                  id="btn-pass"
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handlePassTurn();
+                  }}
+                  title="Passar a vez sem jogar carta"
+                  className={cn(
+                    ACTION_BTN,
+                    discardLimit > 0 && selectedCardIds.length > 0
+                      ? 'border-stone-300 bg-stone-900 text-parchment hover:border-gold-aged hover:text-white'
+                      : 'border-gold-aged bg-[#3a2212] text-amber-50 hover:bg-[#4d2e18]'
+                  )}
+                >
+                  <Hand size={16} className="text-gold-aged" /> Passar a Vez
+                </button>
+              </div>
+            )}
+          </>,
+          document.body
+        )}
 
       {/* 6. ZONA INTENCIONAL NO EXTREMO INFERIOR DA TELA PARA ACESSAR O CHAT & GRIMÓRIO */}
       {cameraZone !== CAMERA_ZONES.NOTEBOOK && (

@@ -13,7 +13,7 @@ export function seatAngle(index, localIndex, totalPlayers) {
 }
 
 /** Posição 2D/3D percentual sobre o tampo da mesa (0..100%). */
-export function seatPosition(index, localIndex, totalPlayers, rx = 38, ry = 36) {
+export function seatPosition(index, localIndex, totalPlayers, rx = 41, ry = 36) {
   const angle = seatAngle(index, localIndex, totalPlayers);
   return {
     x: 50 + rx * Math.cos(angle),

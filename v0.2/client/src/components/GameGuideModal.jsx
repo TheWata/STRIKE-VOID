@@ -160,7 +160,7 @@ function TabTheGame() {
         <p className="text-parchment-light text-xs sm:text-sm mb-2">
           A mesa é totalmente tridimensional e reage ao movimento vertical do seu mouse:
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono text-[11px]">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 font-mono text-xs sm:text-[13px]">
           <div className="rounded bg-wood-dark/80 border border-gold-aged/40 p-2.5">
             <strong className="text-amber-300 block mb-0.5">1. MOUSE PARA CIMA ↑</strong>
             Olha para as <strong>Silhuetas 3D</strong> dos jogadores sentados ao redor da mesa, suas vidas, pactos e cartas reveladas.
@@ -192,7 +192,7 @@ function TabTheGame() {
         <div className="font-grimoire font-bold text-xs sm:text-sm tracking-wider text-parchment mb-2 flex items-center gap-2">
           <Swords size={15} className="text-gold-aged" /> TIPOS DE CARTAS & ORDEM DE PRIORIDADE (P1 → P5)
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-[10.5px] font-mono">
+        <div className="grid grid-cols-1 sm:grid-cols-5 gap-2 text-xs sm:text-[12.5px] font-mono">
           <div className="rounded border border-purple-700/70 bg-purple-950/30 p-2">
             <span className="text-purple-300 font-bold block mb-0.5">P1 · REAÇÃO</span>
             <strong>Espelho Amaldiçoado:</strong> Reflete ataques e maldições, rouba paredes e pune uso no vazio com -1 Vida.
