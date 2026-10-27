@@ -1,5 +1,4 @@
 import React from 'react';
-import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Pause,
@@ -11,6 +10,8 @@ import {
   ChevronUp,
   Ghost,
   Flame,
+  ZoomIn,
+  Lock,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import {
@@ -18,11 +19,13 @@ import {
   RESOLUTION_STEPS,
   VISUAL_EFFECT_BADGES,
 } from '../models/gameModel';
-import { CARD_TYPES, CARD_META, CARD_CATEGORIES } from '../models/cardModel';
+import { CARD_TYPES, CARD_META } from '../models/cardModel';
 import { seatPosition, TABLE_NAILS } from '../helpers/math3d';
 import { useCamera3DController } from '../controllers/useCamera3DController';
 import InscryptionCard from '../components/InscryptionCard';
-import PlayerSeat, { CardSlot } from '../components/PlayerSeat';
+import CardInspectModal from '../components/CardInspectModal';
+import DynamicPlayerPortrait from '../components/DynamicPlayerPortrait';
+import { CardSlot } from '../components/PlayerSeat';
 import PlayerSilhouette3D from '../components/PlayerSilhouette3D';
 import TargetArrowsSVG from '../components/TargetArrowsSVG';
 import CentralClock from '../components/CentralClock';
@@ -35,8 +38,8 @@ import {
 } from '../models/assetCatalog';
 import { audio } from '../lib/audio';
 
-const ACTION_BTN =
-  'flex items-center justify-center gap-2 py-3 px-5 rounded-lg border-2 font-grimoire font-extrabold text-sm sm:text-base tracking-wider uppercase whitespace-nowrap shadow-[0_0_22px_rgba(212,175,55,0.5),0_8px_24px_rgba(0,0,0,0.95)] active:scale-95 transition-all cursor-pointer min-h-[48px] sm:min-h-[52px]';
+const HERO_WING_BTN =
+  'relative flex flex-col items-center justify-center gap-0.5 px-3 sm:px-5 py-2.5 sm:py-3 rounded-xl border-2 font-grimoire font-extrabold tracking-wider uppercase transition-all select-none min-h-[56px] sm:min-h-[64px] shadow-[0_10px_28px_rgba(0,0,0,0.92)]';
 
 export default function GameTable3DView({
   socket,
@@ -50,7 +53,6 @@ export default function GameTable3DView({
   setSelectedCardIds,
   selectedCard,
   canAct,
-  walled,
   discardLimit,
   isTargetable,
   sendAction,
@@ -66,6 +68,7 @@ export default function GameTable3DView({
   handleSendChat,
   onTogglePause,
   onSkipAnalysis,
+  showToast,
 }) {
   const {
     cameraZone,
@@ -78,6 +81,9 @@ export default function GameTable3DView({
     setTypingChat,
   } = useCamera3DController({ inGame: true });
 
+  const [inspectedCard, setInspectedCard] = React.useState(null);
+  const [hoveredCardId, setHoveredCardId] = React.useState(null);
+
   React.useEffect(() => {
     preloadCriticalTableAssets();
   }, []);
@@ -88,95 +94,237 @@ export default function GameTable3DView({
     (p) => p.visualEffect && VISUAL_EFFECT_BADGES[p.visualEffect]
   );
 
-  // Inclinação 3D suave e orgânica da mesa, posicionada para que todos os oponentes do topo fiquem 100% visíveis
+  // Inclinação 3D suave e orgânica da mesa
   const tablePitch =
     cameraZone === CAMERA_ZONES.PLAYERS
-      ? 25
+      ? 24
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? 52
-        : 30;
+        : 28;
 
-  // Mesa ~1cm (≈38px) mais alta que antes para dar espaço à mão ampliada
   const tableTranslateY =
     cameraZone === CAMERA_ZONES.PLAYERS
       ? compact
-        ? 26
-        : 54
+        ? 18
+        : 32
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? -210
         : compact
-          ? 14
-          : 40;
+          ? 8
+          : 18;
 
   const tableScale =
     cameraZone === CAMERA_ZONES.NOTEBOOK
-      ? 0.84
+      ? 0.82
       : compact
-        ? 0.88
-        : 0.92;
-
-  const [hoveredCard, setHoveredCard] = React.useState(null);
-
-  // Dock de ações: mede a mão em tela para ancorar botões e descrição colados ao deck
-  const handRef = React.useRef(null);
-  const [dock, setDock] = React.useState({
-    side: false,
-    left: 0,
-    right: 0,
-    bottom: 40,
-    top: 262,
-    leftRoom: 0,
-  });
-  React.useLayoutEffect(() => {
-    const measure = () => {
-      const el = handRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      const vw = window.innerWidth;
-      const vh = window.innerHeight;
-      const rightRoom = vw - r.right;
-      const leftRoom = r.left;
-      const next = {
-        side: rightRoom >= 250 && leftRoom >= 290,
-        left: Math.round(r.right + 20),
-        right: Math.round(vw - r.left + 20),
-        bottom: Math.round(vh - r.bottom + 6),
-        top: Math.round(vh - r.top),
-        leftRoom: Math.round(leftRoom),
-      };
-      setDock((prev) =>
-        Object.keys(next).every((k) => prev[k] === next[k]) ? prev : next
-      );
-    };
-    measure();
-    const t = setTimeout(measure, 450);
-    window.addEventListener('resize', measure);
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    if (ro && handRef.current) ro.observe(handRef.current);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener('resize', measure);
-      ro && ro.disconnect();
-    };
-  }, [cameraZone, compact, me?.hand?.length, me?.isAlive]);
-
-  const infoCard = selectedCard || hoveredCard;
-  const infoMeta = infoCard ? CARD_META[infoCard.type] : null;
-  const infoCategory = infoMeta ? CARD_CATEGORIES[infoMeta.category] : null;
+        ? 0.86
+        : 0.9;
 
   // Verifica se a carta selecionada permite mirar em si mesmo
-  const canSelfTarget =
+  const canSelfTarget = Boolean(
     canAct &&
-    selectedCard &&
-    !CARD_META[selectedCard.type]?.requiresOtherPlayer;
+      selectedCard &&
+      !CARD_META[selectedCard.type]?.requiresOtherPlayer
+  );
+
+  const selectedMeta = selectedCard ? CARD_META[selectedCard.type] : null;
+
+  const handleSelfTargetTrigger = () => {
+    if (!canAct) return;
+    if (canSelfTarget && selectedCard && me) {
+      sendAction(selectedCard.id, me.id);
+      setSelectedCardIds([]);
+      return;
+    }
+    if (selectedCard && selectedMeta?.requiresOtherPlayer) {
+      showToast?.(
+        `${selectedMeta.name} deve ser usada contra outro jogador na mesa! Clique em uma silhueta.`
+      );
+      return;
+    }
+    if (selectedCardIds.length > 1) {
+      showToast?.('Para usar uma carta em si mesmo, deixe apenas 1 carta selecionada.');
+      return;
+    }
+    showToast?.('Selecione 1 carta na sua mão acima para usar em si mesmo!');
+  };
+
+  const handleDiscardTrigger = (e) => {
+    e?.stopPropagation();
+    if (!canAct) return;
+    if (selectedCardIds.length === 0) {
+      showToast?.(
+        `Selecione até ${discardLimit} carta(s) na mão acima para descartar!`
+      );
+      return;
+    }
+    handleDiscard();
+  };
+
+  // Configuração dinâmica de rótulo e cor do Botão Esquerdo (Ação 1: Usar em Si Mesmo)
+  const renderLeftActionContent = () => {
+    if (!canAct) {
+      const myAction = me?.selectedAction;
+      const lockedLabel =
+        phase === 'PLANNING' && me?.lockedIn
+          ? myAction?.cardType === 'NONE'
+            ? 'Vez Passada'
+            : myAction?.cardType === 'DISCARD'
+              ? 'Descarte Travado'
+              : 'Jogada Travada'
+          : isResolving
+            ? 'Resolvendo Rodada'
+            : 'Aguardando';
+      return (
+        <>
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-stone-300">
+            <Lock size={15} className="text-gold-aged/80 shrink-0" />
+            <span>{lockedLabel}</span>
+          </div>
+          <span className="font-mono text-[10px] sm:text-[11px] font-normal text-stone-400 normal-case tracking-normal">
+            {phase === 'PLANNING' ? 'Aguardando demais jogadores' : 'Observe as revelações na mesa'}
+          </span>
+        </>
+      );
+    }
+
+    if (canSelfTarget && selectedCard) {
+      if (selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA) {
+        return (
+          <>
+            <div className="flex items-center gap-1.5 text-sm sm:text-base text-teal-50">
+              <Flame size={18} className="text-teal-200 shrink-0" />
+              <span>+1 Dano na Faca</span>
+            </div>
+            <span className="font-mono text-[10.5px] sm:text-xs font-bold text-teal-200/95 normal-case tracking-normal">
+              Usar Manip. de Alma em Mim
+            </span>
+          </>
+        );
+      }
+      if (selectedCard.type === CARD_TYPES.PACTO_SANGUE) {
+        const hasPact = (me?.bloodPactWith || []).length > 0;
+        return hasPact ? (
+          <>
+            <div className="flex items-center gap-1.5 text-sm sm:text-base text-amber-50">
+              <GameIcon name="broken-chain" size={18} />
+              <span>Quebrar Meu Pacto</span>
+            </div>
+            <span className="font-mono text-[10.5px] sm:text-xs font-bold text-amber-200 normal-case tracking-normal">
+              Romper vínculo de sangue ativo
+            </span>
+          </>
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5 text-sm sm:text-base text-rose-50">
+              <GameIcon name="blood-drop" size={18} />
+              <span>Pacto em Mim (-1 HP)</span>
+            </div>
+            <span className="font-mono text-[10.5px] sm:text-xs font-bold text-rose-200 normal-case tracking-normal">
+              Sem pacto ativo: perde 1 Vida
+            </span>
+          </>
+        );
+      }
+      if (selectedCard.type === CARD_TYPES.SERINGA) {
+        const charges = selectedCard.charges || 0;
+        const missing = Math.max(0, (me?.maxLives || 3) - (me?.lives || 0));
+        const isOverdose = charges > 0 && charges > missing;
+        return (
+          <>
+            <div className="flex items-center gap-1.5 text-sm sm:text-base text-emerald-50">
+              <GameIcon name="syringe-vial" size={18} />
+              <span>Usar em Mim ({charges}/4)</span>
+            </div>
+            <span
+              className={cn(
+                'font-mono text-[10.5px] sm:text-xs font-bold normal-case tracking-normal',
+                isOverdose ? 'text-lime-200' : 'text-emerald-200'
+              )}
+            >
+              {charges === 0
+                ? 'Seringa vazia (0 cura)'
+                : isOverdose
+                  ? `Cura + ALERTA DE OVERDOSE!`
+                  : `Restaura +${charges} de Vida`}
+            </span>
+          </>
+        );
+      }
+      if (selectedCard.type === CARD_TYPES.FACA && me?.isWalled) {
+        return (
+          <>
+            <div className="flex items-center gap-1.5 text-sm sm:text-base text-amber-50">
+              <GameIcon name="wall-shatter" size={18} />
+              <span>Quebrar Minha Parede</span>
+            </div>
+            <span className="font-mono text-[10.5px] sm:text-xs font-bold text-amber-200 normal-case tracking-normal">
+              Destrói sua Parede sem sofrer dano
+            </span>
+          </>
+        );
+      }
+      return (
+        <>
+          <div className="flex items-center gap-1.5 text-sm sm:text-base text-amber-50">
+            <Crosshair size={18} className="text-amber-300 shrink-0" />
+            <span>Usar em Si Mesmo</span>
+          </div>
+          <span className="font-mono text-[10.5px] sm:text-xs font-bold text-amber-200/95 normal-case tracking-normal">
+            Aplicar {selectedMeta?.name} em você
+          </span>
+        </>
+      );
+    }
+
+    if (selectedCard && selectedMeta?.requiresOtherPlayer) {
+      return (
+        <>
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-amber-200">
+            <Crosshair size={16} className="text-red-400 animate-pulse shrink-0" />
+            <span>Mirar em Oponente</span>
+          </div>
+          <span className="font-mono text-[10.5px] sm:text-xs font-bold text-parchment/90 normal-case tracking-normal">
+            Clique em uma silhueta na mesa
+          </span>
+        </>
+      );
+    }
+
+    if (selectedCardIds.length > 1) {
+      return (
+        <>
+          <div className="flex items-center gap-1.5 text-xs sm:text-sm text-amber-200">
+            <Trash2 size={16} className="text-amber-300 shrink-0" />
+            <span>{selectedCardIds.length} Cartas Selecionadas</span>
+          </div>
+          <span className="font-mono text-[10.5px] sm:text-xs font-normal text-parchment/85 normal-case tracking-normal">
+            Use Descartar à direita ou deixe 1 carta
+          </span>
+        </>
+      );
+    }
+
+    return (
+      <>
+        <div className="flex items-center gap-1.5 text-sm sm:text-base text-amber-100/90">
+          <Crosshair size={17} className="text-gold-aged shrink-0" />
+          <span>Usar em Si Mesmo</span>
+        </div>
+        <span className="font-mono text-[10.5px] sm:text-xs font-normal text-parchment/80 normal-case tracking-normal">
+          Selecione 1 carta acima para auto-alvo
+        </span>
+      </>
+    );
+  };
 
   return (
     <div
       id="game-table-3d-viewport"
       onMouseMove={handleMouseMove}
-      className="flex-1 min-h-0 flex flex-col relative overflow-hidden select-none inscryption-3d-stage"
+      className="flex-1 min-h-0 flex flex-col justify-between relative overflow-hidden select-none inscryption-3d-stage"
     >
-      {/* 1. AMBIÊNCIA PROFUNDA DA SALA CERIMONIAL (Asset de fundo atmosférico + luz de vela) */}
+      {/* 1. AMBIÊNCIA PROFUNDA DA SALA CERIMONIAL */}
       <div
         className="pointer-events-none absolute inset-0 z-0 transition-transform duration-700 ease-out"
         style={{
@@ -200,11 +348,8 @@ export default function GameTable3DView({
         <div className="candle absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(255,165,60,0.16),rgba(139,0,0,0.07)_46%,transparent_76%)]" />
       </div>
 
-      {/* 2. SUSSURRO CONTEXTUAL INTEGRADO AO CENÁRIO (Sem sobrepor os oponentes do topo) */}
-      <div
-        className="pointer-events-none fixed inset-x-0 z-40 flex flex-col items-center justify-center px-4 gap-1"
-        style={{ bottom: dock.side ? dock.top + 62 : dock.top + (canAct ? 130 : 66) }}
-      >
+      {/* 2. FAIXA CONTEXTUAL DE RESOLUÇÃO / MIRA NO TOPO DA MESA */}
+      <div className="pointer-events-none relative z-40 pt-9 sm:pt-10 px-4 flex flex-col items-center justify-center gap-1 shrink-0">
         <AnimatePresence mode="wait">
           {isResolving && activeStep ? (
             <motion.div
@@ -212,13 +357,12 @@ export default function GameTable3DView({
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              className="flex flex-col items-center text-center"
-              style={{ textShadow: '0 2px 12px rgba(0,0,0,0.98), 0 0 24px rgba(0,0,0,0.9)' }}
+              className="flex flex-col items-center text-center bg-black/70 border border-gold-aged/45 px-4 py-1.5 rounded-full shadow-lg"
             >
-              <span className="font-grimoire font-extrabold text-xs sm:text-sm tracking-[0.25em] text-amber-200/95 uppercase">
+              <span className="font-grimoire font-extrabold text-xs sm:text-sm tracking-[0.22em] text-amber-200 uppercase">
                 {activeStep.label}
               </span>
-              <span className="font-typewriter text-[10.5px] sm:text-xs text-parchment/75 max-w-md">
+              <span className="font-typewriter text-xs sm:text-sm text-parchment max-w-lg">
                 {activeStep.subtitle}
               </span>
             </motion.div>
@@ -228,20 +372,26 @@ export default function GameTable3DView({
               initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -6 }}
-              className="flex items-center gap-2 text-red-200/95 font-grimoire text-xs sm:text-sm tracking-[0.18em] uppercase"
-              style={{
-                textShadow: '0 0 16px rgba(220,38,38,0.85), 0 2px 8px rgba(0,0,0,0.98)',
-              }}
+              className="pointer-events-auto flex items-center gap-2.5 bg-black/80 border border-red-500/60 px-4 py-1.5 rounded-full text-red-100 font-grimoire text-xs sm:text-sm tracking-[0.14em] uppercase shadow-[0_0_20px_rgba(220,38,38,0.45)]"
             >
-              <Crosshair size={13} className="text-red-400 animate-pulse shrink-0" />
+              <Crosshair size={15} className="text-red-400 animate-pulse shrink-0" />
               <span>
-                {CARD_META[selectedCard.type]?.name} — Escolha uma presença na mesa
+                <strong>{selectedMeta?.name}</strong> — Clique em um oponente na mesa
+                {canSelfTarget ? ' ou use o botão Usar em Si Mesmo abaixo' : ''}
               </span>
+              <button
+                type="button"
+                onClick={() => setInspectedCard(selectedCard)}
+                className="ml-1 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-stone-900 border border-gold-aged/70 text-amber-200 hover:text-white font-mono text-[11px] cursor-pointer"
+              >
+                <ZoomIn size={12} />
+                <span>Ampliar</span>
+              </button>
             </motion.div>
           ) : null}
         </AnimatePresence>
 
-        {/* Efeitos da rodada integrados como inscrições sutis no ar */}
+        {/* Efeitos ativos da rodada */}
         <AnimatePresence>
           {activeEffects.length > 0 && (
             <motion.div
@@ -256,10 +406,7 @@ export default function GameTable3DView({
                 return (
                   <span
                     key={`${p.id}-${p.visualEffect}`}
-                    className="inline-flex items-center gap-1.5 text-[11px] font-grimoire font-bold tracking-wider text-amber-100/95"
-                    style={{
-                      textShadow: '0 2px 8px rgba(0,0,0,0.98), 0 0 14px rgba(220,38,38,0.65)',
-                    }}
+                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/75 border border-amber-500/40 text-xs font-grimoire font-bold tracking-wider text-amber-100"
                   >
                     <span>{p.name} ·</span>
                     {badge.icon && <GameIcon name={badge.icon} size={13} />}
@@ -272,8 +419,8 @@ export default function GameTable3DView({
         </AnimatePresence>
       </div>
 
-      {/* 3. PALCO 3D CENTRAL (MESA OCTOGONAL + PRESENÇAS SOMBRIAS GRANDES + BARRAS DE VIDA SEMPRE VISÍVEIS) */}
-      <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 sm:p-2 inscryption-perspective overflow-visible">
+      {/* 3. PALCO 3D CENTRAL (MESA OCTOGONAL + PRESENÇAS SOMBRIAS DOS OPONENTES) */}
+      <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 inscryption-perspective overflow-visible">
         <motion.div
           animate={{
             rotateX: tablePitch - parallax.y * 0.45,
@@ -284,9 +431,9 @@ export default function GameTable3DView({
           transition={{ type: 'spring', stiffness: 120, damping: 24, mass: 0.95 }}
           style={{
             width: compact
-              ? 'min(92vw, calc(100dvh - 250px))'
-              : 'min(80vw, calc(100dvh - 270px))',
-            maxHeight: compact ? 'calc(100dvh - 250px)' : 'calc(100dvh - 270px)',
+              ? 'min(88vw, calc(100dvh - 330px))'
+              : 'min(74vw, calc(100dvh - 360px))',
+            maxHeight: compact ? 'calc(100dvh - 330px)' : 'calc(100dvh - 360px)',
             aspectRatio: '1 / 1',
             transformStyle: 'preserve-3d',
           }}
@@ -308,20 +455,16 @@ export default function GameTable3DView({
             style={{ transform: 'translateZ(-9px) translateY(7px)' }}
           />
 
-          {/* CAMADA 0: SILHUETAS DOS OPONENTES SENTADOS ATRÁS DA MESA (Z negativo: o tampo de madeira da mesa oclui o corpo) */}
+          {/* CAMADA 0: SILHUETAS DOS OPONENTES SENTADOS ATRÁS DA MESA */}
           {players.map((p, i) => {
             if (p.id === me?.id) return null;
             const { angle } = seatPosition(i, localIndex, players.length);
             const sinA = Math.sin(angle);
             const cosA = Math.cos(angle);
-            // Raio polar ao redor do perímetro externo do octógono da mesa
-            // Raios ampliados horizontalmente para espaçar melhor as presenças ao redor da mesa
             const radX = sinA < -0.3 ? 53 : 56;
             const radY = sinA < -0.3 ? 47 : 44;
             const silX = 50 + radX * cosA;
             const silY = 50 + radY * sinA;
-            // Ancoragem precisa: cabeça, olhos e barra de vida erguem-se acima da mesa,
-            // enquanto o tronco/manto fica atrás da borda de madeira da mesa
             const anchorY = sinA < -0.7 ? -70 : sinA < -0.3 ? -72 : -74;
             const targetable = isTargetable(p);
             const dimmed = canAct && !!selectedCard && !targetable;
@@ -346,6 +489,7 @@ export default function GameTable3DView({
                   dimmed={dimmed}
                   onSeatClick={onSeatClick}
                   onDropCard={onDropCard}
+                  onInspectCard={setInspectedCard}
                   allPlayers={players}
                 />
               </div>
@@ -397,39 +541,18 @@ export default function GameTable3DView({
             <TargetArrowsSVG players={players} localIndex={localIndex} />
           </div>
 
-          {/* SLOTS DE CARTAS NA MESA E ASSENTO DO JOGADOR LOCAL */}
+          {/* SLOTS DE CARTAS NA MESA PARA TODOS OS JOGADORES */}
           {players.map((p, i) => {
-            const isMe = p.id === me?.id;
             const { angle } = seatPosition(i, localIndex, players.length);
             const slotX = 50 + 22 * Math.cos(angle);
             const slotY = 50 + 20 * Math.sin(angle);
-            const targetable = isTargetable(p);
-            const dimmed = canAct && !!selectedCard && !targetable;
-
-            if (isMe) {
-              return (
-                <PlayerSeat
-                  key={p.id}
-                  player={p}
-                  index={i}
-                  localIndex={localIndex}
-                  totalPlayers={players.length}
-                  isMe={true}
-                  phase={phase}
-                  targetable={targetable}
-                  dimmed={dimmed}
-                  onSeatClick={onSeatClick}
-                  onDropCard={onDropCard}
-                  allPlayers={players}
-                />
-              );
-            }
 
             return (
               <CardSlot
                 key={`slot-${p.id}`}
                 player={p}
                 phase={phase}
+                onInspectCard={setInspectedCard}
                 slotStyle={{
                   left: `${slotX}%`,
                   top: `${slotY}%`,
@@ -439,7 +562,7 @@ export default function GameTable3DView({
             );
           })}
 
-          {/* Centro da mesa 3D: Relógio + Controles discretos de Análise */}
+          {/* Centro da mesa 3D: Relógio + Controles de Análise */}
           <div
             className="absolute left-1/2 top-1/2 z-30 flex flex-col items-center gap-1.5"
             style={{
@@ -464,61 +587,48 @@ export default function GameTable3DView({
               >
                 <button
                   id="btn-pause"
+                  type="button"
                   onClick={onTogglePause}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/75 border border-gold-aged/40 text-amber-200/90 text-[10px] font-mono hover:border-gold-aged hover:text-white active:scale-95 transition-all"
+                  className="flex items-center gap-1 px-3 py-1 rounded-full bg-black/80 border border-gold-aged/60 text-amber-200 text-xs font-mono hover:border-gold-aged hover:text-white active:scale-95 transition-all cursor-pointer"
                 >
-                  <Pause size={10} /> {gameState.isPaused ? 'Continuar' : 'Pausar'}
+                  <Pause size={12} /> {gameState.isPaused ? 'Continuar' : 'Pausar'}
                 </button>
                 <button
                   id="btn-skip"
+                  type="button"
                   onClick={onSkipAnalysis}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/75 border border-red-500/40 text-red-200/90 text-[10px] font-mono hover:border-red-400 hover:text-white active:scale-95 transition-all"
+                  className="flex items-center gap-1 px-3 py-1 rounded-full bg-black/80 border border-red-500/60 text-red-200 text-xs font-mono hover:border-red-400 hover:text-white active:scale-95 transition-all cursor-pointer"
                 >
-                  <SkipForward size={10} /> Próximo
+                  <SkipForward size={12} /> Próximo
                 </button>
               </motion.div>
             )}
           </div>
-
-          {/* Sussurro de parede sutil */}
-          {walled && canAct && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: [0.95, 0.55, 0.95] }}
-              transition={{ duration: 1.6, repeat: Infinity }}
-              style={{
-                transform: 'translate(-50%, 0) translateZ(36px)',
-                textShadow: '0 2px 10px rgba(0,0,0,0.98)',
-              }}
-              className="pointer-events-none absolute left-1/2 bottom-[7%] z-50 inline-flex items-center gap-1.5 text-sky-300/95 text-[10.5px] sm:text-xs font-grimoire font-bold tracking-widest uppercase text-center whitespace-nowrap"
-            >
-              <GameIcon name="iron-lock" size={13} />
-              <span>Emparedado · Aja em si mesmo, use Pacto de Sangue ou Passe a vez</span>
-            </motion.div>
-          )}
         </motion.div>
       </main>
 
-      {/* 4. MÃO DE CARTAS EM PRIMEIRA PESSOA (100% estável durante a inspeção e uso das cartas; separada do gatilho do chat) */}
+      {/* 4. CONJUNTO INTEGRADO DA HUD INFERIOR:
+           - CAMADA SUPERIOR: CARTAS EM LEQUE ACIMA DO RETRATO E DOS CONTROLES
+           - CAMADA INFERIOR: [BOTÃO ESQUERDO] — (RETRATO DINÂMICO CENTRAL) — [BOTÃO DIREITO] */}
       <motion.footer
         data-hand-zone="true"
         onMouseEnter={() => setOverHandOrControls(true)}
         onMouseLeave={() => setOverHandOrControls(false)}
         animate={{
-          y: cameraZone === CAMERA_ZONES.NOTEBOOK ? 240 : 0,
+          y: cameraZone === CAMERA_ZONES.NOTEBOOK ? 320 : 0,
           opacity: cameraZone === CAMERA_ZONES.NOTEBOOK ? 0 : 1,
         }}
         transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          'relative z-[45] h-[214px] sm:h-[262px] flex items-end justify-center pb-7 sm:pb-8 px-2 shrink-0',
+          'relative z-[50] w-full flex flex-col items-center justify-end pb-5 sm:pb-6 px-2 shrink-0',
           cameraZone === CAMERA_ZONES.NOTEBOOK && 'pointer-events-none'
         )}
       >
+        {/* 4A. CAMADA SUPERIOR: CARTAS NA MÃO POSICIONADAS EM ARCO ACIMA DO RETRATO E DOS BOTÕES */}
         {me && me.isAlive ? (
           <div
-            ref={handRef}
             data-hand-zone="true"
-            className="relative flex items-end justify-center max-w-full pb-1"
+            className="relative z-30 flex items-end justify-center max-w-full -mb-5 sm:-mb-7 px-2"
           >
             <AnimatePresence>
               {me.hand.map((card, i) => {
@@ -526,40 +636,32 @@ export default function GameTable3DView({
                 const mid = (total - 1) / 2;
                 const offset = i - mid;
                 const isSel = selectedCardIds.includes(card.id);
-                const fanRotate = offset * (compact ? 5.5 : 7.5);
-                const fanY = Math.abs(offset) * (compact ? 6 : 10);
+                const isHovered = hoveredCardId === card.id;
+
+                // Arco fiel à referência: carta central reta no topo do círculo, laterais inclinadas acompanhando o retrato
+                const fanRotate = offset * (compact ? 9 : 13);
+                const fanY = Math.abs(offset) * (compact ? 10 : 16);
 
                 return (
                   <motion.div
                     key={card.id}
                     data-hand-zone="true"
-                    onMouseEnter={() => setHoveredCard(card)}
-                    onMouseLeave={() => setHoveredCard(null)}
-                    initial={{ y: 160, opacity: 0, rotate: -14, scale: 0.8 }}
+                    onMouseEnter={() => setHoveredCardId(card.id)}
+                    onMouseLeave={() => setHoveredCardId(null)}
+                    initial={{ y: 140, opacity: 0, rotate: -12, scale: 0.85 }}
                     animate={{
-                      y: isSel ? -28 : fanY,
-                      rotate: isSel ? 0 : fanRotate,
-                      scale: isSel ? 1.12 : 1,
+                      y: isSel ? -24 : isHovered ? -18 : fanY,
+                      rotate: isSel || isHovered ? 0 : fanRotate,
+                      scale: isSel ? 1.07 : isHovered ? 1.04 : 1,
                       opacity: 1,
-                      zIndex: isSel ? 50 : 10 + i,
+                      zIndex: isSel ? 65 : isHovered ? 60 : 20 + i,
                     }}
-                    whileHover={
-                      canAct
-                        ? {
-                            y: -30,
-                            rotate: 0,
-                            scale: 1.14,
-                            zIndex: 60,
-                            transition: { type: 'spring', stiffness: 320, damping: 22 },
-                          }
-                        : undefined
-                    }
-                    exit={{ y: -70, opacity: 0, scale: 0.7 }}
-                    transition={{ type: 'spring', stiffness: 190, damping: 20 }}
+                    exit={{ y: -60, opacity: 0, scale: 0.75 }}
+                    transition={{ type: 'spring', stiffness: 210, damping: 21 }}
                     className={cn(
                       'transition-shadow duration-200 card-fan-item',
-                      i > 0 && (compact ? '-ml-3' : '-ml-4'),
-                      isSel && 'drop-shadow-[0_0_25px_rgba(212,175,55,0.75)]'
+                      i > 0 && (compact ? '-ml-5' : '-ml-3.5'),
+                      isSel && 'drop-shadow-[0_0_28px_rgba(212,175,55,0.85)]'
                     )}
                     style={{ transformOrigin: 'bottom center' }}
                   >
@@ -567,6 +669,7 @@ export default function GameTable3DView({
                       card={card}
                       isSelected={isSel}
                       onClick={onCardClick}
+                      onInspect={setInspectedCard}
                       onDragStart={onCardDragStart}
                       onDragEnd={() => (dragCardRef.current = null)}
                       disabled={!canAct}
@@ -578,203 +681,141 @@ export default function GameTable3DView({
             </AnimatePresence>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-1.5 pb-5 text-center px-3 z-40 max-w-md mx-auto">
-            <div
-              className="flex items-center gap-2 font-grimoire text-purple-300/90 tracking-[0.2em] text-xs sm:text-sm uppercase"
-              style={{ textShadow: '0 2px 10px rgba(0,0,0,0.95)' }}
-            >
-              <Ghost size={15} className="text-purple-400/80 animate-pulse shrink-0" />
-              <span>Espírito Espectador</span>
+          <div className="mb-2 flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/75 border border-purple-500/50 font-grimoire text-purple-200 tracking-[0.18em] text-xs sm:text-sm uppercase shadow-lg">
+            <Ghost size={16} className="text-purple-300 animate-pulse shrink-0" />
+            <span>Espírito Espectador · Acompanhe o destino da mesa</span>
+          </div>
+        )}
+
+        {/* 4B. CAMADA INFERIOR: BARRA HERO-SHOOTER [BOTÃO ESQUERDO] — (RETRATO DINÂMICO) — [BOTÃO DIREITO] */}
+        {me && (
+          <div
+            id="turn-actions-cluster"
+            data-hand-zone="true"
+            className="relative z-40 w-full max-w-[960px] flex items-center justify-center px-1 sm:px-4"
+          >
+            {/* ASA ESQUERDA (BTN 1: Primeira Ação de Combate — Usar em Si Mesmo / Auto-Alvo) */}
+            <div className="flex-1 flex items-center justify-end -mr-4 sm:-mr-6 pr-6 sm:pr-9 py-1.5 pl-1.5 rounded-l-2xl bg-gradient-to-r from-[#1c1009]/95 via-[#28170d]/95 to-[#160c07]/95 border-y-2 border-l-2 border-gold-aged/65 shadow-[0_14px_38px_rgba(0,0,0,0.95)]">
+              <button
+                id="btn-self-target"
+                type="button"
+                disabled={!canAct}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSelfTargetTrigger();
+                }}
+                className={cn(
+                  HERO_WING_BTN,
+                  'w-full cursor-pointer',
+                  !canAct
+                    ? 'border-stone-700/80 bg-stone-950/90 text-stone-400 cursor-default opacity-80'
+                    : canSelfTarget && selectedCard
+                      ? selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA
+                        ? 'border-teal-300 bg-gradient-to-b from-teal-800 to-teal-950 text-teal-50 hover:from-teal-700 hover:to-teal-900 shadow-[0_0_24px_rgba(45,212,191,0.5)] active:scale-[0.98]'
+                        : selectedCard.type === CARD_TYPES.PACTO_SANGUE
+                          ? (me.bloodPactWith || []).length > 0
+                            ? 'border-amber-300 bg-gradient-to-b from-amber-800 to-amber-950 text-amber-50 hover:from-amber-700 hover:to-amber-900 shadow-[0_0_24px_rgba(251,191,36,0.5)] active:scale-[0.98]'
+                            : 'border-rose-400 bg-gradient-to-b from-rose-800 to-rose-950 text-rose-50 hover:from-rose-700 hover:to-rose-900 shadow-[0_0_24px_rgba(244,63,94,0.5)] active:scale-[0.98]'
+                          : selectedCard.type === CARD_TYPES.SERINGA
+                            ? 'border-emerald-300 bg-gradient-to-b from-emerald-800 to-emerald-950 text-emerald-50 hover:from-emerald-700 hover:to-emerald-900 shadow-[0_0_24px_rgba(52,211,153,0.5)] active:scale-[0.98]'
+                            : 'border-gold-aged bg-gradient-to-b from-[#542c16] to-[#2e170b] text-amber-50 hover:from-[#69371c] hover:to-[#3d1f0f] shadow-[0_0_24px_rgba(212,175,55,0.5)] active:scale-[0.98]'
+                      : 'border-stone-600/90 bg-gradient-to-b from-[#2b190f] to-[#170d07] text-amber-100/90 hover:border-gold-aged/85 hover:from-[#382013] hover:to-[#21120a] active:scale-[0.98]'
+                )}
+              >
+                {renderLeftActionContent()}
+              </button>
+            </div>
+
+            {/* CÍRCULO CENTRAL: RETRATO DINÂMICO DO JOGADOR (Tensão Reativa à Gameplay) */}
+            <DynamicPlayerPortrait
+              me={me}
+              players={players}
+              localIndex={localIndex}
+              phase={phase}
+              selectedCard={selectedCard}
+              socket={socket}
+              canSelfTarget={canSelfTarget}
+              onSelfTargetClick={handleSelfTargetTrigger}
+              onDropCardOnSelf={onDropCard}
+            />
+
+            {/* ASA DIREITA (BTN 2: Segunda Ação de Combate — Descartar & Passar a Vez) */}
+            <div className="flex-1 flex items-center justify-start gap-2 -ml-4 sm:-ml-6 pl-6 sm:pl-9 py-1.5 pr-1.5 rounded-r-2xl bg-gradient-to-l from-[#1c1009]/95 via-[#28170d]/95 to-[#160c07]/95 border-y-2 border-r-2 border-gold-aged/65 shadow-[0_14px_38px_rgba(0,0,0,0.95)]">
+              {/* Botão Descartar (sempre acessível quando discardLimit > 0) */}
+              {discardLimit > 0 && (
+                <button
+                  id="btn-discard"
+                  type="button"
+                  disabled={!canAct}
+                  onClick={handleDiscardTrigger}
+                  title="Descartar cartas selecionadas da mão"
+                  className={cn(
+                    HERO_WING_BTN,
+                    'flex-1 cursor-pointer',
+                    !canAct
+                      ? 'border-stone-700/80 bg-stone-950/90 text-stone-400 cursor-default opacity-80'
+                      : selectedCardIds.length > 0
+                        ? 'border-amber-300 bg-gradient-to-b from-amber-800 to-amber-950 text-amber-50 hover:from-amber-700 hover:to-amber-900 shadow-[0_0_24px_rgba(245,158,11,0.55)] active:scale-[0.98]'
+                        : 'border-stone-600/90 bg-gradient-to-b from-[#2b190f] to-[#170d07] text-amber-100/85 hover:border-amber-400/80 hover:text-amber-50 active:scale-[0.98]'
+                  )}
+                >
+                  <div className="flex items-center gap-1.5 text-xs sm:text-base">
+                    <Trash2
+                      size={17}
+                      className={
+                        selectedCardIds.length > 0 ? 'text-amber-300 shrink-0' : 'text-stone-400 shrink-0'
+                      }
+                    />
+                    <span>
+                      Descartar{selectedCardIds.length > 0 ? ` (${selectedCardIds.length})` : ''}
+                    </span>
+                  </div>
+                  <span className="font-mono text-[10px] sm:text-[11px] font-normal text-amber-200/85 normal-case tracking-normal">
+                    {selectedCardIds.length > 0
+                      ? `Trocar ${selectedCardIds.length} selecionada(s)`
+                      : `Até ${discardLimit} carta(s)`}
+                  </span>
+                </button>
+              )}
+
+              {/* Botão Passar a Vez */}
+              <button
+                id="btn-pass"
+                type="button"
+                disabled={!canAct}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (canAct) handlePassTurn();
+                }}
+                title="Passar a vez sem jogar carta"
+                className={cn(
+                  HERO_WING_BTN,
+                  'flex-1 cursor-pointer',
+                  !canAct
+                    ? 'border-stone-700/80 bg-stone-950/90 text-stone-400 cursor-default opacity-80'
+                    : 'border-gold-aged bg-gradient-to-b from-[#462614] to-[#241309] text-amber-50 hover:from-[#5c321a] hover:to-[#331b0d] hover:border-amber-300 shadow-[0_0_20px_rgba(212,175,55,0.35)] active:scale-[0.98]'
+                )}
+              >
+                <div className="flex items-center gap-1.5 text-xs sm:text-base">
+                  <Hand size={17} className="text-gold-aged shrink-0" />
+                  <span>Passar a Vez</span>
+                </div>
+                <span className="font-mono text-[10px] sm:text-[11px] font-normal text-parchment/85 normal-case tracking-normal">
+                  Manter mão atual
+                </span>
+              </button>
             </div>
           </div>
         )}
       </motion.footer>
 
-      {/* DOCK DA MÃO (portal no body → fica ACIMA da vinheta/grão que escurecia os botões).
-          Descrição da carta à esquerda do deck e botões de ação à direita; em telas estreitas
-          ambos empilham logo acima da mão. */}
-      {me &&
-        me.isAlive &&
-        cameraZone !== CAMERA_ZONES.NOTEBOOK &&
-        typeof document !== 'undefined' &&
-        createPortal(
-          <>
-            <AnimatePresence>
-              {infoMeta && (
-                <motion.div
-                  key="card-info-panel"
-                  id="card-info-panel"
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 8 }}
-                  transition={{ duration: 0.15 }}
-                  style={
-                    dock.side
-                      ? {
-                          right: dock.right,
-                          bottom: dock.bottom,
-                          width: Math.min(340, dock.leftRoom - 36),
-                        }
-                      : {
-                          left: '50%',
-                          x: '-50%',
-                          bottom: dock.top + 64 + (canAct ? 62 : 0),
-                          width: 'min(440px, 94vw)',
-                        }
-                  }
-                  className="pointer-events-none fixed z-[200] rounded-lg border-2 border-gold-aged/80 bg-[#0d0704] px-4 py-3 shadow-[0_12px_40px_rgba(0,0,0,0.95)]"
-                >
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="font-grimoire font-extrabold text-sm sm:text-base tracking-wider text-amber-100 uppercase">
-                      {infoMeta.name}
-                    </span>
-                    {infoCategory && (
-                      <span
-                        className={cn(
-                          'shrink-0 rounded border px-1.5 py-0.5 font-typewriter font-extrabold text-[10px] sm:text-xs uppercase',
-                          infoCategory.badgeCls
-                        )}
-                      >
-                        P{infoMeta.priority} · {infoMeta.categoryLabel}
-                      </span>
-                    )}
-                  </div>
-                  <p className="font-typewriter text-[12.5px] sm:text-sm leading-snug text-parchment">
-                    {infoMeta.description.replace(/^Prioridade \d \([^)]*\):\s*/, '')}
-                  </p>
-                  <p className="mt-1.5 font-typewriter font-bold text-[11px] sm:text-xs uppercase tracking-wide text-gold-aged">
-                    {infoMeta.foot}
-                  </p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-
-            {/* CONTROLES DE AÇÃO DO TURNO (Usar em Mim / Descartar / Passar a Vez) */}
-            {canAct && (
-              <div
-                id="turn-actions-cluster"
-                data-hand-zone="true"
-                onMouseEnter={() => setOverHandOrControls(true)}
-                onMouseLeave={() => setOverHandOrControls(false)}
-                style={
-                  dock.side
-                    ? { left: dock.left, bottom: dock.bottom }
-                    : { left: '50%', transform: 'translateX(-50%)', bottom: dock.top + 64 }
-                }
-                className={cn(
-                  'fixed z-[200] flex gap-2.5 pointer-events-auto',
-                  dock.side
-                    ? 'flex-col items-stretch w-[220px]'
-                    : 'flex-row flex-wrap items-center justify-center w-[96vw] max-w-[640px]'
-                )}
-              >
-                <AnimatePresence>
-                  {canSelfTarget && (
-                    <motion.button
-                      key="self-target"
-                      type="button"
-                      initial={{ y: 10, opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: 10, opacity: 0 }}
-                      id="btn-self-target"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        sendAction(selectedCard.id, me.id);
-                        setSelectedCardIds([]);
-                      }}
-                      className={cn(
-                        ACTION_BTN,
-                        selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA
-                          ? 'border-teal-300 bg-teal-900 text-teal-50 hover:bg-teal-800'
-                          : selectedCard.type === CARD_TYPES.PACTO_SANGUE
-                            ? (me.bloodPactWith || []).length > 0
-                              ? 'border-amber-300 bg-amber-900 text-amber-50 hover:bg-amber-800'
-                              : 'border-rose-400 bg-rose-900 text-rose-50 hover:bg-rose-800'
-                            : selectedCard.type === CARD_TYPES.SERINGA
-                              ? 'border-emerald-300 bg-emerald-900 text-emerald-50 hover:bg-emerald-800'
-                              : 'border-gold-aged bg-[#3a2212] text-amber-50 hover:bg-[#4d2e18]'
-                      )}
-                    >
-                      {selectedCard.type === CARD_TYPES.MANIPULAMENTO_ALMA ? (
-                        <>
-                          <Flame size={16} className="text-teal-200" /> +1 Dano na Faca
-                        </>
-                      ) : selectedCard.type === CARD_TYPES.PACTO_SANGUE ? (
-                        (me.bloodPactWith || []).length > 0 ? (
-                          <>
-                            <GameIcon name="broken-chain" size={16} /> Quebrar Meu Pacto
-                          </>
-                        ) : (
-                          <>
-                            <GameIcon name="blood-drop" size={16} /> Pacto em Mim (-1 Vida)
-                          </>
-                        )
-                      ) : selectedCard.type === CARD_TYPES.SERINGA ? (
-                        <>
-                          <GameIcon name="syringe-vial" size={16} /> Usar em Mim (
-                          {selectedCard.charges || 0}/4
-                          {(selectedCard.charges || 0) > me.maxLives - me.lives
-                            ? ' · Overdose'
-                            : ''}
-                          )
-                        </>
-                      ) : (
-                        <>
-                          <Crosshair size={16} className="text-amber-300" /> Usar em Mim
-                        </>
-                      )}
-                    </motion.button>
-                  )}
-                </AnimatePresence>
-
-                {discardLimit > 0 && selectedCardIds.length > 0 && (
-                  <button
-                    id="btn-discard"
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDiscard();
-                    }}
-                    className={cn(
-                      ACTION_BTN,
-                      'border-amber-300 bg-amber-900 text-amber-50 hover:bg-amber-800'
-                    )}
-                  >
-                    <Trash2 size={16} className="text-amber-300" /> Descartar (
-                    {selectedCardIds.length})
-                  </button>
-                )}
-
-                <button
-                  id="btn-pass"
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handlePassTurn();
-                  }}
-                  title="Passar a vez sem jogar carta"
-                  className={cn(
-                    ACTION_BTN,
-                    discardLimit > 0 && selectedCardIds.length > 0
-                      ? 'border-stone-300 bg-stone-900 text-parchment hover:border-gold-aged hover:text-white'
-                      : 'border-gold-aged bg-[#3a2212] text-amber-50 hover:bg-[#4d2e18]'
-                  )}
-                >
-                  <Hand size={16} className="text-gold-aged" /> Passar a Vez
-                </button>
-              </div>
-            )}
-          </>,
-          document.body
-        )}
-
-      {/* 6. ZONA INTENCIONAL NO EXTREMO INFERIOR DA TELA PARA ACESSAR O CHAT & GRIMÓRIO */}
+      {/* 5. ZONA INTENCIONAL NO EXTREMO INFERIOR DA TELA PARA ACESSAR O CHAT & GRIMÓRIO */}
       {cameraZone !== CAMERA_ZONES.NOTEBOOK && (
         <div
           id="under-table-trigger"
           onMouseEnter={handleBottomEdgeEnter}
           onMouseLeave={handleBottomEdgeLeave}
-          className="fixed inset-x-0 bottom-0 z-[55] h-[16px] flex items-center justify-center bg-gradient-to-t from-black/90 to-transparent"
+          className="fixed inset-x-0 bottom-0 z-[55] h-[20px] flex items-center justify-center bg-gradient-to-t from-black/95 to-transparent"
         >
           <button
             id="btn-scroll-under-table"
@@ -783,16 +824,16 @@ export default function GameTable3DView({
               audio.play('select');
               selectZone(CAMERA_ZONES.NOTEBOOK);
             }}
-            className="flex items-center gap-1.5 text-[9.5px] font-mono tracking-widest uppercase text-parchment/45 hover:text-amber-200 px-3 py-0.5 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-[10.5px] font-mono font-bold tracking-widest uppercase text-parchment/70 hover:text-amber-200 px-3 py-0.5 transition-colors cursor-pointer"
           >
-            <ChevronDown size={11} className="text-gold-aged/70" />
-            <span>Grimório & Caderno ({logs.length})</span>
-            <ChevronDown size={11} className="text-gold-aged/70" />
+            <ChevronDown size={12} className="text-gold-aged" />
+            <span>Grimório de Cartas & Caderno ({logs.length})</span>
+            <ChevronDown size={12} className="text-gold-aged" />
           </button>
         </div>
       )}
 
-      {/* 7. GAVETA SOB A MESA: LIVRO DE CARTAS & CADERNO DE CHAT */}
+      {/* 6. GAVETA SOB A MESA: LIVRO DE CARTAS & CADERNO DE CHAT */}
       <AnimatePresence>
         {cameraZone === CAMERA_ZONES.NOTEBOOK && (
           <motion.div
@@ -801,15 +842,15 @@ export default function GameTable3DView({
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
             transition={{ type: 'spring', stiffness: 190, damping: 25 }}
-            className="fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center justify-end bg-gradient-to-t from-black/95 via-black/85 to-transparent pt-6 pb-2 px-2 max-h-[86dvh] overflow-y-auto"
+            className="fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center justify-end bg-gradient-to-t from-black/95 via-black/90 to-transparent pt-6 pb-2 px-2 max-h-[90dvh] overflow-y-auto"
           >
             <button
               id="btn-return-to-table"
               type="button"
               onClick={() => selectZone(CAMERA_ZONES.CARDS)}
-              className="mb-2 px-4 py-1 rounded-full bg-black/75 border border-gold-aged/40 flex items-center justify-center gap-1.5 text-[10px] font-mono tracking-widest uppercase text-amber-200/85 hover:text-white hover:border-gold-aged cursor-pointer transition-all"
+              className="mb-2 px-5 py-1.5 rounded-full bg-black/85 border-2 border-gold-aged/65 flex items-center justify-center gap-2 text-xs font-mono font-bold tracking-widest uppercase text-amber-200 hover:text-white hover:border-gold-aged cursor-pointer transition-all shadow-lg"
             >
-              <ChevronUp size={13} className="text-gold-aged" />
+              <ChevronUp size={15} className="text-gold-aged" />
               <span>Voltar à Mesa</span>
             </button>
 
@@ -825,6 +866,13 @@ export default function GameTable3DView({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 7. MODAL DE INSPEÇÃO AMPLIADA DE CARTA DURANTE A GAMEPLAY */}
+      <CardInspectModal
+        card={inspectedCard}
+        onClose={() => setInspectedCard(null)}
+        allowBrowseAll={false}
+      />
     </div>
   );
 }

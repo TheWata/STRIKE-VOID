@@ -359,6 +359,7 @@ export default function PlayerSilhouette3D({
   dimmed,
   onSeatClick,
   onDropCard,
+  onInspectCard,
   allPlayers = [],
 }) {
   const [over, setOver] = useState(false);
@@ -415,17 +416,24 @@ export default function PlayerSilhouette3D({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 6, scale: 0.85 }}
             style={{ transform: 'translateZ(36px)' }}
-            className="mb-1.5 flex items-center justify-center -space-x-1.5 z-50 pointer-events-none"
+            className="mb-1.5 flex items-center justify-center -space-x-1.5 z-50 pointer-events-auto"
           >
             {player.revealedHand.length > 0 ? (
               player.revealedHand.map((c, idx) => (
                 <div
                   key={c.id || idx}
+                  onClick={(e) => {
+                    if (onInspectCard) {
+                      e.stopPropagation();
+                      onInspectCard(c);
+                    }
+                  }}
+                  title="Clique para inspecionar carta revelada"
                   style={{
                     transform: `rotate(${(idx - (player.revealedHand.length - 1) / 2) * 6}deg)`,
                   }}
                 >
-                  <InscryptionCard card={c} mini />
+                  <InscryptionCard card={c} mini onInspect={onInspectCard} />
                 </div>
               ))
             ) : (

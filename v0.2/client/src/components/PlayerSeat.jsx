@@ -56,9 +56,10 @@ function ReflectOverlay() {
   );
 }
 
-export function CardSlot({ player, phase, slotStyle }) {
+export function CardSlot({ player, phase, slotStyle, onInspectCard }) {
   const action = player.selectedAction;
   let content = null;
+  let canInspectSlot = false;
 
   if (phase === 'PLANNING') {
     if (player.lockedIn) content = <InscryptionCard faceDown small />;
@@ -70,8 +71,8 @@ export function CardSlot({ player, phase, slotStyle }) {
         <motion.div
           key="none"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.7 }}
-          className="px-2 py-1 text-[9px] text-parchment/60 text-center font-mono tracking-widest uppercase"
+          animate={{ opacity: 0.85 }}
+          className="px-2 py-1 text-[10px] text-parchment/75 text-center font-mono font-bold tracking-widest uppercase"
           style={{ textShadow: '0 2px 6px rgba(0,0,0,0.95)' }}
         >
           Passou
@@ -82,14 +83,16 @@ export function CardSlot({ player, phase, slotStyle }) {
         <motion.div
           key="discard"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.8 }}
-          className="px-2 py-1 text-[9px] text-amber-300/75 text-center font-mono tracking-wider uppercase"
+          animate={{ opacity: 0.9 }}
+          className="px-2 py-1 text-[10px] text-amber-300/85 text-center font-mono font-bold tracking-wider uppercase"
           style={{ textShadow: '0 2px 6px rgba(0,0,0,0.95)' }}
         >
           Descartou {action.discardedCount || 1}
         </motion.div>
       );
     } else if (action.cardType) {
+      canInspectSlot = Boolean(onInspectCard);
+      const slotCard = { type: action.cardType, charges: action.cardCharges ?? 0 };
       content = (
         <motion.div
           key={'face-' + action.cardType}
@@ -99,8 +102,9 @@ export function CardSlot({ player, phase, slotStyle }) {
           style={{ transformStyle: 'preserve-3d', backfaceVisibility: 'hidden' }}
         >
           <InscryptionCard
-            card={{ type: action.cardType, charges: action.cardCharges ?? 0 }}
+            card={slotCard}
             small
+            onInspect={onInspectCard}
           />
         </motion.div>
       );
@@ -108,7 +112,13 @@ export function CardSlot({ player, phase, slotStyle }) {
   }
 
   return (
-    <div className="absolute z-[20] pointer-events-none" style={slotStyle}>
+    <div
+      className={cn(
+        'absolute z-[20]',
+        canInspectSlot ? 'pointer-events-auto cursor-pointer' : 'pointer-events-none'
+      )}
+      style={slotStyle}
+    >
       <div style={{ perspective: 600 }}>{content}</div>
     </div>
   );

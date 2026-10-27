@@ -1,8 +1,17 @@
 import React, { useState } from 'react';
-import { BookOpen, Sparkles, Shield, Crosshair, Flame, Layers } from 'lucide-react';
+import {
+  BookOpen,
+  Sparkles,
+  Shield,
+  Crosshair,
+  Flame,
+  Layers,
+  ZoomIn,
+} from 'lucide-react';
 import { cn } from '../lib/cn';
 import { audio } from '../lib/audio';
 import InscryptionCard from './InscryptionCard';
+import CardInspectModal from './CardInspectModal';
 import GameIcon from './GameIcon';
 import { CARD_TYPES, CARD_META, CARD_CATEGORIES } from '../models/cardModel';
 
@@ -13,108 +22,108 @@ import { CARD_TYPES, CARD_META, CARD_CATEGORIES } from '../models/cardModel';
 export const GRIMOIRE_CARDS = [
   {
     type: CARD_TYPES.REVERSO,
-    shortEffect: 'Reflete ataques e maldições. No vazio: -1 Vida.',
+    shortEffect: 'Reflete ataques e maldições de volta aos agressores. No vazio: -1 Vida.',
     targetLabel: 'Você ou Outro Jogador',
     wallRule: 'Respeita Parede (em si mesmo se emparedado)',
     bullets: [
       'Prioridade 1 (Reação): Resolve antes de todas as outras cartas da mesa.',
-      'Reflete ataques e maldições de volta para quem mirou no alvo protegido (Faca, Marca da Morte, Desarmar, Seringa, etc.).',
-      'Se refletir um Pacto de Sangue, o autor do pacto toma 1 de Dano imediato!',
+      'Reflete ataques e maldições de volta para quem mirou no alvo protegido (Faca, Marca da Morte, Desarmar, Seringa, Revelar, etc.).',
+      'Se refletir um Pacto de Sangue, o autor do pacto sofre 1 de Dano imediato!',
       'Lei do Vácuo: Se ninguém interagir com o alvo protegido na rodada, quem usou o Espelho Amaldiçoado perde 1 Vida!',
     ],
   },
   {
     type: CARD_TYPES.PAREDE,
-    shortEffect: 'Bloqueia 1 facada e prende a mira do alvo.',
+    shortEffect: 'Ergue grades de ferro que bloqueiam 1 facada, mas prendem a mira do alvo.',
     targetLabel: 'Você ou Outro Jogador',
     wallRule: 'Cria o estado Emparedado',
     bullets: [
       'Prioridade 2 (Defensivo): Ergue grades de ferro ao redor do alvo antes de Suportes, Controles e Facas.',
-      'Absorve 1 golpe de Faca e se estilhaça.',
+      'Absorve 1 golpe de Faca e se estilhaça ao bloquear.',
       'Enquanto estiver EMPAREDADO, o jogador só pode mirar em si mesmo (exceto com Pacto de Sangue, que ignora paredes).',
     ],
   },
   {
     type: CARD_TYPES.SERINGA,
-    shortEffect: 'Enche +1/turno (máx 4). Cura ou causa Overdose!',
+    shortEffect: 'Ganha +1 carga por turno na mão (máx 4). Cura ou aplica Overdose!',
     targetLabel: 'Você ou Outro Jogador',
     wallRule: 'Respeita Parede',
     bullets: [
-      'Prioridade 3 (Suporte): Começa vazia (0/4 cargas) ao ser comprada e não faz nada se usada com 0 cargas.',
-      'Cada turno que passa na sua mão enche +1 carga (máximo de 4 cargas). Cada carga cura +1 de Vida.',
-      'OVERDOSE: A cura deve ser exatamente a necessária para a vida cheia. Se aplicar cargas além da vida máxima, cura tudo e aplica MARCA DA MORTE com (5 − excesso) turnos!',
-      'Exemplo prático: Com 2/3 de Vida (falta 1), aplica Seringa cheia (4 cargas) → cura para 3/3 e o excesso (3) reduz a Marca da Morte para 5 − 3 = 2 turnos sem tomar dano para morrer!',
+      'Prioridade 3 (Suporte): Começa vazia (0/4 cargas) ao ser comprada e não surte efeito se usada com 0 cargas.',
+      'Cada turno que permanece na sua mão adiciona +1 carga (máximo de 4 cargas). Cada carga cura +1 de Vida.',
+      'OVERDOSE: Se aplicar cargas além da vida máxima do alvo, restaura a vida ao máximo e aplica MARCA DA MORTE com (5 − excesso) turnos!',
+      'Exemplo prático: Com 2/3 de Vida (falta 1), usar Seringa cheia (4 cargas) → cura para 3/3 e o excesso (3) reduz a Marca da Morte para 5 − 3 = 2 turnos!',
     ],
   },
   {
     type: CARD_TYPES.MANIPULAMENTO_ALMA,
-    shortEffect: 'Troca barra de vida c/ outro ou +1 Dano na Faca.',
-    targetLabel: 'Outro (Troca Vida) ou Você (+1 Faca)',
+    shortEffect: 'Troca sua barra de vida com outro jogador ou concede +1 Dano permanente à sua Faca.',
+    targetLabel: 'Outro Jogador (Troca Vida) ou Você (+1 Faca)',
     wallRule: 'Respeita Parede',
     bullets: [
-      'Prioridade 3 (Suporte): Resolve junto aos suportes, antes dos Controles e das Facas.',
-      'Usado em OUTRO jogador: Troca a sua barra de vida atual pela barra de vida dele!',
-      'Usado em SI MESMO: Fortalece sua alma e aumenta permanentemente o dano da sua própria Faca em +1!',
+      'Prioridade 3 (Suporte): Resolve na fase de suporte, antes dos Controles (P4) e das Facas (P5).',
+      'Usado em OUTRO jogador: Troca a sua barra de vida atual pela barra de vida dele imediatamente!',
+      'Usado em SI MESMO: Fortalece sua alma e aumenta permanentemente o dano da sua própria Faca em +1 pelo resto da partida!',
     ],
   },
   {
     type: CARD_TYPES.REVELAR,
-    shortEffect: 'Expõe todas as cartas da mão do alvo p/ a mesa.',
+    shortEffect: 'Expõe todas as cartas da mão do oponente selecionado para toda a mesa.',
     targetLabel: 'Apenas Outro Jogador',
     wallRule: 'Bloqueada se você estiver Emparedado',
     bullets: [
-      'Prioridade 3 (Suporte): Utiliza o Olho Abissal para devassar o jogo oculto de um oponente.',
-      'Revela todas as cartas da mão da pessoa selecionada para TODA A MESA!',
-      'As cartas reveladas ficam flutuando acima da silhueta 3D do alvo e registradas no Caderno.',
+      'Prioridade 3 (Suporte): Invoca o Olho Abissal para devassar o jogo oculto de um adversário.',
+      'Revela todas as cartas da mão da pessoa selecionada para TODA A MESA durante esta e a próxima rodada!',
+      'As cartas reveladas ficam visíveis acima da silhueta 3D do alvo (podendo ser ampliadas) e registradas no Caderno.',
     ],
   },
   {
     type: CARD_TYPES.PACTO_SANGUE,
-    shortEffect: 'Ignora Parede e vincula vida. Em si: quebra pacto.',
-    targetLabel: 'Outro (Vincula) ou Você (Quebra Pacto)',
-    wallRule: 'IGNORA PAREDES (pode mirar em qualquer um)',
+    shortEffect: 'Ignora Parede e vincula sua vida à de outro. Em si mesmo: quebra seus pactos.',
+    targetLabel: 'Outro (Vincula Vida) ou Você (Quebra Pacto)',
+    wallRule: 'IGNORA PAREDES (pode mirar em qualquer jogador vivo)',
     bullets: [
-      'Prioridade 4 (Controle): Atravessa qualquer Parede e vincula sua barra de vida à de outra pessoa (todo dano sofrido é compartilhado).',
-      'USADO EM SI MESMO: Se você já estiver em um Pacto de Sangue, QUEBRA o pacto imediatamente! Se não estiver em nenhum pacto, você toma 1 de Dano!',
-      'Se refletido pelo Espelho Amaldiçoado, você toma 1 de Dano imediato!',
+      'Prioridade 4 (Controle): Atravessa qualquer Parede e vincula sua barra de vida à do alvo (todo dano sofrido por um fere o outro também).',
+      'USADO EM SI MESMO: Se você já estiver em um Pacto de Sangue, QUEBRA todos os seus pactos ativos! Se não estiver em nenhum pacto, você perde 1 de Vida!',
+      'Se refletido pelo Espelho Amaldiçoado, ricocheteia e causa 1 de Dano imediato em quem lançou!',
     ],
   },
   {
     type: CARD_TYPES.MARCA_MORTE,
-    shortEffect: 'Se ficar 5 rodadas sem tomar dano, morre insta!',
+    shortEffect: 'Amaldiçoa o alvo: se ficar 5 rodadas sem tomar dano, morre instantaneamente!',
     targetLabel: 'Apenas Outro Jogador',
     wallRule: 'Bloqueada se você estiver Emparedado',
     bullets: [
-      'Prioridade 4 (Controle): Crava a Marca da Morte em outro jogador com contagem de 5 rodadas.',
-      'Se o jogador marcado ficar 5 rodadas sem tomar dano, MORRE INSTANTANEAMENTE!',
-      'Sofrer qualquer dano (e sobreviver) sacia a maldição com sangue e remove a Marca da Morte.',
+      'Prioridade 4 (Controle): Crava a Marca da Morte em outro jogador com contagem regressiva de 5 rodadas.',
+      'Se o jogador marcado passar 5 rodadas sem sofrer dano, MORRE INSTANTANEAMENTE ao fim da rodada!',
+      'Sofrer qualquer dano na mesa (e sobreviver) sacia a maldição com sangue e remove a Marca da Morte.',
     ],
   },
   {
     type: CARD_TYPES.DESARMAR,
-    shortEffect: 'Descarta 2 cartas aleatórias da mão do alvo.',
+    shortEffect: 'Sabota o alvo descartando 2 cartas aleatórias diretamente da mão dele.',
     targetLabel: 'Apenas Outro Jogador',
     wallRule: 'Bloqueada se você estiver Emparedado',
     bullets: [
-      'Prioridade 4 (Controle): Sabotagem direta na mão de um adversário.',
+      'Prioridade 4 (Controle): Sabotagem direta nos recursos táticos de um adversário.',
       'Arranca e descarta até 2 cartas aleatórias diretamente da mão do jogador selecionado.',
     ],
   },
   {
     type: CARD_TYPES.FACA,
-    shortEffect: 'Causa 1+ de Dano ou destrói uma Parede.',
+    shortEffect: 'Golpeia causando 1+ de Dano ou destrói 1 Parede (em si mesmo quebra Parede sem dano).',
     targetLabel: 'Você ou Outro Jogador',
-    wallRule: 'Quebra Parede do alvo (ou a própria sem dano)',
+    wallRule: 'Destrói 1 Parede do alvo (ou a própria sem sofrer dano)',
     bullets: [
-      'Prioridade 5 (Ofensivo): Resolve por último, executando os golpes sangrentos na mesa.',
-      'Causa 1 de Dano (ou mais se fortalecida por Manipulamento de Alma) ou destrói uma Parede.',
-      'Usar em si mesmo quando EMPAREDADO destrói sua própria Parede sem sofrer dano (ou pode ser usado em si mesmo para sangrar e limpar uma Marca da Morte!).',
+      'Prioridade 5 (Ofensivo): Resolve por último na rodada, executando os golpes sangrentos na mesa.',
+      'Causa 1 de Dano (ou mais se fortalecida por Manipulamento de Alma). Se o alvo estiver Emparedado, destrói a Parede (dano excedente perfura!).',
+      'Usar em si mesmo quando EMPAREDADO destrói sua própria Parede sem sofrer dano. Sem Parede, corta a si mesmo (útil para saciar e remover uma Marca da Morte!).',
     ],
   },
 ];
 
 const CATEGORY_FILTERS = [
-  { id: 'ALL', label: 'TODAS (9)' },
+  { id: 'ALL', label: 'TODAS AS CARTAS (9)' },
   { id: 'REACAO', label: 'P1 · REAÇÃO' },
   { id: 'DEFENSIVO', label: 'P2 · DEFENSIVO' },
   { id: 'SUPORTE', label: 'P3 · SUPORTE' },
@@ -124,254 +133,284 @@ const CATEGORY_FILTERS = [
 
 /**
  * Livro Grimório das Cartas:
- * Exibe todas as 9 cartas numa grade interativa e mostra em detalhes o que cada carta faz.
- * Usado tanto debaixo da mesa (ao lado do Caderno/Chat) quanto no Modal de Guia.
+ * Apresenta todas as cartas em seu tamanho real de gameplay (ou maior),
+ * preservando proporções e detalhes visuais, com explicações completas
+ * e tipografia ampla ao lado de cada carta, além de inspeção ampliada.
  */
 export default function CardGrimoireBook({ compact = false, className }) {
-  const [selectedType, setSelectedType] = useState(CARD_TYPES.SERINGA);
   const [categoryFilter, setCategoryFilter] = useState('ALL');
+  const [focusedType, setFocusedType] = useState(null);
   const [previewSyringeCharges, setPreviewSyringeCharges] = useState(4);
+  const [inspectedCard, setInspectedCard] = useState(null);
 
   const filteredCards = GRIMOIRE_CARDS.filter((item) => {
+    if (focusedType) return item.type === focusedType;
     if (categoryFilter === 'ALL') return true;
     return CARD_META[item.type]?.category === categoryFilter;
   });
-
-  const activeEntry =
-    GRIMOIRE_CARDS.find((c) => c.type === selectedType) || GRIMOIRE_CARDS[0];
-  const activeMeta = CARD_META[activeEntry.type];
-  const activeCat = CARD_CATEGORIES[activeMeta.category];
 
   return (
     <div
       id="card-grimoire-book"
       className={cn(
-        'rounded-xl overflow-hidden border-2 border-[#6e4726] bg-gradient-to-b from-[#26150d] via-[#1b0f09] to-[#120905] shadow-[0_24px_65px_rgba(0,0,0,0.98)] flex flex-col select-text',
+        'rounded-xl overflow-hidden border-2 border-[#7c532f] bg-gradient-to-b from-[#26150d] via-[#1b0f09] to-[#120905] shadow-[0_24px_65px_rgba(0,0,0,0.98)] flex flex-col select-text',
         className
       )}
     >
       {/* CABEÇALHO DO LIVRO GRIMÓRIO */}
-      <div className="px-3 py-2 bg-gradient-to-r from-[#361c12] via-[#4a2618] to-[#2d160e] border-b-2 border-[#7c532f] flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <div className="p-1 rounded bg-gold-aged/20 border border-gold-aged/60 text-gold-aged">
-            <BookOpen size={14} />
+      <div className="px-4 sm:px-6 py-3.5 bg-gradient-to-r from-[#361c12] via-[#4a2618] to-[#2d160e] border-b-2 border-[#7c532f] flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gold-aged/20 border border-gold-aged/70 text-gold-aged shrink-0">
+              <BookOpen size={20} />
+            </div>
+            <div>
+              <h3 className="font-grimoire font-black tracking-wider text-amber-100 text-base sm:text-xl leading-tight">
+                LIVRO DAS CARTAS · GRIMÓRIO DO VAZIO
+              </h3>
+              <p className="font-typewriter text-xs sm:text-sm text-amber-200/90 mt-0.5">
+                Cartas exibidas em tamanho real de partida · Clique em qualquer carta para inspeção ampliada
+              </p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-grimoire font-black tracking-widest text-amber-100 text-xs sm:text-sm leading-none">
-              LIVRO DAS CARTAS · GRIMÓRIO DO VAZIO
-            </h3>
-            <p className="font-mono text-[9.5px] text-amber-200/75 mt-0.5">
-              Clique em qualquer carta na grade para inspecionar seus efeitos e prioridades
-            </p>
-          </div>
+
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-black/65 border border-gold-aged/50 font-mono text-xs text-amber-200">
+            <Layers size={14} className="text-gold-aged" />
+            <span>Ordem de Resolução: P1 → P5</span>
+          </span>
         </div>
 
-        {/* Filtro rápido por Tipo / Prioridade */}
-        <div className="flex flex-wrap items-center gap-1">
-          {CATEGORY_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              onClick={() => {
-                audio.play('select');
-                setCategoryFilter(f.id);
-              }}
-              className={cn(
-                'px-1.5 py-0.5 rounded font-mono text-[9px] font-bold border transition-all',
-                categoryFilter === f.id
-                  ? 'bg-gold-aged text-black border-gold-aged shadow-[0_0_8px_rgba(212,175,55,0.5)]'
-                  : 'bg-black/60 text-amber-200/80 border-stone-700 hover:border-gold-aged/60'
-              )}
-            >
-              {f.label}
-            </button>
-          ))}
+        {/* Filtros por Categoria / Prioridade com Tipografia Confortável */}
+        <div className="flex flex-wrap items-center gap-2">
+          {CATEGORY_FILTERS.map((f) => {
+            const isActive = !focusedType && categoryFilter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => {
+                  audio.play('select');
+                  setFocusedType(null);
+                  setCategoryFilter(f.id);
+                }}
+                className={cn(
+                  'px-3 py-1.5 rounded-lg font-mono text-xs sm:text-sm font-extrabold border transition-all cursor-pointer',
+                  isActive
+                    ? 'bg-gold-aged text-black border-gold-aged shadow-[0_0_12px_rgba(212,175,55,0.55)]'
+                    : 'bg-black/70 text-amber-100/90 border-stone-700 hover:border-gold-aged/70 hover:text-white'
+                )}
+              >
+                {f.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Navegação Direta por Carta Individual */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+          <span className="font-mono text-xs font-bold text-amber-200/80 shrink-0 mr-1">
+            Ir para:
+          </span>
+          {GRIMOIRE_CARDS.map((entry) => {
+            const meta = CARD_META[entry.type];
+            const isFocused = focusedType === entry.type;
+            return (
+              <button
+                key={entry.type}
+                type="button"
+                onClick={() => {
+                  audio.play('select');
+                  setFocusedType((prev) => (prev === entry.type ? null : entry.type));
+                }}
+                className={cn(
+                  'shrink-0 px-2.5 py-1 rounded-md font-mono text-xs font-bold border transition-all cursor-pointer',
+                  isFocused
+                    ? 'bg-blood text-white border-gold-aged shadow-[0_0_10px_rgba(220,38,38,0.6)]'
+                    : 'bg-stone-900/90 text-parchment border-stone-700/90 hover:border-gold-aged/60 hover:text-amber-100'
+                )}
+              >
+                P{meta.priority} · {meta.name}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* PÁGINAS ABERTAS DO LIVRO (ESQUERDA: GRADE DE TODAS AS CARTAS | DIREITA: PÁGINA DO QUE A CARTA FAZ) */}
-      <div
-        className={cn(
-          'grid grid-cols-1 gap-3 p-2.5 sm:p-3.5 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.06),transparent_75%)]',
-          !compact && 'lg:grid-cols-12'
-        )}
-      >
-        {/* PÁGINA ESQUERDA: GRADE COM TODAS AS CARTAS */}
-        <div className={cn(!compact && 'lg:col-span-7', 'flex flex-col')}>
-          <div className="flex items-center justify-between mb-1.5 px-1">
-            <span className="font-grimoire font-bold text-[10px] sm:text-[11px] tracking-wider text-amber-200 flex items-center gap-1.5">
-              <Layers size={12} className="text-gold-aged" />
-              GRADE DE CARTAS ({filteredCards.length})
-            </span>
-            <span className="font-mono text-[9px] text-stone-400">
-              Ordenadas por Prioridade (P1 → P5)
-            </span>
-          </div>
+      {/* LISTA DE SEÇÕES DE CARTAS EM TAMANHO REAL + EXPLICAÇÃO AO LADO */}
+      <div className="p-3 sm:p-5 space-y-5 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.06),transparent_75%)]">
+        {filteredCards.map((entry) => {
+          const meta = CARD_META[entry.type];
+          const cat = CARD_CATEGORIES[meta.category];
+          const isSyringe = entry.type === CARD_TYPES.SERINGA;
+          const charges = isSyringe ? previewSyringeCharges : 0;
 
-          <div className="grid grid-cols-2 min-[460px]:grid-cols-3 gap-2 sm:gap-2.5 max-h-[420px] sm:max-h-[520px] overflow-y-auto pr-1 scrollbar-thin">
-            {filteredCards.map((entry) => {
-              const meta = CARD_META[entry.type];
-              const cat = CARD_CATEGORIES[meta.category];
-              const isSelected = selectedType === entry.type;
-              const charges = entry.type === CARD_TYPES.SERINGA ? previewSyringeCharges : 0;
+          return (
+            <article
+              key={entry.type}
+              data-guide-card={entry.type}
+              className="rounded-xl border-2 border-[#7a5835] bg-gradient-to-b from-[#23140c] via-[#1a0e08] to-[#130a06] p-4 sm:p-6 shadow-[0_12px_32px_rgba(0,0,0,0.85)] flex flex-col lg:flex-row items-center lg:items-start gap-5 sm:gap-7"
+            >
+              {/* COLUNA ESQUERDA: CARTA RENDERIZADA EM TAMANHO REAL DA GAMEPLAY (OU MAIOR) */}
+              <div className="shrink-0 flex flex-col items-center">
+                <div className="p-2 rounded-xl bg-black/55 border border-gold-aged/40 shadow-[0_14px_32px_rgba(0,0,0,0.9)]">
+                  <InscryptionCard
+                    card={{ type: entry.type, charges }}
+                    xlarge={!compact}
+                    large={compact}
+                    onInspect={() =>
+                      setInspectedCard({
+                        type: entry.type,
+                        charges,
+                      })
+                    }
+                  />
+                </div>
 
-              return (
+                {/* Botão explícito para abrir Inspeção Ampliada */}
                 <button
-                  key={entry.type}
                   type="button"
                   onClick={() => {
                     audio.play('select');
-                    setSelectedType(entry.type);
+                    setInspectedCard({
+                      type: entry.type,
+                      charges,
+                    });
                   }}
-                  className={cn(
-                    'group relative flex flex-col items-center text-center p-1.5 sm:p-2 rounded-lg border-2 transition-all cursor-pointer',
-                    isSelected
-                      ? 'border-gold-aged bg-gradient-to-b from-[#3d2516] to-[#21130b] shadow-[0_0_16px_rgba(212,175,55,0.45)] scale-[1.01]'
-                      : 'border-[#472d1c] bg-black/55 hover:border-gold-aged/60 hover:bg-[#24150c]/80'
-                  )}
+                  className="mt-2.5 w-full flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg border border-gold-aged/75 bg-[#331d10] hover:bg-[#482917] text-amber-100 font-mono text-xs sm:text-sm font-bold transition-all cursor-pointer shadow-md"
                 >
-                  {/* Selo de Prioridade e Tipo */}
-                  <span
-                    className={cn(
-                      'mb-1 px-1.5 py-[1px] rounded border font-mono text-[8px] font-extrabold uppercase tracking-wider',
-                      cat?.badgeCls
-                    )}
-                  >
-                    P{meta.priority} · {meta.categoryLabel}
-                  </span>
+                  <ZoomIn size={15} className="text-gold-aged shrink-0" />
+                  <span>Ampliar Carta</span>
+                </button>
 
-                  {/* Miniatura da Carta */}
-                  <div className="my-0.5 pointer-events-none">
-                    <InscryptionCard
-                      card={{ type: entry.type, charges }}
-                      large
-                    />
+                {/* Controle interativo de cargas para testar a Seringa em tamanho real */}
+                {isSyringe && (
+                  <div className="mt-2.5 w-full p-2 rounded-lg bg-black/70 border border-emerald-500/50 flex flex-col items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 font-mono text-xs font-bold text-emerald-300">
+                      <GameIcon name="syringe-vial" size={13} />
+                      <span>Simular Cargas ({previewSyringeCharges}/4):</span>
+                    </span>
+                    <div className="flex items-center gap-1">
+                      {[0, 1, 2, 3, 4].map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          onClick={() => {
+                            audio.play('click');
+                            setPreviewSyringeCharges(c);
+                          }}
+                          className={cn(
+                            'px-2 py-1 rounded font-mono text-xs font-extrabold border transition-all cursor-pointer',
+                            previewSyringeCharges === c
+                              ? 'bg-emerald-600 text-white border-emerald-300 shadow-[0_0_8px_rgba(52,211,153,0.6)]'
+                              : 'bg-stone-900 text-amber-100 border-stone-700 hover:border-emerald-400'
+                          )}
+                        >
+                          {c}/4
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* COLUNA DIREITA: EXPLICAÇÃO DETALHADA EM PERGAMINHO DE ALTA LEGIBILIDADE */}
+              <div className="flex-1 w-full rounded-xl border-2 border-[#8c6d46] bg-gradient-to-b from-[#f4e7cd] via-[#ecdab7] to-[#e1cba2] text-[#1a0f06] p-4 sm:p-5 shadow-[inset_0_0_28px_rgba(120,85,40,0.3)] flex flex-col justify-between">
+                <div>
+                  {/* Topo: Prioridade, Categoria e Título Grande */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b-2 border-[#b09268]">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1.5">
+                        <span
+                          className={cn(
+                            'px-2.5 py-0.5 rounded-md border font-mono text-xs sm:text-sm font-extrabold uppercase tracking-wider',
+                            cat?.badgeCls
+                          )}
+                        >
+                          PRIORIDADE {meta.priority} · {meta.categoryLabel}
+                        </span>
+                        <span className="font-mono text-xs sm:text-sm font-bold text-[#5a371c]">
+                          {meta.foot}
+                        </span>
+                      </div>
+
+                      <h4 className="font-grimoire font-black text-xl sm:text-2xl text-[#241006] tracking-wide leading-tight">
+                        {meta.name}
+                      </h4>
+                    </div>
                   </div>
 
-                  {/* Nome + Resumo rápido do que faz */}
-                  <div className="mt-1.5 font-grimoire font-extrabold text-[11px] sm:text-[12.5px] text-amber-100 leading-tight truncate w-full">
-                    {meta.name}
-                  </div>
-                  <p className="mt-0.5 font-typewriter text-[10px] sm:text-[11.5px] text-[#e6d3ae] leading-snug line-clamp-3">
+                  {/* Resumo em destaque */}
+                  <p className="mt-3 font-typewriter font-bold text-base sm:text-lg text-[#4a1515] leading-snug">
                     {entry.shortEffect}
                   </p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
 
-        {/* PÁGINA DIREITA: PÁGINA DE PERGAMINHO DETALHANDO O QUE A CARTA SELECIONADA FAZ */}
-        <div
-          className={cn(
-            !compact && 'lg:col-span-5',
-            'rounded-lg border-2 border-[#8c6d46] bg-gradient-to-b from-[#f3e5c8] via-[#ead7b3] to-[#dfc89e] text-[#1e120a] p-3 shadow-[inset_0_0_28px_rgba(120,85,40,0.35)] flex flex-col justify-between'
-          )}
-        >
-          <div>
-            {/* Topo da Página da Carta */}
-            <div className="flex items-start gap-3 pb-2.5 border-b-2 border-[#b09268]">
-              <div className="shrink-0">
-                <InscryptionCard
-                  card={{
-                    type: activeEntry.type,
-                    charges:
-                      activeEntry.type === CARD_TYPES.SERINGA ? previewSyringeCharges : 0,
-                  }}
-                  xlarge
-                />
-              </div>
+                  {/* Quadros de Alvo e Parede */}
+                  <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="rounded-lg bg-[#e5d2ad] border border-[#9e7f56] p-2.5 sm:p-3">
+                      <div className="flex items-center gap-1.5 font-mono text-xs font-extrabold uppercase text-[#7f1d1d] mb-0.5">
+                        <Crosshair size={14} className="shrink-0" />
+                        <span>Alvo da Carta</span>
+                      </div>
+                      <div className="font-typewriter text-sm sm:text-[15px] font-bold text-[#1e1107]">
+                        {entry.targetLabel}
+                      </div>
+                    </div>
 
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-1 mb-1">
-                  <span
-                    className={cn(
-                      'px-1.5 py-0.5 rounded border font-mono text-[10.5px] font-extrabold uppercase',
-                      activeCat?.badgeCls
-                    )}
-                  >
-                    PRIORIDADE {activeMeta.priority} · {activeMeta.categoryLabel}
+                    <div className="rounded-lg bg-[#e5d2ad] border border-[#9e7f56] p-2.5 sm:p-3">
+                      <div className="flex items-center gap-1.5 font-mono text-xs font-extrabold uppercase text-[#1e3a8a] mb-0.5">
+                        <Shield size={14} className="shrink-0" />
+                        <span>Interação com Parede</span>
+                      </div>
+                      <div className="font-typewriter text-sm sm:text-[15px] font-bold text-[#1e1107]">
+                        {entry.wallRule}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Lista detalhada do que a carta faz */}
+                  <div className="mt-4">
+                    <div className="font-grimoire font-black text-sm sm:text-base uppercase tracking-wider text-[#6b1d1d] mb-2 flex items-center gap-1.5">
+                      <Flame size={15} className="text-[#8b0000] shrink-0" />
+                      <span>COMO FUNCIONA NO COMBATE:</span>
+                    </div>
+                    <ul className="space-y-2.5 font-typewriter text-[15px] sm:text-base leading-relaxed text-[#180d05]">
+                      {entry.bullets.map((bullet, idx) => (
+                        <li key={idx} className="flex items-start gap-2">
+                          <span className="text-[#8b0000] font-bold shrink-0 mt-0.5">❖</span>
+                          <span>{bullet}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div className="mt-4 pt-2.5 border-t border-[#bfa37a] flex flex-wrap items-center justify-between gap-2 font-mono text-xs text-[#54361e]">
+                  <span className="flex items-center gap-1.5 font-bold">
+                    <Sparkles size={13} className="text-[#8b0000]" />
+                    <span>Grimório Oficial · STRIKE / VOID</span>
+                  </span>
+                  <span className="font-bold">
+                    Ordem na Rodada: {meta.priority}º ({meta.categoryLabel})
                   </span>
                 </div>
-
-                <h4 className="font-grimoire font-black text-base sm:text-lg text-[#2b1408] tracking-wide leading-tight">
-                  {activeMeta.name}
-                </h4>
-
-                <div className="mt-2 space-y-1 font-mono text-[11.5px] sm:text-xs text-[#3a210f]">
-                  <div className="flex items-center gap-1">
-                    <Crosshair size={11} className="text-[#8b0000] shrink-0" />
-                    <span>
-                      <strong>Alvo:</strong> {activeEntry.targetLabel}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Shield size={11} className="text-[#1e3a8a] shrink-0" />
-                    <span>
-                      <strong>Parede:</strong> {activeEntry.wallRule}
-                    </span>
-                  </div>
-                </div>
               </div>
-            </div>
-
-            {/* Controle interativo de cargas para testar a Seringa no próprio livro */}
-            {activeEntry.type === CARD_TYPES.SERINGA && (
-              <div className="mt-2 p-1.5 rounded bg-[#e2ceaa] border border-[#9e7f56] flex items-center justify-between gap-2">
-                <span className="inline-flex items-center gap-1 font-mono text-[9.5px] font-bold text-[#2b180a]">
-                  <GameIcon name="syringe-vial" size={12} />
-                  <span>Simular Cargas na Mão:</span>
-                </span>
-                <div className="flex items-center gap-1">
-                  {[0, 1, 2, 3, 4].map((c) => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => {
-                        audio.play('click');
-                        setPreviewSyringeCharges(c);
-                      }}
-                      className={cn(
-                        'px-1.5 py-0.5 rounded font-mono text-[9.5px] font-extrabold border transition-all',
-                        previewSyringeCharges === c
-                          ? 'bg-[#15803d] text-white border-black'
-                          : 'bg-[#f7eed9] text-[#2b180a] border-[#8c6d46] hover:bg-white'
-                      )}
-                    >
-                      {c}/4
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Lista detalhada do que a carta faz */}
-            <div className="mt-2.5">
-              <div className="font-grimoire font-extrabold text-xs sm:text-[13px] uppercase tracking-wider text-[#6b1d1d] mb-1.5 flex items-center gap-1">
-                <Flame size={12} className="text-[#8b0000]" /> O QUE ESTA CARTA FAZ:
-              </div>
-              <ul className="space-y-2 font-typewriter text-[13px] sm:text-sm leading-snug text-[#1a0f06]">
-                {activeEntry.bullets.map((bullet, idx) => (
-                  <li key={idx} className="flex items-start gap-1.5">
-                    <span className="text-[#8b0000] font-bold shrink-0">❖</span>
-                    <span>{bullet}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-
-          <div className="mt-2.5 pt-1.5 border-t border-[#bfa37a] flex items-center justify-between font-mono text-[9px] text-[#5c3d24]">
-            <span className="flex items-center gap-1">
-              <Sparkles size={10} className="text-[#8b0000]" />
-              Grimório Oficial · STRIKE / VOID
-            </span>
-            <span>
-              Ordem na Rodada: {activeMeta.priority}º ({activeMeta.categoryLabel})
-            </span>
-          </div>
-        </div>
+            </article>
+          );
+        })}
       </div>
+
+      {/* Modal de Inspeção Ampliada */}
+      <CardInspectModal
+        card={inspectedCard}
+        onClose={() => setInspectedCard(null)}
+        allowBrowseAll={true}
+        onSelectCardType={(nextType) =>
+          setInspectedCard({
+            type: nextType,
+            charges: nextType === CARD_TYPES.SERINGA ? previewSyringeCharges : 0,
+          })
+        }
+      />
     </div>
   );
 }
