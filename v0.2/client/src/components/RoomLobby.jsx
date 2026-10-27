@@ -24,11 +24,14 @@ import {
 import { cn } from '../lib/cn';
 import { LOG_STYLES } from '../lib/constants';
 import { audio } from '../lib/audio';
+import CharacterPortrait from './CharacterPortrait';
 
 export default function RoomLobby({
   roomState,
   me,
   isHost,
+  characterGender = 'female',
+  setCharacterGender,
   onLeaveRoom,
   onTogglePrivacy,
   onAddBot,
@@ -254,6 +257,51 @@ export default function RoomLobby({
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Personalização do Avatar / Gênero no Lobby */}
+            <div className="pt-2 border-t border-stone-800 flex items-center justify-between gap-2 bg-black/40 p-2.5 rounded-lg border border-stone-800/80">
+              <div className="flex items-center gap-2">
+                <div className="w-9 h-9 rounded-full border border-gold-aged/80 overflow-hidden bg-black shrink-0">
+                  <CharacterPortrait character={characterGender} expression="NORMAL" />
+                </div>
+                <div className="text-left">
+                  <div className="font-grimoire text-[11px] font-bold text-amber-200">
+                    SEU PERSONAGEM:
+                  </div>
+                  <div className="font-mono text-[10px] text-stone-400">
+                    {characterGender === 'female'
+                      ? '♀ Feminina (Grade Cima)'
+                      : '♂ Masculino (Grade Baixo)'}
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setCharacterGender?.('female')}
+                  className={cn(
+                    'px-2.5 py-1 rounded text-[11px] font-mono font-bold border transition-all cursor-pointer',
+                    characterGender === 'female'
+                      ? 'bg-blood text-white border-blood-bright shadow-sm'
+                      : 'bg-black/60 text-stone-400 border-stone-700 hover:text-white'
+                  )}
+                >
+                  ♀ FEM
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCharacterGender?.('male')}
+                  className={cn(
+                    'px-2.5 py-1 rounded text-[11px] font-mono font-bold border transition-all cursor-pointer',
+                    characterGender === 'male'
+                      ? 'bg-amber-800 text-white border-amber-400 shadow-sm'
+                      : 'bg-black/60 text-stone-400 border-stone-700 hover:text-white'
+                  )}
+                >
+                  ♂ MASC
+                </button>
               </div>
             </div>
 

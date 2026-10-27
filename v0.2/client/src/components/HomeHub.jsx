@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { LogIn, Plus, Globe, Lock, Users, RotateCw, Skull, Sparkles, BookOpen } from 'lucide-react';
 import { cn } from '../lib/cn';
+import CharacterPortrait from './CharacterPortrait';
 
 export default function HomeHub({
   nickname,
   setNickname,
+  characterGender = 'female',
+  setCharacterGender,
   publicRooms,
   onJoinRoom,
   onCreateRoom,
@@ -70,21 +73,78 @@ export default function HomeHub({
           </div>
         </div>
 
-        {/* Barra de Identidade do Jogador */}
-        <div className="rounded-lg border-2 border-stone-800 bg-wood-dark/80 p-4 shadow-xl backdrop-blur-sm max-w-lg mx-auto">
-          <label className="block font-grimoire font-bold text-xs tracking-wider text-gold-aged mb-1.5 flex items-center gap-1.5">
-            <Skull size={14} className="text-blood-bright" />
-            SEU NOME / PSEUDÔNIMO
-          </label>
-          <div className="flex gap-2">
+        {/* Barra de Identidade do Jogador & Seleção de Gênero */}
+        <div className="rounded-lg border-2 border-stone-800 bg-wood-dark/80 p-4 shadow-xl backdrop-blur-sm max-w-lg mx-auto space-y-3.5">
+          <div>
+            <label className="block font-grimoire font-bold text-xs tracking-wider text-gold-aged mb-1.5 flex items-center gap-1.5">
+              <Skull size={14} className="text-blood-bright" />
+              SEU NOME / PSEUDÔNIMO
+            </label>
             <input
               id="input-nickname"
               value={nickname}
               onChange={(e) => setNickname(e.target.value)}
               maxLength={16}
               placeholder="Digite seu nome..."
-              className="flex-1 min-h-[44px] bg-black/70 border-2 border-iron/80 rounded px-3 py-2 font-typewriter text-parchment text-base sm:text-sm outline-none focus:border-gold-aged transition-colors"
+              className="w-full min-h-[44px] bg-black/70 border-2 border-iron/80 rounded px-3 py-2 font-typewriter text-parchment text-base sm:text-sm outline-none focus:border-gold-aged transition-colors"
             />
+          </div>
+
+          {/* Seleção de Gênero do Personagem com Preview da Arte */}
+          <div className="pt-2 border-t border-stone-800/80">
+            <label className="block font-grimoire font-bold text-xs tracking-wider text-amber-200 mb-2 flex items-center justify-between">
+              <span>GÊNERO DO PERSONAGEM (RETRATO):</span>
+              <span className="font-mono text-[10.5px] text-stone-400">
+                {characterGender === 'female' ? 'Grade Superior' : 'Grade Inferior'}
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-2.5">
+              <button
+                type="button"
+                onClick={() => setCharacterGender?.('female')}
+                className={cn(
+                  'flex items-center gap-2.5 p-2 rounded-lg border-2 transition-all cursor-pointer text-left',
+                  characterGender === 'female'
+                    ? 'border-blood-bright bg-blood/35 text-white shadow-[0_0_15px_rgba(220,38,38,0.4)]'
+                    : 'border-stone-800 bg-black/50 text-stone-400 hover:border-gold-aged/50 hover:text-stone-200'
+                )}
+              >
+                <div className="w-10 h-10 rounded-full border border-gold-aged/80 overflow-hidden bg-black shrink-0">
+                  <CharacterPortrait character="female" expression="NORMAL" />
+                </div>
+                <div>
+                  <div className="font-grimoire font-bold text-xs sm:text-sm text-amber-100 flex items-center gap-1">
+                    <span>♀ FEMININA</span>
+                  </div>
+                  <div className="font-typewriter text-[10px] text-parchment-dark">
+                    Grade de Cima
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCharacterGender?.('male')}
+                className={cn(
+                  'flex items-center gap-2.5 p-2 rounded-lg border-2 transition-all cursor-pointer text-left',
+                  characterGender === 'male'
+                    ? 'border-amber-400 bg-amber-950/45 text-white shadow-[0_0_15px_rgba(245,158,11,0.35)]'
+                    : 'border-stone-800 bg-black/50 text-stone-400 hover:border-gold-aged/50 hover:text-stone-200'
+                )}
+              >
+                <div className="w-10 h-10 rounded-full border border-gold-aged/80 overflow-hidden bg-black shrink-0">
+                  <CharacterPortrait character="male" expression="NORMAL" />
+                </div>
+                <div>
+                  <div className="font-grimoire font-bold text-xs sm:text-sm text-amber-100 flex items-center gap-1">
+                    <span>♂ MASCULINO</span>
+                  </div>
+                  <div className="font-typewriter text-[10px] text-parchment-dark">
+                    Grade de Baixo
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
         </div>
 

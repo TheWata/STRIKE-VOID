@@ -79,4 +79,20 @@ export const storageService = {
       // ignore storage errors
     }
   },
+  getCharacterGender() {
+    try {
+      const g = localStorage.getItem('strike_void_character_gender');
+      return g === 'male' ? 'male' : 'female';
+    } catch (_e) {
+      return 'female';
+    }
+  },
+  setCharacterGender(gender) {
+    try {
+      const val = gender === 'male' ? 'male' : 'female';
+      localStorage.setItem('strike_void_character_gender', val);
+    } catch (_e) {
+      // ignore storage errors
+    }
+  },
 };

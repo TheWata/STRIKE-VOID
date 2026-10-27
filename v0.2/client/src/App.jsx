@@ -77,6 +77,19 @@ export default function App() {
     onUpdateSettings,
   } = ctrl;
 
+  // Atalho global de teclado: Pressionar [G] ou [?] abre/fecha o Guia de Regras e Cartas a qualquer momento
+  React.useEffect(() => {
+    const handleKey = (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === 'g' || e.key === 'G' || e.key === '?' || e.key === 'F1') {
+        e.preventDefault();
+        setShowGuide((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [setShowGuide]);
+
   return (
     <>
       <motion.div
@@ -106,8 +119,8 @@ export default function App() {
               </button>
             </div>
 
-            {/* Canto superior direito: Ícones discretos sem caixas pesadas */}
-            <div className="pointer-events-auto flex items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+            {/* Canto superior direito: Ícones e botão do Guia destacados */}
+            <div className="pointer-events-auto flex items-center gap-2">
               <AudioControls minimal />
               <button
                 id="btn-guide"
@@ -116,17 +129,18 @@ export default function App() {
                   audioService.play('click');
                   setShowGuide(true);
                 }}
-                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/45 hover:bg-black/80 text-parchment/70 hover:text-amber-200 transition-all active:scale-95"
-                aria-label="Grimório e Regras"
-                title="Grimório e Regras"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-blood-bright bg-blood/80 hover:bg-blood text-white font-mono text-xs font-bold shadow-[0_0_14px_rgba(220,38,38,0.55)] transition-all active:scale-95 cursor-pointer"
+                aria-label="Abrir Guia de Regras [G]"
+                title="Abrir Guia de Regras e Consulta de Cartas [Tecla G ou ?]"
               >
-                <HelpCircle size={15} />
+                <HelpCircle size={15} className="text-red-200" />
+                <span className="font-extrabold tracking-wider">GUIA [G]</span>
               </button>
               <button
                 id="btn-settings"
                 type="button"
                 onClick={() => setShowSettings(true)}
-                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/45 hover:bg-black/80 text-parchment/70 hover:text-amber-200 transition-all active:scale-95"
+                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-black/90 text-parchment/80 hover:text-amber-200 transition-all active:scale-95"
                 aria-label="Tempos da Partida"
                 title="Tempos da Partida"
               >
@@ -136,7 +150,7 @@ export default function App() {
                 id="btn-leave-room"
                 type="button"
                 onClick={handleLeaveRoom}
-                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/45 hover:bg-red-950/80 text-parchment/70 hover:text-red-300 transition-all active:scale-95"
+                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-red-950 text-parchment/80 hover:text-red-300 transition-all active:scale-95"
                 title="Deixar a mesa"
                 aria-label="Deixar a mesa"
               >
@@ -255,6 +269,8 @@ export default function App() {
           <HomeHubView
             nickname={nickname}
             setNickname={setNickname}
+            characterGender={ctrl.characterGender}
+            setCharacterGender={ctrl.setCharacterGender}
             publicRooms={publicRooms}
             onJoinRoom={handleJoinRoom}
             onCreateRoom={handleCreateRoom}
@@ -266,6 +282,8 @@ export default function App() {
             roomState={gameState}
             me={me}
             isHost={isHost}
+            characterGender={ctrl.characterGender}
+            setCharacterGender={ctrl.setCharacterGender}
             onLeaveRoom={handleLeaveRoom}
             onTogglePrivacy={onTogglePrivacy}
             onAddBot={onAddBot}
@@ -307,7 +325,7 @@ export default function App() {
           }}
         />
 
-        <GameGuideModal open={showGuide} onClose={() => setShowGuide(false)} />
+        <GameGuideModal open={showGuide} onClose={() => setShowGuide(false)} inGame={inGame} />
 
         {gameState?.settings && (
           <SettingsModal

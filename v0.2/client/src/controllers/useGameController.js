@@ -27,6 +27,15 @@ export function useGameController() {
   const shakeControls = useAnimationControls();
 
   const [nickname, setNickname] = useState(() => storageService.getNickname());
+  const [characterGender, setCharacterGenderState] = useState(() =>
+    storageService.getCharacterGender()
+  );
+
+  const setCharacterGender = useCallback((gender) => {
+    const val = gender === 'male' ? 'male' : 'female';
+    storageService.setCharacterGender(val);
+    setCharacterGenderState(val);
+  }, []);
 
   useEffect(() => {
     if (nickname) storageService.setNickname(nickname);
@@ -421,6 +430,8 @@ export function useGameController() {
     hitKey,
     nickname,
     setNickname,
+    characterGender,
+    setCharacterGender,
     selectedCardIds,
     setSelectedCardIds,
     selectedCard,

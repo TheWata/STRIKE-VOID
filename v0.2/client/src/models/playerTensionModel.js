@@ -1,4 +1,5 @@
-import { CARD_TYPES } from './cardModel.js';
+import { CARD_TYPES, CARD_META } from './cardModel.js';
+import { EXPRESSION_KEYS, EXPRESSION_LABELS } from './expressionAtlas.js';
 
 const clamp = (val, min, max) => Math.min(max, Math.max(min, val));
 
@@ -12,6 +13,357 @@ const HOSTILE_CARD_TYPES = [
 ];
 
 /**
+ * Avalia o efeito real da carta selecionada caso seja usada no próprio jogador
+ * e retorna a reação facial contextual (Prioridade 1) e os textos de preview.
+ */
+export function resolveContextualSelfCardReaction(selectedCard, me) {
+  if (!selectedCard || !me) return null;
+
+  const meta = CARD_META[selectedCard.type];
+  if (!meta || meta.requiresOtherPlayer) return null;
+
+  const maxLives = Math.max(1, Number(me.maxLives ?? me.maxHp) || 3);
+  const lives = clamp(Number(me.lives ?? me.hp ?? maxLives), 0, maxLives);
+  const missingHp = Math.max(0, maxLives - lives);
+  const isWalled = Boolean(me.isWalled);
+  const hasActivePact = Array.isArray(me.bloodPactWith) && me.bloodPactWith.length > 0;
+  const currentKnife = Number(me.knifeDamage) || 1;
+
+  switch (selectedCard.type) {
+    case CARD_TYPES.SERINGA: {
+      const charges = Number(selectedCard.charges) || 0;
+      if (charges <= 0) {
+        return {
+          expression: EXPRESSION_KEYS.TRISTE,
+          actionTitle: 'Seringa Vazia (0/4)',
+          actionSubtitle: 'Sem cargas restantes — não restaura vida',
+          tone: 'neutral',
+        };
+      }
+      if (charges > missingHp) {
+        return {
+          expression: EXPRESSION_KEYS.ENVENENADO,
+          actionTitle: `Risco de Overdose (${charges}/4)`,
+          actionSubtitle: 'Excede sua vida máxima e aplica Marca da Morte!',
+          tone: 'danger',
+        };
+      }
+      return {
+        expression: EXPRESSION_KEYS.ALIVIO,
+        actionTitle: `Curar +${charges} Vida (${charges}/4)`,
+        actionSubtitle: 'Clique no retrato para restaurar sua vitalidade',
+        tone: 'beneficial',
+      };
+    }
+
+    case CARD_TYPES.FACA: {
+      if (isWalled) {
+        return {
+          expression: EXPRESSION_KEYS.DETERMINADO,
+          actionTitle: 'Quebrar Minha Parede',
+          actionSubtitle: 'Destrói suas grades de ferro sem sofrer dano',
+          tone: 'beneficial',
+        };
+      }
+      return {
+        expression: currentKnife >= lives ? EXPRESSION_KEYS.MORRENDO : EXPRESSION_KEYS.MEDO,
+        actionTitle: `Auto-Golpe (-${currentKnife} HP)`,
+        actionSubtitle: 'Cuidado: corta a própria carne na mesa!',
+        tone: 'danger',
+      };
+    }
+
+    case CARD_TYPES.PACTO_SANGUE: {
+      if (hasActivePact) {
+        return {
+          expression: EXPRESSION_KEYS.DETERMINADO,
+          actionTitle: 'Romper Meu Pacto',
+          actionSubtitle: 'Quebra todos os seus vínculos de sangue ativos',
+          tone: 'beneficial',
+        };
+      }
+      return {
+        expression: lives <= 1 ? EXPRESSION_KEYS.MORRENDO : EXPRESSION_KEYS.MEDO,
+        actionTitle: 'Pacto Vazio (-1 HP)',
+        actionSubtitle: 'Sem pacto ativo: fere a si mesmo em 1 Vida',
+        tone: 'danger',
+      };
+    }
+
+    case CARD_TYPES.MANIPULAMENTO_ALMA: {
+      return {
+        expression: EXPRESSION_KEYS.LOUCURA,
+        actionTitle: `Fortalecer Faca (${currentKnife + 1}x Dano)`,
+        actionSubtitle: 'Aumenta permanentemente o dano da sua Faca em +1',
+        tone: 'beneficial',
+      };
+    }
+
+    case CARD_TYPES.PAREDE: {
+      return {
+        expression: EXPRESSION_KEYS.DETERMINADO,
+        actionTitle: 'Erguer Parede em Mim',
+        actionSubtitle: 'Bloqueia 1 Faca, mas restringe sua mira no próximo turno',
+        tone: 'tactical',
+      };
+    }
+
+    case CARD_TYPES.REVERSO: {
+      return {
+        expression: lives <= 1 ? EXPRESSION_KEYS.ANSIEDADE : EXPRESSION_KEYS.ATENCAO,
+        actionTitle: 'Espelho em Mim',
+        actionSubtitle: 'Reflete ataques e maldições (Risco de Vácuo se ninguém atacar)',
+        tone: 'tactical',
+      };
+    }
+
+    default:
+      return {
+        expression: EXPRESSION_KEYS.ATENCAO,
+        actionTitle: `Usar ${meta.name} em Mim`,
+        actionSubtitle: 'Clique no retrato para confirmar a ação',
+        tone: 'tactical',
+      };
+  }
+}
+
+/**
+ * Resolve a expressão ativa do personagem respeitando a hierarquia estrita de 5 prioridades:
+ *   Prioridade 1 — Reação contextual ao apontar uma carta auto-alvejável para o retrato
+ *   Prioridade 2 — Reação temporária a evento imediato (DOR ou ALIVIO)
+ *   Prioridade 3 — Estado crítico ou efeito prioritário de combate
+ *   Prioridade 4 — Condições persistentes da partida
+ *   Prioridade 5 — Expressão padrão (NORMAL)
+ */
+export function resolvePortraitExpression({
+  factors,
+  tensionLevel,
+  tensionScore,
+  selectedCard = null,
+  canSelfTarget = false,
+  isHoveringValidSelfTarget = false,
+  isDamagedEvent = false,
+  isReliefEvent = false,
+  me = null,
+}) {
+  if (!factors) {
+    return {
+      expressionKey: EXPRESSION_KEYS.NORMAL,
+      expressionLabel: EXPRESSION_LABELS.NORMAL,
+      priorityLevel: 5,
+      selfCardPreview: null,
+    };
+  }
+
+  const selfCardPreview =
+    canSelfTarget && selectedCard ? resolveContextualSelfCardReaction(selectedCard, me) : null;
+
+  // PRIORIDADE 1: Reação contextual ao apontar uma carta válida sobre o próprio retrato
+  if (isHoveringValidSelfTarget && selfCardPreview) {
+    const key = selfCardPreview.expression;
+    return {
+      expressionKey: key,
+      expressionLabel: EXPRESSION_LABELS[key] || 'Atenção',
+      priorityLevel: 1,
+      selfCardPreview,
+    };
+  }
+
+  // Se o jogador está morto, mantém expressão de morte/colapso
+  if (!factors.isAlive) {
+    return {
+      expressionKey: EXPRESSION_KEYS.MORRENDO,
+      expressionLabel: EXPRESSION_LABELS.MORRENDO,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  // PRIORIDADE 2: Reação temporária a evento imediato de combate (DOR tem precedência sobre ALIVIO)
+  if (isDamagedEvent || factors.isDamagedNow) {
+    return {
+      expressionKey: EXPRESSION_KEYS.DOR,
+      expressionLabel: EXPRESSION_LABELS.DOR,
+      priorityLevel: 2,
+      selfCardPreview,
+    };
+  }
+
+  if (isReliefEvent || factors.isHealingNow) {
+    return {
+      expressionKey: EXPRESSION_KEYS.ALIVIO,
+      expressionLabel: EXPRESSION_LABELS.ALIVIO,
+      priorityLevel: 2,
+      selfCardPreview,
+    };
+  }
+
+  // PRIORIDADE 3: Estado crítico ou efeito prioritário de combate
+  if (
+    factors.isCriticalHp &&
+    (factors.hasLethalIncoming ||
+      factors.isDeathMarkUrgent ||
+      factors.incomingAttackCount >= 2)
+  ) {
+    return {
+      expressionKey: EXPRESSION_KEYS.MORRENDO,
+      expressionLabel: EXPRESSION_LABELS.MORRENDO,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  if (
+    factors.isCriticalHp &&
+    (factors.incomingAttackCount === 1 ||
+      factors.pactPartnerInDanger ||
+      factors.isWalledWithoutEscape)
+  ) {
+    return {
+      expressionKey: EXPRESSION_KEYS.CHORANDO,
+      expressionLabel: EXPRESSION_LABELS.CHORANDO,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.isOverdoseNow || factors.isDeathMarkUrgent) {
+    return {
+      expressionKey: EXPRESSION_KEYS.ENVENENADO,
+      expressionLabel: EXPRESSION_LABELS.ENVENENADO,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.isWalled) {
+    return {
+      expressionKey: EXPRESSION_KEYS.PRESO,
+      expressionLabel: EXPRESSION_LABELS.PRESO,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.isDisarmed) {
+    return {
+      expressionKey: EXPRESSION_KEYS.PARALISADO,
+      expressionLabel: EXPRESSION_LABELS.PARALISADO,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.isSoulSwapped || factors.isReflecting) {
+    return {
+      expressionKey: EXPRESSION_KEYS.LOUCURA,
+      expressionLabel: EXPRESSION_LABELS.LOUCURA,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.isHandRevealed || factors.incomingAttackCount >= 2) {
+    return {
+      expressionKey: EXPRESSION_KEYS.ASSUSTADO,
+      expressionLabel: EXPRESSION_LABELS.ASSUSTADO,
+      priorityLevel: 3,
+      selfCardPreview,
+    };
+  }
+
+  // PRIORIDADE 4: Condições persistentes da partida
+  if (factors.isCriticalHp) {
+    return {
+      expressionKey: EXPRESSION_KEYS.POUCA_VIDA,
+      expressionLabel: EXPRESSION_LABELS.POUCA_VIDA,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  if (
+    factors.incomingAttackCount === 1 ||
+    factors.enemyHasLethalKnife ||
+    (factors.hasBloodPact && factors.pactPartnerInDanger)
+  ) {
+    return {
+      expressionKey: EXPRESSION_KEYS.MEDO,
+      expressionLabel: EXPRESSION_LABELS.MEDO,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.hasDeathMark) {
+    return {
+      expressionKey: EXPRESSION_KEYS.ENVENENADO,
+      expressionLabel: EXPRESSION_LABELS.ENVENENADO,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  if (
+    factors.hasBloodPact ||
+    factors.timeUrgency > 0 ||
+    factors.selectedCardSelfRisk === 'OVERDOSE' ||
+    factors.selectedCardSelfRisk === 'SELF_DAMAGE'
+  ) {
+    return {
+      expressionKey: EXPRESSION_KEYS.ANSIEDADE,
+      expressionLabel: EXPRESSION_LABELS.ANSIEDADE,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.isLowHp) {
+    return {
+      expressionKey: EXPRESSION_KEYS.FERIDO,
+      expressionLabel: EXPRESSION_LABELS.FERIDO,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.lowHandResources || factors.isSyringeEmpty) {
+    return {
+      expressionKey: EXPRESSION_KEYS.TRISTE,
+      expressionLabel: EXPRESSION_LABELS.TRISTE,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  if (factors.hasSoulBuff) {
+    return {
+      expressionKey: EXPRESSION_KEYS.DETERMINADO,
+      expressionLabel: EXPRESSION_LABELS.DETERMINADO,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  if (tensionLevel === 'WATCHFUL' || tensionScore >= 0.2) {
+    return {
+      expressionKey: EXPRESSION_KEYS.ATENCAO,
+      expressionLabel: EXPRESSION_LABELS.ATENCAO,
+      priorityLevel: 4,
+      selfCardPreview,
+    };
+  }
+
+  // PRIORIDADE 5: Expressão padrão
+  return {
+    expressionKey: EXPRESSION_KEYS.NORMAL,
+    expressionLabel: EXPRESSION_LABELS.NORMAL,
+    priorityLevel: 5,
+    selfCardPreview,
+  };
+}
+
+/**
  * Avalia todas as condições reais da partida no STRIKE / VOID e consolida
  * o estado físico, emocional e tático do retrato dinâmico do jogador.
  *
@@ -23,7 +375,10 @@ export function computePlayerPortraitState({
   players = [],
   phase = 'PLANNING',
   selectedCard = null,
+  canSelfTarget = false,
+  isHoveringValidSelfTarget = false,
   secsLeft = null,
+  isDamagedEvent = false,
   isRecovering = false,
 }) {
   if (!me) {
@@ -32,6 +387,10 @@ export function computePlayerPortraitState({
       tensionLevel: 'CALM',
       statusLabel: 'AGUARDANDO',
       statusSummary: 'Aguardando início do ritual',
+      expressionKey: EXPRESSION_KEYS.NORMAL,
+      expressionLabel: EXPRESSION_LABELS.NORMAL,
+      expressionPriority: 5,
+      selfCardPreview: null,
       factors: {},
       visualParams: {
         heartbeatDuration: 3.8,
@@ -54,6 +413,10 @@ export function computePlayerPortraitState({
       tensionLevel: 'DEAD',
       statusLabel: 'ESPÍRITO ESPECTADOR',
       statusSummary: 'Sua carne tombou na mesa; resta o sussurro no Vazio',
+      expressionKey: EXPRESSION_KEYS.MORRENDO,
+      expressionLabel: EXPRESSION_LABELS.MORRENDO,
+      expressionPriority: 3,
+      selfCardPreview: null,
       factors: {
         isAlive: false,
         lives: 0,
@@ -82,7 +445,8 @@ export function computePlayerPortraitState({
   const missingHpRatio = 1 - hpRatio;
   const isCriticalHp = lives === 1;
   const isLowHp = lives < maxLives;
-  const isDamagedNow = fx === 'DAMAGE' || fx === 'VACUUM' || fx === 'DEATH_MARK_KILL';
+  const isDamagedNow =
+    isDamagedEvent || fx === 'DAMAGE' || fx === 'VACUUM' || fx === 'DEATH_MARK_KILL';
   const isHealingNow = fx === 'HEAL' || isRecovering;
 
   let vitalityStress = isCriticalHp ? 0.72 : missingHpRatio * 0.52;
@@ -99,6 +463,8 @@ export function computePlayerPortraitState({
 
   const isHandRevealed = Boolean(me.isHandRevealed || fx === 'REVEALED');
   const isDisarmed = fx === 'DISARMED';
+  const isSoulSwapped = fx === 'SOUL_SWAP';
+  const isSyringeEmpty = fx === 'SYRINGE_EMPTY';
   const lowHandResources = hand.length <= 1 && phase === 'PLANNING' && !me.lockedIn;
 
   // Verifica se o jogador está com menos vida que os oponentes vivos (desvantagem na mesa)
@@ -126,7 +492,6 @@ export function computePlayerPortraitState({
   /* ------------------------------------------------------------------ */
   /* 3. AMEAÇA IMINENTE & CONDIÇÕES DE COMBATE (Alvejado, Marca, Pacto) */
   /* ------------------------------------------------------------------ */
-  // Ataques revelados na rodada apontando diretamente para o jogador
   const incomingAttacks = [];
   for (const opp of aliveOpponents) {
     const act = opp.selectedAction;
@@ -249,26 +614,23 @@ export function computePlayerPortraitState({
     threatScore >= 0.3,
   ].filter(Boolean).length;
 
-  // Combinação de situações: pouca vida + encurralado/ameaça amplifica a tensão
   const synergyBonus =
     activeDimensions >= 3 ? 0.22 : activeDimensions === 2 ? 0.13 : 0;
 
-  // Peso consolidado das três dimensões + bônus de combinação
   const dominant = Math.max(vitalityStress, corneredScore, threatScore);
   const secondary =
     (vitalityStress + corneredScore + threatScore - dominant) * 0.42;
 
   let rawTension = dominant + secondary + synergyBonus;
 
-  // Se o jogador acabou de se curar / recuperar e não está sob risco letal imediato, suaviza a tensão
-  if (isHealingNow && !hasLethalIncoming && !isCriticalHp) {
+  if (isHealingNow && !hasLethalIncoming && !isCriticalHp && !isDamagedNow) {
     rawTension = Math.max(0.08, rawTension * 0.55 - 0.12);
   }
 
   const tensionScore = Number(clamp(rawTension, 0, 1).toFixed(2));
 
   /* ------------------------------------------------------------------ */
-  /* 5. CLASSIFICAÇÃO DO ESTADO E RÓTULO TÁTICO CONTEXTUAL              */
+  /* 5. CLASSIFICAÇÃO DO ESTADO E EXPRESSÃO DO SPRITESHEET              */
   /* ------------------------------------------------------------------ */
   const knifeDamage = Number(me.knifeDamage) || 1;
   const hasSoulBuff = knifeDamage > 1 || fx === 'SOUL_BUFF';
@@ -276,9 +638,13 @@ export function computePlayerPortraitState({
   const isVacuum = fx === 'VACUUM';
 
   let tensionLevel = 'CALM';
-  if (isHealingNow && tensionScore < 0.45) {
+  if (isHealingNow && !isDamagedNow && tensionScore < 0.45) {
     tensionLevel = 'RELIEF';
-  } else if (tensionScore >= 0.74 || (isCriticalHp && (corneredScore >= 0.3 || threatScore >= 0.3))) {
+  } else if (
+    isDamagedNow ||
+    tensionScore >= 0.74 ||
+    (isCriticalHp && (corneredScore >= 0.3 || threatScore >= 0.3))
+  ) {
     tensionLevel = 'CRITICAL';
   } else if (corneredScore >= 0.45 || (isWalled && tensionScore >= 0.42)) {
     tensionLevel = 'CORNERED';
@@ -288,7 +654,56 @@ export function computePlayerPortraitState({
     tensionLevel = 'WATCHFUL';
   }
 
-  // Construção do resumo contextual real (sem inventar mecânicas)
+  const factors = {
+    isAlive,
+    lives,
+    maxLives,
+    hpRatio,
+    isLowHp,
+    isCriticalHp,
+    isDamagedNow,
+    isHealingNow,
+    isWalled,
+    isWalledWithoutEscape,
+    isHandRevealed,
+    isDisarmed,
+    isSoulSwapped,
+    isSyringeEmpty,
+    lowHandResources,
+    incomingAttacks,
+    incomingAttackCount,
+    hasLethalIncoming,
+    enemyHasLethalKnife,
+    hasDeathMark,
+    deathMarkTurns,
+    isDeathMarkUrgent,
+    isOverdoseNow,
+    hasBloodPact,
+    pactPartners,
+    pactPartnerInDanger,
+    enemyMaxKnife,
+    timeUrgency,
+    selectedCardSelfRisk,
+    hasSoulBuff,
+    knifeDamage,
+    isReflecting,
+    isVacuum,
+    activeDimensions,
+  };
+
+  const resolvedExpression = resolvePortraitExpression({
+    factors,
+    tensionLevel,
+    tensionScore,
+    selectedCard,
+    canSelfTarget,
+    isHoveringValidSelfTarget,
+    isDamagedEvent,
+    isReliefEvent: isRecovering,
+    me,
+  });
+
+  // Construção do resumo contextual real
   const activeReasons = [];
   if (isCriticalHp) activeReasons.push('1 Vida restante');
   else if (isLowHp) activeReasons.push(`Ferido (${lives}/${maxLives} HP)`);
@@ -321,23 +736,34 @@ export function computePlayerPortraitState({
   }
 
   let statusLabel = 'ESTÁVEL';
-  if (tensionLevel === 'RELIEF') statusLabel = 'ALÍVIO · RECUPERADO';
-  else if (tensionLevel === 'CRITICAL') {
+  if (isHoveringValidSelfTarget && resolvedExpression.selfCardPreview) {
+    statusLabel = resolvedExpression.selfCardPreview.actionTitle.toUpperCase();
+  } else if (isDamagedNow) {
+    statusLabel = 'DOR · FERIMENTO';
+  } else if (tensionLevel === 'RELIEF') {
+    statusLabel = 'ALÍVIO · RECUPERADO';
+  } else if (tensionLevel === 'CRITICAL') {
     statusLabel =
       activeDimensions >= 2 ? 'COLAPSO IMINENTE' : 'ESTADO CRÍTICO';
-  } else if (tensionLevel === 'CORNERED') statusLabel = 'ENCURRALADO';
-  else if (tensionLevel === 'PRESSURED') statusLabel = 'AMEAÇA ELEVADA';
-  else if (tensionLevel === 'WATCHFUL') statusLabel = 'SOB TENSÃO';
-  else if (hasSoulBuff) statusLabel = 'ALMA FORTALECIDA';
+  } else if (tensionLevel === 'CORNERED') {
+    statusLabel = 'ENCURRALADO';
+  } else if (tensionLevel === 'PRESSURED') {
+    statusLabel = 'AMEAÇA ELEVADA';
+  } else if (tensionLevel === 'WATCHFUL') {
+    statusLabel = 'SOB TENSÃO';
+  } else if (hasSoulBuff) {
+    statusLabel = 'ALMA FORTALECIDA';
+  }
 
   const statusSummary =
-    activeReasons.length > 0
-      ? activeReasons.slice(0, 2).join(' · ')
-      : tensionLevel === 'RELIEF'
-        ? 'Vitalidade restaurada na mesa'
-        : 'Postura firme e controle tático';
+    isHoveringValidSelfTarget && resolvedExpression.selfCardPreview
+      ? resolvedExpression.selfCardPreview.actionSubtitle
+      : activeReasons.length > 0
+        ? activeReasons.slice(0, 2).join(' · ')
+        : tensionLevel === 'RELIEF'
+          ? 'Vitalidade restaurada na mesa'
+          : 'Postura firme e controle tático';
 
-  // Parâmetros visuais contínuos para animar o retrato
   const heartbeatDuration =
     tensionLevel === 'CRITICAL'
       ? 0.68
@@ -384,39 +810,11 @@ export function computePlayerPortraitState({
     tensionLevel,
     statusLabel,
     statusSummary,
-    factors: {
-      isAlive,
-      lives,
-      maxLives,
-      hpRatio,
-      isLowHp,
-      isCriticalHp,
-      isDamagedNow,
-      isHealingNow,
-      isWalled,
-      isWalledWithoutEscape,
-      isHandRevealed,
-      isDisarmed,
-      lowHandResources,
-      incomingAttacks,
-      incomingAttackCount,
-      hasLethalIncoming,
-      hasDeathMark,
-      deathMarkTurns,
-      isDeathMarkUrgent,
-      isOverdoseNow,
-      hasBloodPact,
-      pactPartners,
-      pactPartnerInDanger,
-      enemyMaxKnife,
-      timeUrgency,
-      selectedCardSelfRisk,
-      hasSoulBuff,
-      knifeDamage,
-      isReflecting,
-      isVacuum,
-      activeDimensions,
-    },
+    expressionKey: resolvedExpression.expressionKey,
+    expressionLabel: resolvedExpression.expressionLabel,
+    expressionPriority: resolvedExpression.priorityLevel,
+    selfCardPreview: resolvedExpression.selfCardPreview,
+    factors,
     visualParams: {
       heartbeatDuration,
       eyeState,

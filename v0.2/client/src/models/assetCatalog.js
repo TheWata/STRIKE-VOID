@@ -19,6 +19,9 @@ export const CARD_ART_ASSETS = {
   CARD_BACK: '/assets/cards/card-back.webp',
 };
 
+export const CHARACTER_EXPRESSION_SPRITESHEET =
+  '/assets/characters/expressions-spritesheet.jpg';
+
 /**
  * Silhuetas/presenças sombrias com transparência real (PNG/WebP RGBA)
  * e coordenadas calibradas dos olhos dinâmicos no viewBox 160x210.
@@ -131,6 +134,7 @@ export function preloadCriticalTableAssets() {
   preloaded = true;
 
   const criticalUrls = [
+    CHARACTER_EXPRESSION_SPRITESHEET,
     TEXTURE_ASSETS.TABLE_WOOD,
     TEXTURE_ASSETS.TABLE_FELT,
     TEXTURE_ASSETS.PARCHMENT_GRAIN,
