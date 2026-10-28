@@ -42,7 +42,7 @@ export function seatAngle(index, localIndex, totalPlayers) {
  * Posição 2D/3D percentual sobre o feltro da mesa (0..100%).
  * Usada para slots de cartas e setas táticas entre jogadores.
  */
-export function seatPosition(index, localIndex, totalPlayers, rx = 37, ry = 31) {
+export function seatPosition(index, localIndex, totalPlayers, rx = 35, ry = 28) {
   const angle = seatAngle(index, localIndex, totalPlayers);
   return {
     x: 50 + rx * Math.cos(angle),
@@ -56,6 +56,7 @@ export function seatPosition(index, localIndex, totalPlayers, rx = 37, ry = 31) 
  * - Compensa a perspectiva para que oponentes distantes (no topo da mesa)
  *   mantenham escala visual perceptiva similar aos oponentes das laterais.
  * - Ajusta escala e raio de acordo com o total de jogadores (2 a 8).
+ * - Raio e anchorY calibrados para folga vertical ideal e visibilidade total da barra de vida.
  */
 export function silhouettePosition(index, localIndex, totalPlayers) {
   const angle = seatAngle(index, localIndex, totalPlayers);
@@ -63,8 +64,8 @@ export function silhouettePosition(index, localIndex, totalPlayers) {
   const cosA = Math.cos(angle);
 
   // Raio da elipse de ancoragem das presenças sombrias
-  const rx = 52.5;
-  const ry = sinA < -0.35 ? 44.5 : 41.5;
+  const rx = totalPlayers >= 7 ? 48.0 : 46.5;
+  const ry = totalPlayers === 2 ? 34.5 : sinA < -0.35 ? 36.5 : 35.0;
   const x = 50 + rx * cosA;
   const y = 50 + ry * sinA;
 
@@ -77,16 +78,16 @@ export function silhouettePosition(index, localIndex, totalPlayers) {
   // Escala base adaptativa ao total de jogadores para evitar sobreposição
   let countScale = 1.0;
   if (totalPlayers >= 7) {
-    countScale = 0.78; // 7 oponentes: layout ultra-compacto com espaçamento perfeito
+    countScale = 0.80; // 7 oponentes: layout proporcional e espaçado
   } else if (totalPlayers >= 5) {
-    countScale = 0.88; // 4-5 oponentes
+    countScale = 0.90; // 4-5 oponentes
   } else if (totalPlayers === 2) {
-    countScale = 1.18; // Duelo 1v1: chefe imponente na cabeceira
+    countScale = 1.15; // Duelo 1v1: chefe imponente na cabeceira
   }
 
   const finalScale = Number((countScale * perspectiveCompensation).toFixed(2));
-  const isLeftFlank = x < 23;
-  const isRightFlank = x > 77;
+  const isLeftFlank = x < 24;
+  const isRightFlank = x > 76;
 
   return {
     x: Number(x.toFixed(1)),
@@ -95,7 +96,7 @@ export function silhouettePosition(index, localIndex, totalPlayers) {
     sinA,
     cosA,
     scale: finalScale,
-    anchorY: -73,
+    anchorY: -48,
     isLeftFlank,
     isRightFlank,
   };
@@ -105,22 +106,22 @@ export function silhouettePosition(index, localIndex, totalPlayers) {
 export function getSilhouetteDimensions(totalPlayers, isCompact = false) {
   if (totalPlayers >= 7) {
     return isCompact
-      ? { widthCls: 'w-[94px] h-[126px]', badgeScale: 'scale-[0.85]' }
-      : { widthCls: 'w-[124px] h-[162px]', badgeScale: 'scale-[0.92]' };
+      ? { widthCls: 'w-[92px] h-[122px]', badgeScale: 'scale-[0.88]' }
+      : { widthCls: 'w-[118px] h-[154px]', badgeScale: 'scale-[0.92]' };
   }
   if (totalPlayers >= 5) {
     return isCompact
-      ? { widthCls: 'w-[110px] h-[146px]', badgeScale: 'scale-[0.90]' }
-      : { widthCls: 'w-[146px] h-[190px]', badgeScale: 'scale-[0.96]' };
+      ? { widthCls: 'w-[104px] h-[138px]', badgeScale: 'scale-[0.92]' }
+      : { widthCls: 'w-[136px] h-[178px]', badgeScale: 'scale-[0.96]' };
   }
   if (totalPlayers === 2) {
     return isCompact
-      ? { widthCls: 'w-[148px] h-[194px]', badgeScale: 'scale-[1.05]' }
-      : { widthCls: 'w-[196px] h-[252px]', badgeScale: 'scale-[1.08]' };
+      ? { widthCls: 'w-[140px] h-[184px]', badgeScale: 'scale-[1.05]' }
+      : { widthCls: 'w-[180px] h-[234px]', badgeScale: 'scale-[1.08]' };
   }
   return isCompact
-    ? { widthCls: 'w-[126px] h-[166px]', badgeScale: 'scale-[0.95]' }
-    : { widthCls: 'w-[168px] h-[218px]', badgeScale: 'scale-100' };
+    ? { widthCls: 'w-[120px] h-[158px]', badgeScale: 'scale-[0.95]' }
+    : { widthCls: 'w-[154px] h-[202px]', badgeScale: 'scale-100' };
 }
 
 /** Pregos decorativos nos 8 vértices da mesa octogonal */

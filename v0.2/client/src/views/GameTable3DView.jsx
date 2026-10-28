@@ -151,23 +151,27 @@ export default function GameTable3DView({
   const selectedMeta = selectedCard ? CARD_META[selectedCard.type] : null;
 
   // Inclinação e perspectiva da mesa:
-  // - Modo normal: visão equilibrada levemente inclinada (28deg)
-  // - Modo de mira (isTargetingMode): perspectiva baixa de mesa (45deg), imersiva em primeira pessoa,
-  //   onde a superfície da mesa recua em profundidade e todos os oponentes ficam de frente para o jogador.
+  // A mesa permanece inclinada na perspectiva cinemática em primeira pessoa assim que uma carta é selecionada,
+  // mantendo-se inclinada durante a escolha de alvo, o travamento da jogada (lockedIn) e a resolução do combate!
+  const hasChosenCard = Boolean(
+    selectedCardIds.length > 0 ||
+    me?.lockedIn ||
+    me?.selectedAction ||
+    isResolving
+  );
+
   const tablePitch =
     cameraZone === CAMERA_ZONES.PLAYERS
       ? 22
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? 52
-        : isTargetingMode
+        : hasChosenCard
           ? compact
             ? 41
             : 46
-          : isSelectionMode
-            ? 25
-            : 28;
+          : 28;
 
-  // Mesa reposicionada suavemente para dar espaço vertical aos oponentes durante a mira
+  // Mesa reposicionada com folga generosa para os oponentes e suas barras de vida
   const tableTranslateY =
     cameraZone === CAMERA_ZONES.PLAYERS
       ? compact
@@ -175,32 +179,25 @@ export default function GameTable3DView({
         : 60
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? -210
-        : isTargetingMode
+        : hasChosenCard
           ? compact
-            ? 52
-            : 70
-          : isSelectionMode
-            ? compact
-              ? 30
-              : 46
-            : compact
-              ? 24
-              : 38;
+            ? 48
+            : 60
+          : compact
+            ? 24
+            : 36;
 
+  // Tamanho calibrado e reduzido para manter respirabilidade e visibilidade das presenças
   const tableScale =
     cameraZone === CAMERA_ZONES.NOTEBOOK
-      ? 0.82
-      : isTargetingMode
+      ? 0.78
+      : hasChosenCard
         ? compact
-          ? 0.98
-          : 1.04
-        : isSelectionMode
-          ? compact
-            ? 0.94
-            : 0.98
-          : compact
-            ? 0.9
-            : 0.94;
+          ? 0.86
+          : 0.90
+        : compact
+          ? 0.84
+          : 0.88;
 
   const handleSelfTargetTrigger = () => {
     if (!canAct || !canSelfTarget || !selectedCard || !me) return;
@@ -327,10 +324,10 @@ export default function GameTable3DView({
         )}
       </div>
 
-      {/* 2. FAIXA CONTEXTUAL DE RESOLUÇÃO / MIRA NO TOPO DA MESA */}
-      <div className="pointer-events-none relative z-40 pt-2 sm:pt-3 px-4 flex flex-col items-center justify-center gap-1 shrink-0">
+      {/* 2. FAIXA CONTEXTUAL DE RESOLUÇÃO NO TOPO DA MESA */}
+      <div className="pointer-events-none relative z-40 pt-1 px-4 flex flex-col items-center justify-center gap-1 shrink-0">
         <AnimatePresence mode="wait">
-          {isResolving && activeStep ? (
+          {isResolving && activeStep && (
             <motion.div
               key={activeStep.key}
               initial={{ opacity: 0, y: -8 }}
@@ -345,49 +342,7 @@ export default function GameTable3DView({
                 {activeStep.subtitle}
               </span>
             </motion.div>
-          ) : canAct && selectedCard ? (
-            <motion.div
-              key="aim-whisper"
-              initial={{ opacity: 0, y: -6 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -6 }}
-              className="pointer-events-auto flex flex-wrap items-center justify-center gap-2 bg-black/85 border border-red-500/65 px-3.5 py-1.5 rounded-full text-red-100 font-grimoire text-xs sm:text-sm tracking-[0.12em] uppercase shadow-[0_0_22px_rgba(220,38,38,0.45)]"
-            >
-              <Crosshair size={15} className="text-red-400 animate-pulse shrink-0" />
-              <span>
-                <strong>{selectedMeta?.name}</strong> — Clique em um oponente na mesa
-                {canSelfTarget ? ' ou clique no seu Retrato Central' : ''}
-              </span>
-              <button
-                type="button"
-                onClick={() => setInspectedCard(selectedCard)}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-stone-900 border border-gold-aged/70 text-amber-200 hover:text-white font-mono text-[11px] cursor-pointer"
-              >
-                <ZoomIn size={12} />
-                <span>Ampliar</span>
-              </button>
-              {setShowGuide && (
-                <button
-                  type="button"
-                  onClick={() => setShowGuide(true)}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blood/80 border border-blood-bright text-white hover:bg-blood font-mono text-[11px] font-bold cursor-pointer"
-                  title="Consultar manual das 9 cartas [G]"
-                >
-                  <span>Guia [G]</span>
-                </button>
-              )}
-              <button
-                id="btn-cancel-selection"
-                type="button"
-                onClick={() => setSelectedCardIds([])}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-stone-900/90 border border-stone-600 text-stone-300 hover:text-white hover:border-red-400 font-mono text-[11px] cursor-pointer"
-                title="Cancelar seleção de carta [ESC]"
-              >
-                <XCircle size={12} />
-                <span>Cancelar</span>
-              </button>
-            </motion.div>
-          ) : null}
+          )}
         </AnimatePresence>
 
         {/* Efeitos ativos da rodada */}
@@ -426,11 +381,11 @@ export default function GameTable3DView({
           className="relative"
           style={{
             width: compact
-              ? 'min(92vw, calc(100dvh - 280px))'
-              : 'min(78vw, calc(100dvh - 300px))',
+              ? 'min(84vw, calc(100dvh - 310px))'
+              : 'min(66vw, calc(100dvh - 330px))',
             maxHeight: compact
-              ? 'calc(100dvh - 280px)'
-              : 'calc(100dvh - 300px)',
+              ? 'calc(100dvh - 310px)'
+              : 'calc(100dvh - 330px)',
             aspectRatio: '1 / 1',
             transformStyle: 'preserve-3d',
             transform:
@@ -485,10 +440,10 @@ export default function GameTable3DView({
                 style={{
                   left: `${sil.x}%`,
                   top: `${sil.y}%`,
-                  zIndex: isHoveredTarget ? 45 : 15,
+                  zIndex: isHoveredTarget ? 45 : 25,
                   transformStyle: 'preserve-3d',
                   transformOrigin: '50% 85%',
-                  transform: `translate(-50%, ${sil.anchorY}%) translateZ(14px) rotateX(${-tablePitch * 0.82}deg) scale(${sil.scale})`,
+                  transform: `translate(-50%, ${sil.anchorY}%) translateZ(18px) rotateX(${-tablePitch * 0.82}deg) scale(${sil.scale})`,
                 }}
               >
                 <PlayerSilhouette3D

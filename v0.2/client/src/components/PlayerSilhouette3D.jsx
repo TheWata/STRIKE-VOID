@@ -42,19 +42,19 @@ export function StylizedLifeBar({
         targetable && 'scale-105'
       )}
     >
-      {/* Linha 1: Nome do personagem integrado à atmosfera (sem caixa ou moldura) */}
+      {/* Linha 1: Nome do personagem com forte contraste atmosférico */}
       <div className="flex items-center gap-1.5 mb-1">
         <span
           className={cn(
             'font-grimoire tracking-[0.14em] uppercase transition-colors',
             compact ? 'text-[11px]' : 'text-xs sm:text-[13px]',
             !isAlive
-              ? 'text-stone-500/70 line-through'
+              ? 'text-stone-500 line-through'
               : targetable
-                ? 'text-red-200 font-extrabold'
+                ? 'text-amber-100 font-extrabold'
                 : isMe
                   ? 'text-[#f6e7c8] font-extrabold'
-                  : 'text-[#e5d4b3]/95 font-bold'
+                  : 'text-[#e5d4b3] font-bold'
           )}
           style={{
             textShadow: targetable
@@ -68,94 +68,95 @@ export function StylizedLifeBar({
         {/* Indicador discreto de cartas na mão ou jogada pronta */}
         {isAlive && !isMe && handCount != null && (
           <span
-            className="font-mono text-[9.5px] text-amber-200/60 tracking-tight"
+            className="font-mono text-[9.5px] text-amber-200/80 px-1 py-0.2 rounded bg-black/70 border border-stone-800 tracking-tight"
             style={{ textShadow: '0 1px 4px rgba(0,0,0,0.95)' }}
           >
-            · {handCount}
+            🎴 {handCount}
           </span>
         )}
         {isAlive && lockedIn && (
           <span
-            className="w-1.5 h-1.5 rounded-full bg-amber-300/90 shadow-[0_0_8px_rgba(251,191,36,0.95)]"
+            className="w-2 h-2 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,1)]"
             title="Jogada escolhida"
           />
         )}
       </div>
 
-      {/* Linha 2: Barra de vida estilizada em fragmentos de sangue (sem contornos pesados) */}
+      {/* Linha 2: Placa de vida nítida, com corações brilhantes e contador numérico de alto contraste */}
       {isAlive ? (
-        <div className="flex items-center gap-1.5">
-          <div
-            className="flex items-center gap-1 px-1.5 py-1 rounded-full"
-            style={{
-              background:
-                'radial-gradient(ellipse at center, rgba(12, 6, 4, 0.72) 0%, rgba(6, 3, 2, 0.25) 85%, transparent 100%)',
-            }}
-          >
+        <div
+          className={cn(
+            'flex items-center gap-1.5 px-2 py-0.5 rounded-full border shadow-[0_4px_14px_rgba(0,0,0,0.95)] backdrop-blur-sm transition-all duration-300',
+            targetable
+              ? 'bg-[#1e0707]/95 border-red-500 shadow-[0_0_14px_rgba(239,68,68,0.65)] ring-1 ring-red-400/50'
+              : safeLives <= 1
+                ? 'bg-[#250505]/95 border-red-600/90 shadow-[0_0_12px_rgba(220,38,38,0.7)] animate-pulse'
+                : 'bg-[#0d0705]/95 border-gold-aged/60 shadow-[0_0_10px_rgba(0,0,0,0.9)]'
+          )}
+        >
+          {/* Corações de Sangue estilizados e nítidos */}
+          <div className="flex items-center gap-1">
             {Array.from({ length: safeMax }).map((_, i) => {
               const filled = i < safeLives;
               return (
                 <div
                   key={i}
                   className={cn(
-                    'relative transition-all duration-500',
-                    compact
-                      ? 'w-5 h-[7px] sm:w-6 sm:h-[8px]'
-                      : 'w-6 h-[8px] sm:w-7 sm:h-[9px]'
+                    'relative flex items-center justify-center transition-all duration-300',
+                    compact ? 'w-3.5 h-3.5' : 'w-4 h-4'
                   )}
-                  style={{
-                    clipPath:
-                      'polygon(12% 0%, 88% 0%, 100% 50%, 88% 100%, 12% 100%, 0% 50%)',
-                    background: filled
-                      ? 'linear-gradient(90deg, #991b1b 0%, #ef4444 48%, #b91c1c 100%)'
-                      : 'rgba(28, 16, 12, 0.68)',
-                    boxShadow: filled
-                      ? 'inset 0 1px 1px rgba(255, 220, 220, 0.38), 0 0 10px rgba(220, 38, 38, 0.55)'
-                      : 'inset 0 1px 3px rgba(0, 0, 0, 0.92)',
-                    opacity: filled ? 1 : 0.45,
-                  }}
+                  title={filled ? 'Vida ativa' : 'Vida perdida'}
                 >
-                  {filled && (
-                    <div
-                      className="absolute inset-x-[18%] top-[15%] h-[28%] rounded-full"
-                      style={{
-                        background:
-                          'linear-gradient(90deg, transparent, rgba(255,240,240,0.45), transparent)',
-                      }}
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="w-full h-full"
+                    style={{
+                      filter: filled
+                        ? 'drop-shadow(0 0 4px rgba(239, 68, 68, 0.9))'
+                        : 'none',
+                    }}
+                  >
+                    <path
+                      d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                      fill={filled ? '#dc2626' : '#1c0c0c'}
+                      stroke={filled ? '#fca5a5' : '#4a1e1e'}
+                      strokeWidth="1.6"
                     />
-                  )}
+                  </svg>
                 </div>
               );
             })}
           </div>
 
+          {/* Contador Numérico de Vida em Alto Contraste (Sempre visível à distância) */}
           <span
-            className="font-mono text-[10px] tracking-tighter text-[#e5d4b3]/75"
-            style={{ textShadow: '0 2px 5px rgba(0,0,0,0.98)' }}
+            className={cn(
+              'font-mono font-black tracking-tight leading-none px-0.5',
+              compact ? 'text-[11px]' : 'text-xs sm:text-[13px]',
+              safeLives <= 1 ? 'text-red-400 font-extrabold' : 'text-amber-100 font-extrabold'
+            )}
+            style={{ textShadow: '0 1px 4px #000, 0 0 8px rgba(0,0,0,0.95)' }}
           >
-            {safeLives}/{safeMax}
+            {safeLives}/{safeMax} HP
           </span>
         </div>
       ) : (
-        <span
-          className="font-grimoire text-[10px] tracking-[0.2em] text-red-500/70 uppercase"
-          style={{ textShadow: '0 2px 6px rgba(0,0,0,0.98)' }}
-        >
-          Eliminado
-        </span>
+        <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-stone-950/90 border border-stone-800 text-stone-500 font-mono text-[10px] font-bold tracking-wider">
+          <span>☠️ ELIMINADO</span>
+        </div>
       )}
 
       {/* Linha 3: Sinais contextuais orgânicos com ícones SVG dedicados */}
       {isAlive && (hasDeathMark || knifeDmg > 1 || pactPartners.length > 0 || isWalled) && (
         <div
-          className="flex flex-wrap items-center justify-center gap-2 mt-0.5 text-[10px] font-mono font-bold"
+          className="flex flex-wrap items-center justify-center gap-1.5 mt-1 text-[10px] font-mono font-bold"
           style={{ textShadow: '0 2px 6px rgba(0,0,0,0.98)' }}
         >
           {hasDeathMark && (
             <span
               className={cn(
-                'inline-flex items-center gap-0.5 tracking-tight',
-                deathMarkTurns <= 2 ? 'text-red-400 animate-pulse' : 'text-lime-300/95'
+                'inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-red-950/90 border border-red-500/70 tracking-tight shadow-sm',
+                deathMarkTurns <= 2 ? 'text-red-400 animate-pulse' : 'text-lime-300'
               )}
             >
               <GameIcon name="death-mark" size={11} />
@@ -163,19 +164,19 @@ export function StylizedLifeBar({
             </span>
           )}
           {knifeDmg > 1 && (
-            <span className="inline-flex items-center gap-0.5 text-teal-300/95">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-teal-950/90 border border-teal-500/60 text-teal-200 shadow-sm">
               <GameIcon name="dagger-buff" size={11} />
               <span>{knifeDmg}x</span>
             </span>
           )}
           {pactPartners.length > 0 && (
-            <span className="inline-flex items-center gap-0.5 text-rose-400/95 truncate max-w-[125px]">
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded bg-rose-950/90 border border-rose-500/60 text-rose-200 truncate max-w-[130px] shadow-sm">
               <GameIcon name="blood-drop" size={11} />
               <span>{pactPartners.join(', ')}</span>
             </span>
           )}
           {isWalled && (
-            <span className="inline-flex items-center text-sky-300/90">
+            <span className="inline-flex items-center px-1.5 py-0.2 rounded bg-sky-950/90 border border-sky-400/60 text-sky-200 shadow-sm">
               <GameIcon name="iron-lock" size={11} />
             </span>
           )}
@@ -492,7 +493,7 @@ export default function PlayerSilhouette3D({
 
       {/* 2. BARRA DE VIDA ESTILIZADA & BADGE DE COMBATE ACIMA DA SILHUETA E DA MESA */}
       <div
-        className="relative z-40 -mb-2.5 flex flex-col items-center"
+        className="relative z-40 mb-1 flex flex-col items-center"
         style={{
           transform: 'translateZ(34px)',
         }}
@@ -554,7 +555,7 @@ export default function PlayerSilhouette3D({
             transition={{ type: 'spring', stiffness: 280, damping: 22 }}
             style={{ transform: 'translateZ(58px)' }}
             className={cn(
-              'pointer-events-auto absolute -top-24 sm:-top-28 z-50 min-w-[210px] sm:min-w-[260px] max-w-[310px] px-3.5 py-2 rounded-xl border-2 backdrop-blur-md shadow-[0_16px_38px_rgba(0,0,0,0.98)] flex flex-col items-center text-center gap-1 select-none transition-all',
+              'pointer-events-auto absolute top-12 sm:top-14 z-50 min-w-[210px] sm:min-w-[260px] max-w-[310px] px-3.5 py-2 rounded-xl border-2 backdrop-blur-md shadow-[0_16px_38px_rgba(0,0,0,0.98)] flex flex-col items-center text-center gap-1 select-none transition-all',
               panelAlignCls,
               'bg-gradient-to-b from-[#21130b]/98 via-[#180e08]/98 to-[#0e0704]/98 border-gold-aged shadow-[0_0_24px_rgba(212,175,55,0.55),0_0_12px_rgba(168,85,247,0.35)]'
             )}
