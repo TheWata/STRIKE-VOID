@@ -12,6 +12,7 @@ import {
   ZoomIn,
   Lock,
   XCircle,
+  BookOpen,
 } from 'lucide-react';
 import { cn } from '../lib/cn';
 import {
@@ -227,6 +228,57 @@ export default function GameTable3DView({
         <div className="candle absolute inset-0 bg-[radial-gradient(circle_at_50%_28%,rgba(255,165,60,0.16),rgba(139,0,0,0.07)_46%,transparent_76%)]" />
       </div>
 
+      {/* 1B. BARRA SUPERIOR DE UTILIDADES EM PARTIDA: SOB A MESA & GUIA */}
+      <div className="fixed top-2 sm:top-3 left-2 sm:left-3 z-[70] flex items-center gap-1.5 sm:gap-2">
+        <button
+          id="btn-toggle-under-table-top"
+          type="button"
+          onClick={() => {
+            audio.play('select');
+            selectZone(
+              cameraZone === CAMERA_ZONES.NOTEBOOK
+                ? CAMERA_ZONES.CARDS
+                : CAMERA_ZONES.NOTEBOOK
+            );
+          }}
+          className={cn(
+            'flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-mono font-bold tracking-wider uppercase transition-all shadow-lg active:scale-95 cursor-pointer',
+            cameraZone === CAMERA_ZONES.NOTEBOOK
+              ? 'bg-gradient-to-r from-blood to-red-950 border-gold-aged text-white shadow-[0_0_15px_rgba(220,38,38,0.7)]'
+              : 'bg-black/80 hover:bg-[#25150c] border-gold-aged/70 text-amber-200 hover:text-white'
+          )}
+          title="Abrir ou fechar Grimório e Caderno de Chat sob a mesa [Tecla S ou Seta Baixo]"
+        >
+          <BookOpen size={14} className="text-gold-aged" />
+          <span className="hidden sm:inline">
+            {cameraZone === CAMERA_ZONES.NOTEBOOK ? 'Voltar à Mesa [ESC]' : 'Sob a Mesa [S]'}
+          </span>
+          <span className="sm:hidden">
+            {cameraZone === CAMERA_ZONES.NOTEBOOK ? 'Mesa' : 'Sob a Mesa'}
+          </span>
+          {logs.length > 0 && (
+            <span className="px-1.5 py-0.2 rounded-full bg-gold-aged/30 border border-gold-aged/60 text-[10px] text-amber-100">
+              {logs.length}
+            </span>
+          )}
+        </button>
+
+        {setShowGuide && (
+          <button
+            id="btn-top-quick-guide"
+            type="button"
+            onClick={() => {
+              audio.play('select');
+              setShowGuide(true);
+            }}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-black/80 hover:bg-[#25150c] border border-stone-700 hover:border-gold-aged/70 text-amber-200/90 hover:text-white text-xs font-mono font-bold tracking-wider transition-all shadow-md active:scale-95 cursor-pointer"
+            title="Abrir Tabela Rápida de Consulta de Regras [Tecla G]"
+          >
+            <span>📖 Guia [G]</span>
+          </button>
+        )}
+      </div>
+
       {/* 2. FAIXA CONTEXTUAL DE RESOLUÇÃO / MIRA NO TOPO DA MESA */}
       <div className="pointer-events-none relative z-40 pt-2 sm:pt-3 px-4 flex flex-col items-center justify-center gap-1 shrink-0">
         <AnimatePresence mode="wait">
@@ -396,6 +448,8 @@ export default function GameTable3DView({
                   isMe={false}
                   targetable={targetable}
                   dimmed={dimmed}
+                  selectedCard={selectedCard}
+                  me={me}
                   onSeatClick={onSeatClick}
                   onDropCard={onDropCard}
                   onInspectCard={setInspectedCard}
@@ -756,46 +810,49 @@ export default function GameTable3DView({
         )}
       </motion.footer>
 
-      {/* 5. ZONA INTENCIONAL NO EXTREMO INFERIOR DA TELA PARA ACESSAR O CHAT & GRIMÓRIO */}
+      {/* 5. GAVETA / BARRA FLUTUANTE INFERIOR: ACESSO AO GRIMÓRIO & CHAT */}
       {cameraZone !== CAMERA_ZONES.NOTEBOOK && (
         <div
-          id="under-table-trigger"
+          id="under-table-floating-bar"
           onMouseEnter={handleBottomEdgeEnter}
           onMouseLeave={handleBottomEdgeLeave}
-          className="fixed inset-x-0 bottom-0 z-[55] h-[22px] flex items-center justify-center gap-3 bg-gradient-to-t from-black/95 to-transparent"
+          className="fixed inset-x-0 bottom-0 z-[55] flex items-center justify-center pointer-events-none"
         >
-          {setShowGuide && (
+          <div className="pointer-events-auto flex items-center gap-2 mb-0.5 px-3 py-1 rounded-t-xl bg-gradient-to-t from-black via-black/95 to-black/85 border-t-2 border-x-2 border-gold-aged/70 shadow-[0_-4px_24px_rgba(0,0,0,0.95)]">
             <button
-              id="btn-quick-guide-trigger"
+              id="btn-scroll-under-table"
               type="button"
               onClick={() => {
                 audio.play('select');
-                setShowGuide(true);
+                selectZone(CAMERA_ZONES.NOTEBOOK);
               }}
-              className="flex items-center gap-1 text-[10.5px] font-mono font-bold tracking-wider uppercase text-red-300 hover:text-white px-2 py-0.5 rounded bg-blood/40 hover:bg-blood/70 border border-blood-bright/60 transition-colors cursor-pointer"
-              title="Abrir Tabela de Consulta Rápida das Cartas [Tecla G]"
+              className="flex items-center gap-1.5 text-[11px] font-mono font-bold tracking-wider uppercase text-amber-200 hover:text-white transition-colors cursor-pointer"
+              title="Descer o olhar para ver o Livro de Cartas e o Caderno de Anotações sob a mesa [Tecla S ou Seta Baixo]"
             >
-              <span>📖 GUIA RÁPIDO [G]</span>
+              <ChevronDown size={14} className="text-gold-aged animate-bounce" />
+              <span>📖 Grimório de Regras & Caderno de Chat ({logs.length})</span>
+              <ChevronDown size={14} className="text-gold-aged animate-bounce" />
             </button>
-          )}
 
-          <button
-            id="btn-scroll-under-table"
-            type="button"
-            onClick={() => {
-              audio.play('select');
-              selectZone(CAMERA_ZONES.NOTEBOOK);
-            }}
-            className="flex items-center gap-1.5 text-[10.5px] font-mono font-bold tracking-widest uppercase text-parchment/70 hover:text-amber-200 px-3 py-0.5 transition-colors cursor-pointer"
-          >
-            <ChevronDown size={12} className="text-gold-aged" />
-            <span>Grimório & Caderno ({logs.length})</span>
-            <ChevronDown size={12} className="text-gold-aged" />
-          </button>
+            {setShowGuide && (
+              <button
+                id="btn-quick-guide-trigger"
+                type="button"
+                onClick={() => {
+                  audio.play('select');
+                  setShowGuide(true);
+                }}
+                className="hidden sm:flex items-center gap-1 text-[10.5px] font-mono font-bold tracking-wider uppercase text-red-300 hover:text-white px-2 py-0.5 rounded bg-blood/40 hover:bg-blood/70 border border-blood-bright/60 transition-colors cursor-pointer"
+                title="Abrir Tabela de Consulta Rápida das Cartas [Tecla G]"
+              >
+                <span>[G] GUIA RÁPIDO</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      {/* 6. GAVETA SOB A MESA: LIVRO DE CARTAS & CADERNO DE CHAT */}
+      {/* 6. GAVETA SOB A MESA: LIVRO DE CARTAS & CADERNO DE CHAT (Sem corte de topo, estável ao mover mouse) */}
       <AnimatePresence>
         {cameraZone === CAMERA_ZONES.NOTEBOOK && (
           <motion.div
@@ -803,28 +860,48 @@ export default function GameTable3DView({
             initial={{ y: '100%', opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: '100%', opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 190, damping: 25 }}
-            className="fixed inset-x-0 bottom-0 z-[60] flex flex-col items-center justify-end bg-gradient-to-t from-black/95 via-black/90 to-transparent pt-6 pb-2 px-2 max-h-[90dvh] overflow-y-auto"
+            transition={{ type: 'spring', stiffness: 220, damping: 26 }}
+            className="fixed inset-0 z-[85] flex flex-col bg-black/90 backdrop-blur-md overflow-hidden select-text"
           >
-            <button
-              id="btn-return-to-table"
-              type="button"
-              onClick={() => selectZone(CAMERA_ZONES.CARDS)}
-              className="mb-2 px-5 py-1.5 rounded-full bg-black/85 border-2 border-gold-aged/65 flex items-center justify-center gap-2 text-xs font-mono font-bold tracking-widest uppercase text-amber-200 hover:text-white hover:border-gold-aged cursor-pointer transition-all shadow-lg"
-            >
-              <ChevronUp size={15} className="text-gold-aged" />
-              <span>Voltar à Mesa</span>
-            </button>
+            {/* Top Bar Fixa: Voltar à Mesa + Atalho Esc */}
+            <div className="shrink-0 w-full flex items-center justify-between px-3 sm:px-6 py-2.5 bg-gradient-to-r from-[#24140b] via-[#361e11] to-[#1c0f08] border-b-2 border-gold-aged/70 shadow-2xl">
+              <div className="flex items-center gap-2">
+                <BookOpen size={18} className="text-gold-aged" />
+                <span className="font-grimoire font-black tracking-wider text-amber-100 text-xs sm:text-sm uppercase">
+                  Sob a Mesa · Livro de Regras & Caderno de Chat
+                </span>
+              </div>
+              <button
+                id="btn-return-to-table"
+                type="button"
+                onClick={() => selectZone(CAMERA_ZONES.CARDS)}
+                className="px-4 py-1.5 rounded-full bg-gradient-to-r from-blood to-red-950 hover:from-red-700 hover:to-blood border-2 border-gold-aged text-amber-100 hover:text-white font-mono text-xs font-extrabold flex items-center gap-2 shadow-lg active:scale-95 transition-all cursor-pointer"
+                title="Voltar à Mesa [Tecla ESC ou W]"
+              >
+                <ChevronUp size={16} className="text-gold-aged" />
+                <span>VOLTAR À MESA [ESC / ↑]</span>
+              </button>
+            </div>
 
-            <UnderTableChat
-              logs={logs}
-              onSendChat={handleSendChat}
-              isDead={isDead}
-              canAct={canAct}
-              phase={phase}
-              onScrollToTable={() => selectZone(CAMERA_ZONES.CARDS)}
-              onFocusChange={setTypingChat}
-            />
+            {/* Conteúdo rolável sem corte de topo */}
+            <div
+              className="flex-1 w-full overflow-y-auto pt-3 pb-12 px-2 sm:px-4"
+              onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                  selectZone(CAMERA_ZONES.CARDS);
+                }
+              }}
+            >
+              <UnderTableChat
+                logs={logs}
+                onSendChat={handleSendChat}
+                isDead={isDead}
+                canAct={canAct}
+                phase={phase}
+                onScrollToTable={() => selectZone(CAMERA_ZONES.CARDS)}
+                onFocusChange={setTypingChat}
+              />
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

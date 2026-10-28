@@ -88,17 +88,9 @@ export function useCamera3DController({ inGame }) {
 
       const current = zoneRef.current;
 
-      // Quando o caderno/chat sob a mesa está aberto:
+      // Quando o caderno/chat sob a mesa está aberto, mantém a visão estável sob a mesa
+      // sem fechar involuntariamente ao mover o cursor para ler regras, cartas ou chat.
       if (current === CAMERA_ZONES.NOTEBOOK) {
-        if (isTypingChatRef.current && relY > 0.2) {
-          return;
-        }
-        // Só fecha automaticamente ao subir o cursor de volta para a região superior da mesa
-        if (relY < 0.26) {
-          setCameraZone(CAMERA_ZONES.PLAYERS);
-        } else if (relY < 0.34 && !isTypingChatRef.current) {
-          setCameraZone(CAMERA_ZONES.CARDS);
-        }
         return;
       }
 

@@ -244,3 +244,223 @@ export function canTargetPlayer({ canAct, selectedCard, targetPlayer, me }) {
 
   return true;
 }
+
+/**
+ * Calcula a prévia contextual e os dados de combate do que acontecerá se
+ * a carta `selectedCard` conjurada por `me` for direcionada contra o oponente `targetPlayer`.
+ */
+export function resolveTargetOpponentPreview({ selectedCard, me, targetPlayer }) {
+  if (!selectedCard || !targetPlayer || !me) return null;
+
+  const targetName = targetPlayer.name || 'Oponente';
+  const myKnifeDmg = Number(me.knifeDamage) || 1;
+  const targetLives = Math.max(0, Number(targetPlayer.lives) || 0);
+  const targetMaxLives = Math.max(1, Number(targetPlayer.maxLives) || 3);
+  const myLives = Math.max(0, Number(me.lives) || 0);
+  const isReflecting = Boolean(targetPlayer.isReflecting);
+  const isWalled = Boolean(targetPlayer.isWalled);
+  const hasDeathMark = targetPlayer.deathMarkTurns != null;
+  const hasPactWithMe =
+    Array.isArray(me.bloodPactWith) && me.bloodPactWith.includes(targetPlayer.id);
+
+  switch (selectedCard.type) {
+    case CARD_TYPES.FACA: {
+      if (isReflecting) {
+        const selfLethal = myLives <= myKnifeDmg;
+        return {
+          badgeText: '⚠️ ESPELHO!',
+          title: `⚠️ Ricochete em Você (-${myKnifeDmg} HP)`,
+          subtitle: `${targetName} possui reflexão ativa! O ataque voltará contra VOCÊ${selfLethal ? ' (GOLPE FATAL!)' : ''}.`,
+          tone: 'danger',
+          isLethal: selfLethal,
+          damage: myKnifeDmg,
+        };
+      }
+      if (isWalled) {
+        if (myKnifeDmg > 1) {
+          const excessDmg = myKnifeDmg - 1;
+          const wouldKill = targetLives <= excessDmg;
+          return {
+            badgeText: `🛡️ Quebra Parede + ${excessDmg} Dano`,
+            title: `Destrói Parede + Perfura ${excessDmg} Dano`,
+            subtitle: `Quebra grades de ${targetName} e o dano excedente perfura ${excessDmg} HP${wouldKill ? ' (FATAL!)' : ''}!`,
+            tone: 'offensive',
+            isLethal: wouldKill,
+            damage: excessDmg,
+          };
+        }
+        return {
+          badgeText: '🛡️ Quebra Parede',
+          title: 'Destrói Grades de Ferro',
+          subtitle: `Estilhaça a parede de ${targetName} sem ferir a vida dele.`,
+          tone: 'tactical',
+          isLethal: false,
+          damage: 0,
+        };
+      }
+      const isLethal = targetLives <= myKnifeDmg;
+      const remLives = Math.max(0, targetLives - myKnifeDmg);
+      let extraNote = '';
+      if (hasDeathMark) extraNote += ' · Sacia Marca da Morte';
+      if (hasPactWithMe) extraNote += ' · Dano compartilhado via Pacto';
+      return {
+        badgeText: isLethal ? `💀 FATAL (-${myKnifeDmg} HP)` : `🩸 -${myKnifeDmg} HP`,
+        title: isLethal
+          ? `💀 Golpe Fatal: Elimina ${targetName}`
+          : `🩸 Golpe de Faca (-${myKnifeDmg} HP)`,
+        subtitle: isLethal
+          ? `Causa ${myKnifeDmg} de dano e zera a vida de ${targetName}!${extraNote}`
+          : `${targetName} cairá para ${remLives}/${targetMaxLives} HP.${extraNote}`,
+        tone: isLethal ? 'lethal' : 'offensive',
+        isLethal,
+        damage: myKnifeDmg,
+      };
+    }
+
+    case CARD_TYPES.PAREDE: {
+      if (isReflecting) {
+        return {
+          badgeText: '⚠️ ESPELHO!',
+          title: '⚠️ Parede Ricocheteia em Você',
+          subtitle: `${targetName} refletirá o efeito: as grades de ferro prenderão VOCÊ!`,
+          tone: 'danger',
+        };
+      }
+      if (isWalled) {
+        return {
+          badgeText: '🔒 Já Emparedado',
+          title: 'Grades Já Ativas',
+          subtitle: `${targetName} já se encontra cercado por grades de ferro.`,
+          tone: 'neutral',
+        };
+      }
+      return {
+        badgeText: '⛓️ Emparedar',
+        title: `Prender ${targetName} com Grades`,
+        subtitle: `Ergue proteção que bloqueia 1 facada, mas impede ${targetName} de mirar em outros.`,
+        tone: 'tactical',
+      };
+    }
+
+    case CARD_TYPES.SERINGA: {
+      const charges = Number(selectedCard.charges) || 0;
+      if (charges <= 0) {
+        return {
+          badgeText: '⚠️ Vazia (0 cargas)',
+          title: 'Seringa Descarregada',
+          subtitle: 'Sem efeito até acumular cargas a cada turno na sua mão.',
+          tone: 'neutral',
+        };
+      }
+      const missing = Math.max(0, targetMaxLives - targetLives);
+      if (charges > missing) {
+        const excess = charges - missing;
+        const markTurns = Math.max(1, 5 - excess);
+        return {
+          badgeText: `☠️ OVERDOSE (+${excess})`,
+          title: `Overdose: Aplica Marca da Morte (${markTurns}t)`,
+          subtitle: `Cura ${targetName} ao máximo, mas o excesso (+${excess}) aplica Marca da Morte de ${markTurns} turnos!`,
+          tone: 'lethal',
+        };
+      }
+      return {
+        badgeText: `💉 Cura +${charges} HP`,
+        title: `Curar Oponente (+${charges} HP)`,
+        subtitle: `Restaura ${charges} HP de ${targetName} (ficará com ${targetLives + charges}/${targetMaxLives} HP).`,
+        tone: 'tactical',
+      };
+    }
+
+    case CARD_TYPES.MANIPULAMENTO_ALMA: {
+      const hpDiff = targetLives - myLives;
+      if (hpDiff > 0) {
+        return {
+          badgeText: `🔮 +${hpDiff} HP (Rouba Vida)`,
+          title: `Troca de Alma: +${hpDiff} HP p/ Você!`,
+          subtitle: `Você sobe de ${myLives} para ${targetLives} HP; ${targetName} cai para ${myLives} HP!`,
+          tone: 'beneficial',
+        };
+      }
+      if (hpDiff < 0) {
+        return {
+          badgeText: `⚠️ ${hpDiff} HP (Perde Vida)`,
+          title: 'Atenção: Troca Desfavorável',
+          subtitle: `Você cairá de ${myLives} para ${targetLives} HP; ${targetName} subirá para ${myLives} HP!`,
+          tone: 'danger',
+        };
+      }
+      return {
+        badgeText: `🔮 Troca Igual (${myLives} HP)`,
+        title: 'Troca de Alma Neutra',
+        subtitle: `Ambos possuem ${myLives} de vida atual — sem alteração numérica.`,
+        tone: 'neutral',
+      };
+    }
+
+    case CARD_TYPES.REVERSO: {
+      return {
+        badgeText: '🪞 Espelho',
+        title: `Espelho em ${targetName}`,
+        subtitle: `Protege ${targetName} com reflexão (se ninguém agir nele: -1 HP no vácuo).`,
+        tone: 'tactical',
+      };
+    }
+
+    case CARD_TYPES.REVELAR: {
+      const handText =
+        targetPlayer.handCount != null ? `${targetPlayer.handCount} cartas` : 'a mão';
+      return {
+        badgeText: '👁️ Revelar',
+        title: `Devassar Mão de ${targetName}`,
+        subtitle: `Expõe ${handText} do adversário para toda a mesa por 2 rodadas.`,
+        tone: 'tactical',
+      };
+    }
+
+    case CARD_TYPES.PACTO_SANGUE: {
+      if (hasPactWithMe) {
+        return {
+          badgeText: '🩸 Pacto Já Ativo',
+          title: 'Vínculo Já Estabelecido',
+          subtitle: `Sua vida já se encontra vinculada a ${targetName}.`,
+          tone: 'neutral',
+        };
+      }
+      return {
+        badgeText: '🩸 Pacto de Sangue',
+        title: `Vincular Vida a ${targetName}`,
+        subtitle: 'Atravessa paredes! Dano sofrido por um fere o outro simultaneamente.',
+        tone: 'tactical',
+      };
+    }
+
+    case CARD_TYPES.MARCA_MORTE: {
+      if (hasDeathMark) {
+        return {
+          badgeText: `⚠️ Já Marcado (${targetPlayer.deathMarkTurns}t)`,
+          title: 'Marca da Morte Já Ativa',
+          subtitle: `${targetName} já possui a maldição da Marca da Morte ativa.`,
+          tone: 'neutral',
+        };
+      }
+      return {
+        badgeText: '☠️ Marca da Morte (5t)',
+        title: `Cravar Marca da Morte (5t)`,
+        subtitle: `Amaldiçoa ${targetName}: se passar 5 rodadas sem sangrar, morre instantaneamente!`,
+        tone: 'lethal',
+      };
+    }
+
+    case CARD_TYPES.DESARMAR: {
+      return {
+        badgeText: '🗡️ Arrancar 2 Cartas',
+        title: `Desarmar ${targetName}`,
+        subtitle: `Arranca e descarta até 2 cartas aleatórias da mão de ${targetName}.`,
+        tone: 'offensive',
+      };
+    }
+
+    default:
+      return null;
+  }
+}
