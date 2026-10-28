@@ -54,7 +54,7 @@ body::after {
   background:
     radial-gradient(ellipse at center, transparent 55%, rgba(4, 2, 1, 0.62) 100%),
     url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.85 0'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.38'/></svg>");
-  mix-blend-mode: multiply;
+  will-change: auto;
 }
 
 /* Container com perspectiva para a mesa 3D, silhuetas e cartas */
@@ -84,7 +84,7 @@ body::after {
   background-size: cover;
   background-position: center;
   background-color: #1f1209;
-  filter: drop-shadow(0 25px 50px rgba(0, 0, 0, 0.95));
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9);
 }
 
 /* Feltro ritualístico escuro com gravuras arcanas em textura artística real */
@@ -149,7 +149,7 @@ body::after {
 /* Sombra dramática para as cartas na mão */
 .card-fan-item {
   transform-origin: bottom center;
-  filter: drop-shadow(0 14px 20px rgba(0, 0, 0, 0.85));
+  will-change: transform;
 }
 
 /* Scrollbar rústica */
@@ -159,4 +159,15 @@ body::after {
 
 input[type='range'] {
   accent-color: #d4af37;
+}
+
+/* Modo leve: menos animações contínuas em celulares e quando o usuário prefere menos movimento */
+@media (max-width: 639px), (max-height: 520px), (prefers-reduced-motion: reduce) {
+  .candle,
+  .aim-blink {
+    animation: none;
+  }
+  body::after {
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(4, 2, 1, 0.62) 100%);
+  }
 }

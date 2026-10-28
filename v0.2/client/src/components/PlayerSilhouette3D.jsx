@@ -261,9 +261,6 @@ function SilhouetteFigure({
   return (
     <div
       className="relative w-full h-full flex items-center justify-center pointer-events-none select-none"
-      style={{
-        filter: 'drop-shadow(0 20px 26px rgba(0, 0, 0, 0.96))',
-      }}
     >
       {/* 1. Contra-luz atmosférica quente de vela atrás da presença */}
       <div
@@ -311,7 +308,7 @@ function SilhouetteFigure({
               rx="3.2"
               ry="1.65"
               fill={eyeColor}
-              style={{ filter: `drop-shadow(0 0 6px ${eyeColor})` }}
+              opacity="0.95"
             />
             <ellipse
               cx={presence.eyes.rx}
@@ -319,7 +316,7 @@ function SilhouetteFigure({
               rx="3.2"
               ry="1.65"
               fill={eyeColor}
-              style={{ filter: `drop-shadow(0 0 6px ${eyeColor})` }}
+              opacity="0.95"
             />
             <circle cx={presence.eyes.lx} cy={presence.eyes.y} r="0.8" fill="#fff" opacity="0.85" />
             <circle cx={presence.eyes.rx} cy={presence.eyes.y} r="0.8" fill="#fff" opacity="0.85" />
@@ -376,12 +373,12 @@ export default function PlayerSilhouette3D({
       animate={
         shake
           ? { x: [0, -10, 10, -6, 6, 0], scale: [1, 1.05, 0.97, 1] }
-          : { y: [0, -2.5, 0] }
+          : { y: 0 }
       }
       transition={
         shake
           ? { duration: 0.5 }
-          : { duration: 3.6 + (index % 3) * 0.5, repeat: Infinity, ease: 'easeInOut' }
+          : { duration: 0.2 }
       }
       onDragOver={(e) => {
         if (!player.isAlive) return;

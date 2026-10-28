@@ -17,12 +17,13 @@ import { useGameController } from './controllers/useGameController';
 import { audioService } from './services/socketService';
 import HomeHubView from './views/HomeHubView';
 import RoomLobbyView from './views/RoomLobbyView';
-import GameTable3DView from './views/GameTable3DView';
 import SettingsModal from './components/SettingsModal';
 import AudioControls from './components/AudioControls';
 import { LogDrawer } from './components/LogPanel';
 import DamageOverlay from './components/DamageOverlay';
-import GameGuideModal from './components/GameGuideModal';
+// Code-splitting: mesa 3D e guia só são baixados quando necessários (menu inicial carrega bem mais rápido)
+const GameTable3DView = React.lazy(() => import('./views/GameTable3DView'));
+const GameGuideModal = React.lazy(() => import('./components/GameGuideModal'));
 import MobileHeaderMenu from './components/MobileHeaderMenu';
 
 const HEADER_ICON_BTN =
@@ -96,67 +97,21 @@ export default function App() {
         animate={shakeControls}
         className="h-full flex flex-col relative overflow-hidden overflow-x-hidden bg-void-bg text-parchment"
       >
-        <div className="candle pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,rgba(212,175,55,0.07),transparent_60%)]" />
 
-        {/* Em partida (inGame): Sem barra de aplicativo — apenas controles discretos e orgânicos nos cantos */}
+        {/* Em partida (inGame): header escondido — apenas o botão de sair, discreto, no canto superior direito */}
         {inGame ? (
-          <div className="pointer-events-none fixed top-0 inset-x-0 z-[70] flex items-center justify-between px-3 sm:px-5 py-2.5">
-            {/* Canto superior esquerdo: Sussurro discreto da rodada e código da mesa */}
-            <div
-              className="pointer-events-auto flex items-center gap-2.5 text-[11px] font-grimoire tracking-[0.18em] text-parchment/55 hover:text-parchment/90 transition-colors"
-              style={{ textShadow: '0 2px 6px rgba(0,0,0,0.95)' }}
+          <div className="pointer-events-none fixed top-0 right-0 z-[70] p-2 sm:p-3">
+            <button
+              id="btn-leave-room"
+              type="button"
+              onClick={handleLeaveRoom}
+              className="pointer-events-auto flex items-center justify-center h-10 w-10 sm:h-9 sm:w-9 rounded-full bg-black/60 hover:bg-red-950 border border-stone-700/70 hover:border-red-400 text-parchment/80 hover:text-red-300 transition-colors active:scale-95 cursor-pointer"
+              title="Deixar a mesa"
+              aria-label="Deixar a mesa"
             >
-              <span>R{gameState.round}</span>
-              <span className="text-stone-600">·</span>
-              <button
-                type="button"
-                onClick={handleCopyHeaderCode}
-                className="flex items-center gap-1 font-mono text-[10px] tracking-widest text-amber-200/50 hover:text-amber-200 transition-colors cursor-pointer"
-                title="Copiar código da mesa"
-              >
-                <span>#{gameState.roomCode}</span>
-                {copiedCode && <Check size={11} className="text-emerald-400" />}
-              </button>
-            </div>
-
-            {/* Canto superior direito: Ícones e botão do Guia destacados */}
-            <div className="pointer-events-auto flex items-center gap-2">
-              <AudioControls minimal />
-              <button
-                id="btn-guide"
-                type="button"
-                onClick={() => {
-                  audioService.play('click');
-                  setShowGuide(true);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border-2 border-blood-bright bg-blood/80 hover:bg-blood text-white font-mono text-xs font-bold shadow-[0_0_14px_rgba(220,38,38,0.55)] transition-all active:scale-95 cursor-pointer"
-                aria-label="Abrir Guia de Regras [G]"
-                title="Abrir Guia de Regras e Consulta de Cartas [Tecla G ou ?]"
-              >
-                <HelpCircle size={15} className="text-red-200" />
-                <span className="font-extrabold tracking-wider">GUIA [G]</span>
-              </button>
-              <button
-                id="btn-settings"
-                type="button"
-                onClick={() => setShowSettings(true)}
-                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-black/90 text-parchment/80 hover:text-amber-200 transition-all active:scale-95"
-                aria-label="Tempos da Partida"
-                title="Tempos da Partida"
-              >
-                <Settings size={15} />
-              </button>
-              <button
-                id="btn-leave-room"
-                type="button"
-                onClick={handleLeaveRoom}
-                className="flex items-center justify-center h-8 w-8 rounded-full bg-black/60 hover:bg-red-950 text-parchment/80 hover:text-red-300 transition-all active:scale-95"
-                title="Deixar a mesa"
-                aria-label="Deixar a mesa"
-              >
-                <LogOut size={15} />
-              </button>
-            </div>
+              <LogOut size={16} />
+            </button>
           </div>
         ) : (
           /* Fora da partida (Menu / Lobby): Cabeçalho padrão */
@@ -296,7 +251,15 @@ export default function App() {
             onSendChat={handleSendChat}
           />
         ) : (
-          <GameTable3DView {...ctrl} />
+          <React.Suspense
+            fallback={
+              <div className="flex-1 flex items-center justify-center font-grimoire text-sm tracking-[0.3em] text-amber-200/70 animate-pulse">
+                PREPARANDO A MESA...
+              </div>
+            }
+          >
+            <GameTable3DView {...ctrl} />
+          </React.Suspense>
         )}
 
         {compact && (
@@ -325,7 +288,11 @@ export default function App() {
           }}
         />
 
-        <GameGuideModal open={showGuide} onClose={() => setShowGuide(false)} inGame={inGame} />
+        {showGuide && (
+          <React.Suspense fallback={null}>
+            <GameGuideModal open={showGuide} onClose={() => setShowGuide(false)} inGame={inGame} />
+          </React.Suspense>
+        )}
 
         {gameState?.settings && (
           <SettingsModal

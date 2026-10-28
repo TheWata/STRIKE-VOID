@@ -34,8 +34,7 @@ function vignetteStyle(mode, damageRatio) {
     // Escura e fechada nas bordas; elipse alta (85% de altura) preserva o centro e a base (cartas) mais limpos
     return {
       background:
-        'radial-gradient(ellipse 62% 85% at 50% 50%, transparent 0%, transparent 52%, rgba(110,0,0,0.55) 76%, rgba(55,0,0,0.94) 100%)',
-      boxShadow: 'inset 0 0 130px 24px rgba(120,0,0,0.85), inset 0 0 40px 6px rgba(0,0,0,0.6)',
+        'radial-gradient(ellipse 62% 85% at 50% 50%, transparent 0%, transparent 48%, rgba(110,0,0,0.6) 74%, rgba(55,0,0,0.95) 100%)',
     };
   }
   // Ferido: fechamento e opacidade escalam com a proporção de vida perdida
@@ -44,7 +43,6 @@ function vignetteStyle(mode, damageRatio) {
   const edge = (0.5 + damageRatio * 0.4).toFixed(2);
   return {
     background: `radial-gradient(ellipse 62% 85% at 50% 50%, transparent 0%, transparent ${clearStop}%, rgba(139,0,0,${alpha}) 88%, rgba(90,0,0,${edge}) 100%)`,
-    boxShadow: `inset 0 0 ${Math.round(60 + damageRatio * 90)}px ${Math.round(6 + damageRatio * 22)}px rgba(139,0,0,${(0.22 + damageRatio * 0.4).toFixed(2)})`,
   };
 }
 
@@ -59,7 +57,7 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
       <motion.div
         key={`wounded-${cur}`}
         aria-hidden="true"
-        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-20 overflow-hidden"
+        className="fixed inset-x-0 bottom-0 top-0 pointer-events-none z-20 overflow-hidden"
         style={{ ...vignetteStyle('wounded', damageRatio), pointerEvents: 'none' }}
         initial={{ opacity: 0 }}
         animate={reduceMotion ? { opacity: 0.9 } : { opacity: [0.65, 1, 0.65] }}
@@ -72,13 +70,13 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
       <motion.div
         key="critical"
         aria-hidden="true"
-        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-20 overflow-hidden"
+        className="fixed inset-x-0 bottom-0 top-0 pointer-events-none z-20 overflow-hidden"
         style={{ ...vignetteStyle('critical', damageRatio), transformOrigin: '50% 50%', pointerEvents: 'none' }}
         initial={{ opacity: 0 }}
         animate={
           reduceMotion
             ? { opacity: 1 }
-            : { opacity: [0.62, 1, 0.74, 1, 0.62], scale: [1, 1.035, 1, 1.03, 1] }
+            : { opacity: [0.62, 1, 0.74, 1, 0.62] }
         }
         transition={
           reduceMotion
@@ -93,7 +91,7 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
       <motion.div
         key="dead"
         aria-hidden="true"
-        className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-20 overflow-hidden"
+        className="fixed inset-x-0 bottom-0 top-0 pointer-events-none z-20 overflow-hidden"
         style={{
           background:
             'radial-gradient(ellipse 75% 85% at 50% 50%, transparent 0%, transparent 45%, rgba(28, 12, 40, 0.35) 75%, rgba(10, 4, 16, 0.68) 100%)',
@@ -114,7 +112,7 @@ export default function DamageOverlay({ hp, maxHp, active, hitKey }) {
         <motion.div
           key={`flash-${hitKey}`}
           aria-hidden="true"
-          className="fixed inset-x-0 bottom-0 top-[48px] sm:top-[56px] pointer-events-none z-30 bg-red-600"
+          className="fixed inset-x-0 bottom-0 top-0 pointer-events-none z-30 bg-red-600"
           style={{ pointerEvents: 'none' }}
           initial={{ opacity: 0.65 }}
           animate={{ opacity: 0 }}

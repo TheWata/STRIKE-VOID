@@ -267,7 +267,6 @@ function TargetArrowsSVGBase({ players, localIndex }) {
             strokeLinecap="round"
             markerEnd={marker}
             className={ar.reflected ? 'arrow-flow-reverse' : 'arrow-flow'}
-            style={{ filter: `drop-shadow(0 0 1.5px ${color})` }}
           />
         );
       })}

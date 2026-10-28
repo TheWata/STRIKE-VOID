@@ -39,7 +39,7 @@ import {
 import { audio } from '../lib/audio';
 
 const HERO_WING_BTN_BASE =
-  'relative flex flex-col items-center justify-center gap-0.5 rounded-xl border-2 font-grimoire font-extrabold tracking-wider uppercase transition-all duration-300 select-none shadow-[0_10px_28px_rgba(0,0,0,0.92)]';
+  'relative flex flex-col items-center justify-center gap-0.5 rounded-xl border-2 font-grimoire font-extrabold tracking-wider uppercase transition-colors duration-200 select-none shadow-[0_6px_16px_rgba(0,0,0,0.9)]';
 
 export default function GameTable3DView({
   socket,
@@ -77,7 +77,7 @@ export default function GameTable3DView({
   const {
     cameraZone,
     selectZone,
-    parallax,
+    stageRef,
     handleMouseMove,
     handleBottomEdgeEnter,
     handleBottomEdgeLeave,
@@ -135,31 +135,33 @@ export default function GameTable3DView({
           ? 25
           : 28;
 
+  // Mesa posicionada mais abaixo na página (o header foi removido durante a partida).
+  // Apenas translateY/scale animam; o tamanho do layout permanece constante (sem reflow).
   const tableTranslateY =
     cameraZone === CAMERA_ZONES.PLAYERS
       ? compact
-        ? 18
-        : 32
+        ? 40
+        : 58
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? -210
         : isSelectionMode
           ? compact
-            ? 14
-            : 26
+            ? 34
+            : 54
           : compact
-            ? 8
-            : 18;
+            ? 26
+            : 42;
 
   const tableScale =
     cameraZone === CAMERA_ZONES.NOTEBOOK
       ? 0.82
       : isSelectionMode
         ? compact
-          ? 0.91
-          : 0.95
+          ? 0.96
+          : 1
         : compact
-          ? 0.86
-          : 0.9;
+          ? 0.9
+          : 0.94;
 
   const handleSelfTargetTrigger = () => {
     if (!canAct || !canSelfTarget || !selectedCard || !me) return;
@@ -196,6 +198,7 @@ export default function GameTable3DView({
   return (
     <div
       id="game-table-3d-viewport"
+      ref={stageRef}
       data-hud-mode={isSelectionMode ? 'selection' : 'normal'}
       onMouseMove={handleMouseMove}
       className="flex-1 min-h-0 flex flex-col justify-between relative overflow-hidden select-none inscryption-3d-stage"
@@ -204,7 +207,7 @@ export default function GameTable3DView({
       <div
         className="pointer-events-none absolute inset-0 z-0 transition-transform duration-700 ease-out"
         style={{
-          transform: `translate3d(${-parallax.x * 2.5}px, ${
+          transform: `translate3d(calc(var(--px, 0) * -2.5px), ${
             cameraZone === CAMERA_ZONES.PLAYERS
               ? 18
               : cameraZone === CAMERA_ZONES.NOTEBOOK
@@ -225,7 +228,7 @@ export default function GameTable3DView({
       </div>
 
       {/* 2. FAIXA CONTEXTUAL DE RESOLUÇÃO / MIRA NO TOPO DA MESA */}
-      <div className="pointer-events-none relative z-40 pt-9 sm:pt-10 px-4 flex flex-col items-center justify-center gap-1 shrink-0">
+      <div className="pointer-events-none relative z-40 pt-2 sm:pt-3 px-4 flex flex-col items-center justify-center gap-1 shrink-0">
         <AnimatePresence mode="wait">
           {isResolving && activeStep ? (
             <motion.div
@@ -318,38 +321,36 @@ export default function GameTable3DView({
       {/* 3. PALCO 3D CENTRAL (MESA OCTOGONAL + PRESENÇAS SOMBRIAS DOS OPONENTES)
            No modo de seleção (`isSelectionMode`), a área útil da mesa se expande suavemente */}
       <main className="relative flex-1 min-h-0 flex items-center justify-center p-1 inscryption-perspective overflow-visible">
+        {/* Parallax via variáveis CSS (--px/--py) atualizadas fora do React: sem re-render por mousemove */}
+        <div
+          className="relative"
+          style={{
+            width: compact ? 'min(90vw, calc(100dvh - 300px))' : 'min(76vw, calc(100dvh - 330px))',
+            maxHeight: compact ? 'calc(100dvh - 300px)' : 'calc(100dvh - 330px)',
+            aspectRatio: '1 / 1',
+            transformStyle: 'preserve-3d',
+            transform:
+              'rotateX(calc(var(--py, 0) * -0.45deg)) rotateZ(calc(var(--px, 0) * -0.35deg))',
+            transition: 'transform 0.25s ease-out',
+          }}
+        >
         <motion.div
           animate={{
-            rotateX: tablePitch - parallax.y * 0.45,
-            rotateZ: -parallax.x * 0.35,
+            rotateX: tablePitch,
             y: tableTranslateY,
             scale: tableScale,
           }}
           transition={{ type: 'spring', stiffness: 135, damping: 24, mass: 0.95 }}
           style={{
-            width: isSelectionMode
-              ? compact
-                ? 'min(92vw, calc(100dvh - 265px))'
-                : 'min(80vw, calc(100dvh - 285px))'
-              : compact
-                ? 'min(88vw, calc(100dvh - 330px))'
-                : 'min(74vw, calc(100dvh - 360px))',
-            maxHeight: isSelectionMode
-              ? compact
-                ? 'calc(100dvh - 265px)'
-                : 'calc(100dvh - 285px)'
-              : compact
-                ? 'calc(100dvh - 330px)'
-                : 'calc(100dvh - 360px)',
-            aspectRatio: '1 / 1',
+            width: '100%',
+            height: '100%',
             transformStyle: 'preserve-3d',
-            transition: 'width 0.35s ease, max-height 0.35s ease',
           }}
           className="relative"
         >
-          {/* Sombra projetada no chão da sala 3D */}
+          {/* Sombra projetada no chão da sala 3D (sem blur: o clip-path octogonal já cortava o desfoque) */}
           <div
-            className="table-octagon absolute inset-0 bg-black/95 blur-2xl pointer-events-none"
+            className="table-octagon absolute inset-0 bg-black/95 pointer-events-none"
             style={{ transform: 'translateZ(-42px) scale(1.08)' }}
           />
 
@@ -513,6 +514,7 @@ export default function GameTable3DView({
             )}
           </div>
         </motion.div>
+        </div>
       </main>
 
       {/* 4. CONJUNTO INTEGRADO E ADAPTATIVO DA HUD INFERIOR:
@@ -530,8 +532,8 @@ export default function GameTable3DView({
         }}
         transition={{ type: 'spring', stiffness: 180, damping: 24 }}
         className={cn(
-          'relative z-[50] w-full flex flex-col items-center justify-end px-2 shrink-0 transition-all duration-300',
-          isSelectionMode ? 'pb-2 sm:pb-2.5' : 'pb-4 sm:pb-5',
+          'relative z-[50] w-full flex flex-col items-center justify-end px-1 sm:px-2 shrink-0 transition-[padding] duration-300',
+          isSelectionMode ? 'pb-1.5 sm:pb-2.5' : 'pb-2 sm:pb-5',
           cameraZone === CAMERA_ZONES.NOTEBOOK && 'pointer-events-none'
         )}
       >
@@ -543,8 +545,8 @@ export default function GameTable3DView({
             id="player-hand-arc"
             data-hand-zone="true"
             className={cn(
-              'relative z-30 flex items-end justify-center max-w-full px-2 transition-all duration-300',
-              isSelectionMode ? '-mb-9 sm:-mb-11' : '-mb-4 sm:-mb-6'
+              'relative z-30 flex items-end justify-center max-w-full px-1 sm:px-2 transition-[margin] duration-300',
+              isSelectionMode ? '-mb-14 sm:-mb-11' : '-mb-7 sm:-mb-6'
             )}
           >
             <AnimatePresence>
@@ -585,7 +587,7 @@ export default function GameTable3DView({
                     exit={{ y: -60, opacity: 0, scale: 0.75 }}
                     transition={{ type: 'spring', stiffness: 215, damping: 22 }}
                     className={cn(
-                      'transition-all duration-250 card-fan-item',
+                      'card-fan-item',
                       i > 0 &&
                         (isSelectionMode
                           ? compact
@@ -627,15 +629,15 @@ export default function GameTable3DView({
             id="turn-actions-cluster"
             data-hand-zone="true"
             className={cn(
-              'relative z-40 w-full flex items-center justify-center px-1 sm:px-4 transition-all duration-300',
-              isSelectionMode ? 'max-w-[780px]' : 'max-w-[900px]'
+              'relative z-40 w-full flex items-center justify-center px-0.5 sm:px-4 transition-[max-width] duration-300',
+              isSelectionMode ? 'max-w-[820px]' : 'max-w-[960px]'
             )}
           >
             {/* ASA ESQUERDA: BOTÃO DESCARTAR */}
             <div
               className={cn(
-                'flex-1 flex items-center justify-end -mr-4 sm:-mr-6 pr-6 sm:pr-9 pl-1.5 rounded-l-2xl bg-gradient-to-r from-[#1c1009]/95 via-[#28170d]/95 to-[#160c07]/95 border-y-2 border-l-2 border-gold-aged/65 shadow-[0_14px_38px_rgba(0,0,0,0.95)] transition-all duration-300',
-                isSelectionMode ? 'py-1' : 'py-1.5'
+                'flex-1 min-w-0 flex items-center justify-end -mr-5 sm:-mr-8 pr-7 sm:pr-11 pl-1 sm:pl-1.5 rounded-l-2xl bg-gradient-to-r from-[#1c1009]/95 via-[#28170d]/95 to-[#160c07]/95 border-y-2 border-l-2 border-gold-aged/65 shadow-[0_8px_20px_rgba(0,0,0,0.9)]',
+                isSelectionMode ? 'py-1' : 'py-1 sm:py-1.5'
               )}
             >
               <button
@@ -650,10 +652,10 @@ export default function GameTable3DView({
                 }
                 className={cn(
                   HERO_WING_BTN_BASE,
-                  'w-full cursor-pointer px-3 sm:px-5',
+                  'w-full cursor-pointer px-1.5 sm:px-5',
                   isSelectionMode
-                    ? 'py-1.5 sm:py-2 min-h-[48px] sm:min-h-[54px]'
-                    : 'py-2.5 sm:py-3 min-h-[56px] sm:min-h-[64px]',
+                    ? 'py-1 sm:py-2 min-h-[46px] sm:min-h-[54px]'
+                    : 'py-1.5 sm:py-3 min-h-[52px] sm:min-h-[64px]',
                   !canAct || discardLimit <= 0
                     ? 'border-stone-700/80 bg-stone-950/90 text-stone-400 cursor-default opacity-80'
                     : selectedCardIds.length > 0
@@ -661,9 +663,9 @@ export default function GameTable3DView({
                       : 'border-stone-600/90 bg-gradient-to-b from-[#2b190f] to-[#170d07] text-amber-100/90 hover:border-amber-400/80 hover:text-amber-50 active:scale-[0.98]'
                 )}
               >
-                <div className="flex items-center gap-1.5 text-xs sm:text-base">
+                <div className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 text-[10.5px] sm:text-base leading-tight">
                   <Trash2
-                    size={17}
+                    size={compact ? 16 : 17}
                     className={
                       selectedCardIds.length > 0 && canAct
                         ? 'text-amber-300 shrink-0'
@@ -675,7 +677,7 @@ export default function GameTable3DView({
                     {selectedCardIds.length > 0 ? ` (${selectedCardIds.length})` : ''}
                   </span>
                 </div>
-                <span className="font-mono text-[10px] sm:text-[11px] font-normal text-amber-200/85 normal-case tracking-normal">
+                <span className="hidden sm:block font-mono text-[10px] sm:text-[11px] font-normal text-amber-200/85 normal-case tracking-normal">
                   {discardLimit <= 0
                     ? 'Descarte desativado'
                     : selectedCardIds.length > 0
@@ -703,8 +705,8 @@ export default function GameTable3DView({
             {/* ASA DIREITA: BOTÃO PASSAR A VEZ */}
             <div
               className={cn(
-                'flex-1 flex items-center justify-start -ml-4 sm:-ml-6 pl-6 sm:pl-9 pr-1.5 rounded-r-2xl bg-gradient-to-l from-[#1c1009]/95 via-[#28170d]/95 to-[#160c07]/95 border-y-2 border-r-2 border-gold-aged/65 shadow-[0_14px_38px_rgba(0,0,0,0.95)] transition-all duration-300',
-                isSelectionMode ? 'py-1' : 'py-1.5'
+                'flex-1 min-w-0 flex items-center justify-start -ml-5 sm:-ml-8 pl-7 sm:pl-11 pr-1 sm:pr-1.5 rounded-r-2xl bg-gradient-to-l from-[#1c1009]/95 via-[#28170d]/95 to-[#160c07]/95 border-y-2 border-r-2 border-gold-aged/65 shadow-[0_8px_20px_rgba(0,0,0,0.9)]',
+                isSelectionMode ? 'py-1' : 'py-1 sm:py-1.5'
               )}
             >
               <button
@@ -718,10 +720,10 @@ export default function GameTable3DView({
                 title="Passar a vez sem jogar carta"
                 className={cn(
                   HERO_WING_BTN_BASE,
-                  'w-full cursor-pointer px-3 sm:px-5',
+                  'w-full cursor-pointer px-1.5 sm:px-5',
                   isSelectionMode
-                    ? 'py-1.5 sm:py-2 min-h-[48px] sm:min-h-[54px]'
-                    : 'py-2.5 sm:py-3 min-h-[56px] sm:min-h-[64px]',
+                    ? 'py-1 sm:py-2 min-h-[46px] sm:min-h-[54px]'
+                    : 'py-1.5 sm:py-3 min-h-[52px] sm:min-h-[64px]',
                   !canAct
                     ? 'border-stone-700/80 bg-stone-950/90 text-stone-400 cursor-default opacity-80'
                     : 'border-gold-aged bg-gradient-to-b from-[#462614] to-[#241309] text-amber-50 hover:from-[#5c321a] hover:to-[#331b0d] hover:border-amber-300 shadow-[0_0_20px_rgba(212,175,55,0.35)] active:scale-[0.98]'
@@ -729,21 +731,21 @@ export default function GameTable3DView({
               >
                 {lockedPassStatus ? (
                   <>
-                    <div className="flex items-center gap-1.5 text-xs sm:text-sm text-stone-300">
+                    <div className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 text-[10.5px] sm:text-sm leading-tight text-stone-300">
                       <Lock size={15} className="text-gold-aged/80 shrink-0" />
                       <span>{lockedPassStatus}</span>
                     </div>
-                    <span className="font-mono text-[10px] sm:text-[11px] font-normal text-stone-400 normal-case tracking-normal">
+                    <span className="hidden sm:block font-mono text-[10px] sm:text-[11px] font-normal text-stone-400 normal-case tracking-normal">
                       Aguardando demais jogadores
                     </span>
                   </>
                 ) : (
                   <>
-                    <div className="flex items-center gap-1.5 text-xs sm:text-base">
-                      <Hand size={17} className="text-gold-aged shrink-0" />
+                    <div className="flex flex-col sm:flex-row items-center gap-0.5 sm:gap-1.5 text-[10.5px] sm:text-base leading-tight">
+                      <Hand size={compact ? 16 : 17} className="text-gold-aged shrink-0" />
                       <span>PASSAR A VEZ</span>
                     </div>
-                    <span className="font-mono text-[10px] sm:text-[11px] font-normal text-parchment/85 normal-case tracking-normal">
+                    <span className="hidden sm:block font-mono text-[10px] sm:text-[11px] font-normal text-parchment/85 normal-case tracking-normal">
                       Manter mão atual sem agir
                     </span>
                   </>

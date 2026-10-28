@@ -11,7 +11,11 @@ import { CAMERA_ZONES } from '../models/gameModel';
 export function useCamera3DController({ inGame }) {
   const [cameraZone, setCameraZone] = useState(CAMERA_ZONES.CARDS);
   const [cameraLocked, setCameraLocked] = useState(false);
-  const [parallax, setParallax] = useState({ x: 0, y: 0 });
+  // Parallax aplicado via variáveis CSS (--px / --py) direto no DOM,
+  // sem re-render do React a cada movimento do mouse.
+  const stageElRef = useRef(null);
+  const rafRef = useRef(0);
+  const pendingParallaxRef = useRef(null);
   const isTypingChatRef = useRef(false);
   const isOverHandOrControlsRef = useRef(false);
   const bottomTriggerTimerRef = useRef(null);
@@ -26,7 +30,26 @@ export function useCamera3DController({ inGame }) {
       if (bottomTriggerTimerRef.current) {
         clearTimeout(bottomTriggerTimerRef.current);
       }
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
+  }, []);
+
+  /** Ref callback do contêiner da cena: recebe as variáveis CSS de parallax. */
+  const stageRef = useCallback((el) => {
+    stageElRef.current = el;
+  }, []);
+
+  const scheduleParallax = useCallback((x, y) => {
+    pendingParallaxRef.current = { x, y };
+    if (rafRef.current) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = 0;
+      const el = stageElRef.current;
+      const p = pendingParallaxRef.current;
+      if (!el || !p) return;
+      el.style.setProperty('--px', p.x.toFixed(2));
+      el.style.setProperty('--py', p.y.toFixed(2));
+    });
   }, []);
 
   const setTypingChat = useCallback((typing) => {
@@ -49,10 +72,7 @@ export function useCamera3DController({ inGame }) {
       const relX = (e.clientX / vw - 0.5) * 2; // -1 a 1
       const relY = e.clientY / vh; // 0 (topo) a 1 (base)
 
-      setParallax({
-        x: Number((relX * 2.8).toFixed(2)),
-        y: Number(((relY - 0.5) * 3.2).toFixed(2)),
-      });
+      scheduleParallax(relX * 2.8, (relY - 0.5) * 3.2);
 
       if (cameraLocked) return;
 
@@ -97,7 +117,7 @@ export function useCamera3DController({ inGame }) {
         if (current !== CAMERA_ZONES.CARDS) setCameraZone(CAMERA_ZONES.CARDS);
       }
     },
-    [inGame, cameraLocked]
+    [inGame, cameraLocked, scheduleParallax]
   );
 
   /**
@@ -162,7 +182,7 @@ export function useCamera3DController({ inGame }) {
     cameraLocked,
     toggleLock,
     selectZone,
-    parallax,
+    stageRef,
     handleMouseMove,
     handleBottomEdgeEnter,
     handleBottomEdgeLeave,

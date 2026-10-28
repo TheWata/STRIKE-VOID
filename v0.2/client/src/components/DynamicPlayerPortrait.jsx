@@ -186,6 +186,7 @@ export default function DynamicPlayerPortrait({
   const maxLives = factors.maxLives || 3;
   const lives = factors.lives ?? maxLives;
 
+  // Animações contínuas apenas quando há perigo real (economiza CPU/GPU no estado calmo)
   const postureAnimate =
     visualParams.postureState === 'spectral'
       ? { y: [0, -2, 0], scale: [0.98, 1.01, 0.98] }
@@ -193,16 +194,21 @@ export default function DynamicPlayerPortrait({
         ? { x: [0, -5, 5, -3, 3, 0], y: [0, 2, 0], scale: [1, 0.96, 1.02, 1] }
         : visualParams.postureState === 'agonized'
           ? { x: [0, -1, 1, -0.6, 0.6, 0], scale: [1, 1.02, 1] }
-          : { scale: [1, 1.01, 1] };
+          : { x: 0, y: 0, scale: 1 };
+
+  const hasContinuousPosture =
+    visualParams.postureState === 'spectral' || visualParams.postureState === 'agonized';
 
   const postureTransition =
     visualParams.postureState === 'recoil'
       ? { duration: 0.45, ease: 'easeOut' }
-      : {
-          duration: visualParams.heartbeatDuration || 3.4,
-          repeat: Infinity,
-          ease: 'easeInOut',
-        };
+      : hasContinuousPosture
+        ? {
+            duration: visualParams.heartbeatDuration || 3.4,
+            repeat: Infinity,
+            ease: 'easeInOut',
+          }
+        : { duration: 0.3 };
 
   // Moldura circular e outline de auto-alvo
   const ringBorderClass = canSelfTarget
@@ -307,8 +313,8 @@ export default function DynamicPlayerPortrait({
         )}
       </AnimatePresence>
 
-      {/* 1. MOLDURA CIRCULAR CENTRAL DO RETRATO DINÂMICO (Dimensões compactas e equilibradas) */}
-      <div className="relative w-[98px] h-[98px] sm:w-[114px] sm:h-[114px] flex items-center justify-center shrink-0">
+      {/* 1. MOLDURA CIRCULAR CENTRAL DO RETRATO DINÂMICO (ampliada: 128px mobile / 160px desktop) */}
+      <div className="relative w-[128px] h-[128px] sm:w-[160px] sm:h-[160px] flex items-center justify-center shrink-0">
         {/* Halo circular vermelho de Alvo Válido */}
         <AnimatePresence>
           {canSelfTarget && (
@@ -404,18 +410,14 @@ export default function DynamicPlayerPortrait({
               ? { scale: 1.03 }
               : tensionLevel === 'CRITICAL'
                 ? { scale: [1, 1.025, 1, 1.015, 1] }
-                : tensionLevel === 'PRESSURED' || tensionLevel === 'CORNERED'
-                  ? { scale: [1, 1.012, 1] }
-                  : { scale: 1 }
+                : { scale: 1 }
           }
           transition={
             canSelfTarget && isHoveringValidSelfTarget
               ? { duration: 0.18, ease: 'easeOut' }
               : tensionLevel === 'CRITICAL'
                 ? { duration: 0.78, repeat: Infinity, ease: 'easeOut' }
-                : tensionLevel === 'PRESSURED' || tensionLevel === 'CORNERED'
-                  ? { duration: 1.4, repeat: Infinity, ease: 'easeInOut' }
-                  : { duration: 0.3 }
+                : { duration: 0.3 }
           }
           className={cn(
             'relative w-full h-full rounded-full border-[3.5px] bg-[#0b0604] overflow-hidden flex items-center justify-center transition-all duration-300',
@@ -475,10 +477,7 @@ export default function DynamicPlayerPortrait({
                   stroke={active ? strokeColor : 'rgba(68, 45, 28, 0.28)'}
                   strokeWidth={active ? '2.4' : '1.4'}
                   strokeLinecap="round"
-                  style={{
-                    filter: active ? `drop-shadow(0 0 3px ${strokeColor})` : 'none',
-                    transition: 'stroke 0.35s ease, stroke-width 0.35s ease',
-                  }}
+                  style={{ transition: 'stroke 0.35s ease, stroke-width 0.35s ease' }}
                 />
               );
             })}
