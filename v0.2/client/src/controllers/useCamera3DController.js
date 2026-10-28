@@ -11,11 +11,14 @@ import { CAMERA_ZONES } from '../models/gameModel';
 export function useCamera3DController({ inGame }) {
   const [cameraZone, setCameraZone] = useState(CAMERA_ZONES.CARDS);
   const [cameraLocked, setCameraLocked] = useState(false);
-  // Parallax aplicado via variáveis CSS (--px / --py) direto no DOM,
-  // sem re-render do React a cada movimento do mouse.
+  // Parallax amortecido via requestAnimationFrame (damped easing / lerp)
+  // atualizando variáveis CSS no elemento raiz sem re-render do React.
   const stageElRef = useRef(null);
   const rafRef = useRef(0);
-  const pendingParallaxRef = useRef(null);
+  const targetParallaxRef = useRef({ x: 0, y: 0 });
+  const currentParallaxRef = useRef({ x: 0, y: 0 });
+  const rafRunningRef = useRef(false);
+  const reducedMotionRef = useRef(false);
   const isTypingChatRef = useRef(false);
   const isOverHandOrControlsRef = useRef(false);
   const bottomTriggerTimerRef = useRef(null);
@@ -24,6 +27,27 @@ export function useCamera3DController({ inGame }) {
   useEffect(() => {
     zoneRef.current = cameraZone;
   }, [cameraZone]);
+
+  // Monitora preferência de redução de movimento para desativar parallax
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return undefined;
+    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+    reducedMotionRef.current = mql.matches;
+    const onChange = (e) => {
+      reducedMotionRef.current = e.matches;
+      if (e.matches && stageElRef.current) {
+        stageElRef.current.style.setProperty('--px', '0');
+        stageElRef.current.style.setProperty('--py', '0');
+        stageElRef.current.style.setProperty('--bg-px', '0px');
+        stageElRef.current.style.setProperty('--bg-py', '0px');
+        stageElRef.current.style.setProperty('--table-rx', '0deg');
+        stageElRef.current.style.setProperty('--table-rz', '0deg');
+        stageElRef.current.style.setProperty('--sil-px', '0px');
+      }
+    };
+    mql.addEventListener?.('change', onChange);
+    return () => mql.removeEventListener?.('change', onChange);
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -39,18 +63,60 @@ export function useCamera3DController({ inGame }) {
     stageElRef.current = el;
   }, []);
 
-  const scheduleParallax = useCallback((x, y) => {
-    pendingParallaxRef.current = { x, y };
-    if (rafRef.current) return;
-    rafRef.current = requestAnimationFrame(() => {
-      rafRef.current = 0;
-      const el = stageElRef.current;
-      const p = pendingParallaxRef.current;
-      if (!el || !p) return;
-      el.style.setProperty('--px', p.x.toFixed(2));
-      el.style.setProperty('--py', p.y.toFixed(2));
-    });
+  /** Loop rAF com interpolação suave (damped easing / lerp 0.09) */
+  const updateParallaxFrame = useCallback(() => {
+    const el = stageElRef.current;
+    if (!el || reducedMotionRef.current) {
+      rafRunningRef.current = false;
+      return;
+    }
+
+    const cur = currentParallaxRef.current;
+    const tgt = targetParallaxRef.current;
+
+    // Fator lerp: 0.09 confere peso e inércia orgânica sem atraso perceptual
+    cur.x += (tgt.x - cur.x) * 0.09;
+    cur.y += (tgt.y - cur.y) * 0.09;
+
+    const diffX = Math.abs(tgt.x - cur.x);
+    const diffY = Math.abs(tgt.y - cur.y);
+
+    // Amplitudes calibradas e contidas:
+    // Background no sentido oposto para profundidade (-9px a +9px)
+    // Inclinação sutil da mesa (-2.4deg a +2.4deg)
+    // Rolagem horizontal da mesa (-1.6deg a +1.6deg)
+    // Compensação leve nas silhuetas (+2.5px a -2.5px)
+    el.style.setProperty('--px', cur.x.toFixed(3));
+    el.style.setProperty('--py', cur.y.toFixed(3));
+    el.style.setProperty('--bg-px', (cur.x * -9).toFixed(2) + 'px');
+    el.style.setProperty('--bg-py', (cur.y * -6).toFixed(2) + 'px');
+    el.style.setProperty('--table-rx', (cur.y * -2.4).toFixed(2) + 'deg');
+    el.style.setProperty('--table-rz', (cur.x * -1.6).toFixed(2) + 'deg');
+    el.style.setProperty('--sil-px', (cur.x * 2.5).toFixed(2) + 'px');
+
+    if (diffX > 0.001 || diffY > 0.001) {
+      rafRef.current = requestAnimationFrame(updateParallaxFrame);
+    } else {
+      rafRunningRef.current = false;
+    }
   }, []);
+
+  const scheduleParallax = useCallback(
+    (targetX, targetY) => {
+      if (reducedMotionRef.current) return;
+      // Clamping estrito entre -1 e 1
+      const clampedX = Math.max(-1, Math.min(1, targetX));
+      const clampedY = Math.max(-1, Math.min(1, targetY));
+
+      targetParallaxRef.current = { x: clampedX, y: clampedY };
+
+      if (!rafRunningRef.current) {
+        rafRunningRef.current = true;
+        rafRef.current = requestAnimationFrame(updateParallaxFrame);
+      }
+    },
+    [updateParallaxFrame]
+  );
 
   const setTypingChat = useCallback((typing) => {
     isTypingChatRef.current = Boolean(typing);
@@ -69,10 +135,11 @@ export function useCamera3DController({ inGame }) {
       if (!inGame) return;
       const vw = Math.max(1, window.innerWidth);
       const vh = Math.max(1, window.innerHeight);
-      const relX = (e.clientX / vw - 0.5) * 2; // -1 a 1
-      const relY = e.clientY / vh; // 0 (topo) a 1 (base)
+      // Coordenadas normalizadas estritas [-1, 1]
+      const relX = Math.max(-1, Math.min(1, (e.clientX / vw - 0.5) * 2));
+      const relY = Math.max(-1, Math.min(1, (e.clientY / vh - 0.5) * 2));
 
-      scheduleParallax(relX * 2.8, (relY - 0.5) * 3.2);
+      scheduleParallax(relX, relY);
 
       if (cameraLocked) return;
 

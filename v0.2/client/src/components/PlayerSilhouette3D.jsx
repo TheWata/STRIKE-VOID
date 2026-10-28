@@ -8,6 +8,7 @@ import {
   getCharacterPresenceAsset,
 } from '../models/assetCatalog';
 import { resolveTargetOpponentPreview } from '../models/cardModel';
+import { getSilhouetteDimensions } from '../helpers/math3d';
 import { cn } from '../lib/cn';
 
 /**
@@ -353,11 +354,17 @@ function SilhouetteFigure({
 export default function PlayerSilhouette3D({
   player,
   index,
+  totalPlayers = 4,
   isMe,
   targetable,
   dimmed,
+  isFocused = false,
+  isDimmedByOtherTarget = false,
+  isLeftFlank = false,
+  isRightFlank = false,
   selectedCard,
   me,
+  onHoverChange,
   onSeatClick,
   onDropCard,
   onInspectCard,
@@ -365,7 +372,7 @@ export default function PlayerSilhouette3D({
 }) {
   const [over, setOver] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const isTargetHovered = targetable && (over || isHovered);
+  const isTargetHovered = targetable && (over || isHovered || isFocused);
 
   const preview =
     targetable && selectedCard && me
@@ -379,29 +386,59 @@ export default function PlayerSilhouette3D({
     .map((pid) => allPlayers.find((p) => p.id === pid)?.name)
     .filter(Boolean);
 
+  const handleMouseEnter = () => {
+    setIsHovered(true);
+    if (onHoverChange) onHoverChange(true);
+  };
+
+  const handleMouseLeave = () => {
+    setIsHovered(false);
+    if (onHoverChange) onHoverChange(false);
+  };
+
+  const dims = getSilhouetteDimensions(totalPlayers);
+  const isCompactLayout = totalPlayers >= 6;
+
+  // Alinhamento dinâmico do painel de informações para nunca estourar o viewport
+  const panelAlignCls = isLeftFlank
+    ? 'left-0 sm:left-2 -translate-x-0'
+    : isRightFlank
+      ? 'right-0 sm:right-2 translate-x-0'
+      : 'left-1/2 -translate-x-1/2';
+
   return (
     <motion.div
       animate={
         shake
           ? { x: [0, -10, 10, -6, 6, 0], scale: [1, 1.05, 0.97, 1] }
-          : { y: 0 }
+          : {
+              scale: isTargetHovered ? 1.06 : 1,
+              y: isTargetHovered ? -4 : 0,
+            }
       }
       transition={
         shake
           ? { duration: 0.5 }
-          : { duration: 0.2 }
+          : { type: 'spring', stiffness: 260, damping: 22 }
       }
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onDragOver={(e) => {
         if (!player.isAlive) return;
         e.preventDefault();
-        if (!over) setOver(true);
+        if (!over) {
+          setOver(true);
+          onHoverChange?.(true);
+        }
       }}
-      onDragLeave={() => setOver(false)}
+      onDragLeave={() => {
+        setOver(false);
+        onHoverChange?.(false);
+      }}
       onDrop={(e) => {
         e.preventDefault();
         setOver(false);
+        onHoverChange?.(false);
         if (player.isAlive && onDropCard) onDropCard(player, e);
       }}
       onClick={(e) => {
@@ -410,11 +447,11 @@ export default function PlayerSilhouette3D({
       }}
       style={{ transformStyle: 'preserve-3d' }}
       className={cn(
-        'relative flex flex-col items-center select-none group transition-all',
-        targetable ? 'cursor-crosshair scale-[1.04]' : 'cursor-pointer',
-        over && 'scale-110',
+        'relative flex flex-col items-center select-none group transition-all duration-200',
+        targetable ? 'cursor-crosshair' : 'cursor-pointer',
         !player.isAlive && 'opacity-35 grayscale',
-        dimmed && player.isAlive && 'opacity-60'
+        isDimmedByOtherTarget && player.isAlive && 'opacity-80 transition-opacity',
+        dimmed && !isDimmedByOtherTarget && player.isAlive && 'opacity-50 grayscale-[40%]'
       )}
     >
       {/* 1. CARTAS REVELADAS (Carta REVELAR) flutuando no topo */}
@@ -455,28 +492,36 @@ export default function PlayerSilhouette3D({
 
       {/* 2. BARRA DE VIDA ESTILIZADA & BADGE DE COMBATE ACIMA DA SILHUETA E DA MESA */}
       <div
-        className="relative z-40 -mb-3 flex flex-col items-center"
+        className="relative z-40 -mb-2.5 flex flex-col items-center"
         style={{
-          transform: 'translateZ(32px)',
+          transform: 'translateZ(34px)',
         }}
       >
         {/* Pílula Compacta de Prévia de Combate (visível quando carta está selecionada) */}
         {targetable && preview && (
           <motion.div
             initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: isTargetHovered ? 1.06 : 1, opacity: 1 }}
+            animate={{ scale: isTargetHovered ? 1.08 : 1, opacity: 1 }}
             className={cn(
-              'mb-1 px-2.5 py-0.5 rounded-full font-mono text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider border shadow-lg flex items-center gap-1 animate-pulse pointer-events-none select-none transition-all duration-200',
-              preview.tone === 'lethal'
-                ? 'bg-[#3b0808]/95 border-red-400 text-red-100 shadow-[0_0_16px_rgba(239,68,68,0.85)]'
-                : preview.tone === 'danger'
-                  ? 'bg-[#3b1a06]/95 border-amber-400 text-amber-100 shadow-[0_0_16px_rgba(245,158,11,0.75)]'
-                  : preview.tone === 'beneficial'
-                    ? 'bg-[#083620]/95 border-emerald-400 text-emerald-100 shadow-[0_0_16px_rgba(16,185,129,0.75)]'
-                    : 'bg-[#22130a]/95 border-gold-aged text-amber-200 shadow-[0_0_14px_rgba(212,175,55,0.65)]'
+              'mb-1 px-2.5 py-0.5 rounded-full font-mono text-[9px] sm:text-[10px] font-black uppercase tracking-wider border shadow-lg flex items-center gap-1 animate-pulse pointer-events-none select-none transition-all duration-200',
+              isTargetHovered
+                ? 'bg-gradient-to-r from-[#3e2413] via-[#482814] to-[#2a1409] border-gold-aged text-amber-100 shadow-[0_0_18px_rgba(212,175,55,0.85)]'
+                : preview.tone === 'lethal'
+                  ? 'bg-[#3b0808]/95 border-red-400 text-red-100 shadow-[0_0_14px_rgba(239,68,68,0.75)]'
+                  : preview.tone === 'danger'
+                    ? 'bg-[#3b1a06]/95 border-amber-400 text-amber-100 shadow-[0_0_14px_rgba(245,158,11,0.65)]'
+                    : preview.tone === 'beneficial'
+                      ? 'bg-[#083620]/95 border-emerald-400 text-emerald-100 shadow-[0_0_14px_rgba(16,185,129,0.65)]'
+                      : 'bg-[#22130a]/95 border-gold-aged text-amber-200 shadow-[0_0_12px_rgba(212,175,55,0.55)]'
             )}
           >
-            <Crosshair size={10} className={cn('shrink-0 text-red-300', isTargetHovered && 'animate-spin')} />
+            <Crosshair
+              size={10}
+              className={cn(
+                'shrink-0',
+                isTargetHovered ? 'text-amber-200 animate-spin' : 'text-gold-aged'
+              )}
+            />
             <span>{preview.badgeText}</span>
           </motion.div>
         )}
@@ -494,60 +539,110 @@ export default function PlayerSilhouette3D({
           pactPartners={pactPartners}
           isWalled={player.isWalled}
           deathMarkTurns={player.deathMarkTurns}
+          compact={isCompactLayout}
         />
       </div>
 
-      {/* 2B. CARD FLUTUANTE EXPANDIDO DE PRÉVIA TÁTICA (Ao passar o mouse sobre o alvo válido) */}
+      {/* 2B. PAINEL DE INFORMAÇÕES TÁTICAS DO ALVO (Restrito em dourado antigo / púrpura, contido na tela) */}
       <AnimatePresence>
         {isTargetHovered && preview && (
           <motion.div
             key="target-action-preview-card"
-            initial={{ opacity: 0, y: 10, scale: 0.9 }}
+            initial={{ opacity: 0, y: 8, scale: 0.92 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 6, scale: 0.92 }}
+            exit={{ opacity: 0, y: 5, scale: 0.94 }}
             transition={{ type: 'spring', stiffness: 280, damping: 22 }}
-            style={{ transform: 'translateZ(54px)' }}
+            style={{ transform: 'translateZ(58px)' }}
             className={cn(
-              'pointer-events-none absolute -top-20 sm:-top-24 left-1/2 -translate-x-1/2 z-50 min-w-[210px] sm:min-w-[260px] max-w-[300px] px-3.5 py-2 rounded-xl border-2 backdrop-blur-md shadow-[0_14px_36px_rgba(0,0,0,0.98)] flex flex-col items-center text-center gap-1 select-none',
-              preview.tone === 'lethal'
-                ? 'bg-[#2a0606]/95 border-red-500 shadow-[0_0_30px_rgba(239,68,68,0.9)]'
-                : preview.tone === 'danger'
-                  ? 'bg-[#2e1507]/95 border-amber-500 shadow-[0_0_26px_rgba(245,158,11,0.8)]'
-                  : preview.tone === 'beneficial'
-                    ? 'bg-[#062419]/95 border-emerald-500 shadow-[0_0_26px_rgba(16,185,129,0.8)]'
-                    : 'bg-[#1e1009]/95 border-gold-aged shadow-[0_0_22px_rgba(212,175,55,0.7)]'
+              'pointer-events-auto absolute -top-24 sm:-top-28 z-50 min-w-[210px] sm:min-w-[260px] max-w-[310px] px-3.5 py-2 rounded-xl border-2 backdrop-blur-md shadow-[0_16px_38px_rgba(0,0,0,0.98)] flex flex-col items-center text-center gap-1 select-none transition-all',
+              panelAlignCls,
+              'bg-gradient-to-b from-[#21130b]/98 via-[#180e08]/98 to-[#0e0704]/98 border-gold-aged shadow-[0_0_24px_rgba(212,175,55,0.55),0_0_12px_rgba(168,85,247,0.35)]'
             )}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onSeatClick) onSeatClick(player);
+            }}
           >
+            {/* Cabeçalho do alvo: Nome + Vida atual */}
+            <div className="flex items-center justify-between w-full border-b border-gold-aged/30 pb-1 mb-0.5">
+              <span className="font-grimoire font-black text-xs sm:text-[13px] tracking-wider uppercase text-amber-100 truncate max-w-[170px]">
+                {player.name}
+              </span>
+              <span className="font-mono text-[10px] font-bold text-amber-200/90 shrink-0">
+                {player.lives}/{player.maxLives} HP
+              </span>
+            </div>
+
+            {/* Badges de estados ativos do alvo */}
+            {(player.isWalled || player.isReflecting || player.deathMarkTurns != null || knifeDmg > 1 || pactPartners.length > 0) && (
+              <div className="flex flex-wrap items-center justify-center gap-1 my-0.5">
+                {player.isWalled && (
+                  <span className="px-1.5 py-0.2 rounded bg-sky-950/80 border border-sky-400/60 text-sky-200 text-[9px] font-mono font-bold">
+                    ⛓️ Emparedado
+                  </span>
+                )}
+                {player.isReflecting && (
+                  <span className="px-1.5 py-0.2 rounded bg-purple-950/80 border border-purple-400/70 text-purple-200 text-[9px] font-mono font-bold">
+                    🪞 Espelho Ativo
+                  </span>
+                )}
+                {player.deathMarkTurns != null && (
+                  <span className="px-1.5 py-0.2 rounded bg-red-950/80 border border-red-500/70 text-red-200 text-[9px] font-mono font-bold">
+                    ☠️ Marca {player.deathMarkTurns}t
+                  </span>
+                )}
+                {knifeDmg > 1 && (
+                  <span className="px-1.5 py-0.2 rounded bg-teal-950/80 border border-teal-400/60 text-teal-200 text-[9px] font-mono font-bold">
+                    🗡️ Faca {knifeDmg}x
+                  </span>
+                )}
+                {pactPartners.length > 0 && (
+                  <span className="px-1.5 py-0.2 rounded bg-rose-950/80 border border-rose-400/60 text-rose-200 text-[9px] font-mono font-bold truncate max-w-[180px]">
+                    🩸 Pacto ({pactPartners.join(', ')})
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Resultado Previsto da Ação */}
             <div className="flex items-center gap-1.5 font-grimoire font-black text-xs sm:text-[13px] tracking-wider uppercase text-amber-100">
-              <Crosshair size={13} className="text-red-400 shrink-0 animate-spin" />
+              <Crosshair size={13} className="text-gold-aged shrink-0 animate-spin" />
               <span>{preview.title}</span>
             </div>
-            <p className="font-mono text-[10px] sm:text-[10.5px] leading-snug text-stone-300">
+            <p className="font-mono text-[9.5px] sm:text-[10px] leading-snug text-stone-300">
               {preview.subtitle}
             </p>
-            <div className="flex items-center gap-1 text-[8.5px] sm:text-[9.5px] font-mono font-bold text-amber-300/95 uppercase tracking-widest mt-0.5 pt-0.5 border-t border-white/10 w-full justify-center">
-              <span>Clique ou solte a carta para confirmar</span>
+
+            {/* Dica de interação e cancelamento */}
+            <div className="flex items-center justify-between gap-2 text-[8.5px] sm:text-[9px] font-mono font-bold uppercase tracking-wider mt-0.5 pt-1 border-t border-white/10 w-full text-stone-400">
+              <span className="text-amber-300/95 font-extrabold">Clique p/ Confirmar</span>
+              <span className="text-stone-400/80">[Botão Dir. / ESC]</span>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* 3. PRESENÇA SOMBRIA GRANDE E ATMOSFÉRICA (Asset Transparente RGBA) */}
-      <div className="relative w-[136px] h-[176px] sm:w-[184px] sm:h-[232px] flex items-center justify-center -mt-2">
-        {/* OUTLINE E RETÍCULO GÓTICO PISCANTE DE MIRA (TARGETABLE) */}
+      {/* 3. PRESENÇA SOMBRIA COM DIMENSÕES ADAPTATIVAS (Asset Transparente RGBA) */}
+      <div
+        className={cn(
+          'relative flex items-center justify-center -mt-2 transition-all duration-200',
+          dims.widthCls
+        )}
+      >
+        {/* OUTLINE E RETÍCULO GÓTICO RESTRITO EM DOURADO ANTIGO / PÚRPURA */}
         {targetable && (
           <>
-            {/* Halo de fundo pulsante */}
+            {/* Halo de fundo com destaque sofisticado */}
             <div
               className={cn(
-                'pointer-events-none absolute -inset-2.5 sm:-inset-3.5 rounded-2xl border-2 transition-all duration-300 animate-pulse z-30',
+                'pointer-events-none absolute -inset-2.5 sm:-inset-3 rounded-2xl border-2 transition-all duration-300 animate-pulse z-30',
                 isTargetHovered
-                  ? 'border-red-400 bg-red-600/20 shadow-[0_0_35px_rgba(239,68,68,0.95),inset_0_0_20px_rgba(239,68,68,0.5)]'
-                  : 'border-red-500/90 bg-red-950/25 shadow-[0_0_24px_rgba(220,38,38,0.85),inset_0_0_14px_rgba(220,38,38,0.35)]'
+                  ? 'border-gold-aged bg-gradient-to-b from-amber-500/10 via-purple-950/25 to-[#160d08]/70 shadow-[0_0_28px_rgba(212,175,55,0.75),0_0_16px_rgba(168,85,247,0.45),inset_0_0_16px_rgba(212,175,55,0.2)]'
+                  : 'border-gold-aged/75 bg-red-950/20 shadow-[0_0_18px_rgba(212,175,55,0.5),inset_0_0_12px_rgba(220,38,38,0.25)]'
               )}
             />
 
-            {/* Cantoneiras góticas de mira nos 4 cantos piscando em uníssono */}
+            {/* Cantoneiras góticas de mira nos 4 cantos em Dourado Antigo */}
             <svg
               viewBox="0 0 100 100"
               className="pointer-events-none absolute -inset-2.5 sm:-inset-3.5 w-[calc(100%+20px)] sm:w-[calc(100%+28px)] h-[calc(100%+20px)] sm:h-[calc(100%+28px)] overflow-visible z-35 animate-pulse"
@@ -555,30 +650,30 @@ export default function PlayerSilhouette3D({
               <path
                 d="M 5 24 L 5 5 L 24 5"
                 fill="none"
-                stroke={isTargetHovered ? '#fca5a5' : '#ef4444'}
+                stroke={isTargetHovered ? '#fef08a' : '#d4af37'}
                 strokeWidth="3.2"
-                style={{ filter: 'drop-shadow(0 0 4px #ef4444)' }}
+                style={{ filter: 'drop-shadow(0 0 5px rgba(212,175,55,0.85))' }}
               />
               <path
                 d="M 76 5 L 95 5 L 95 24"
                 fill="none"
-                stroke={isTargetHovered ? '#fca5a5' : '#ef4444'}
+                stroke={isTargetHovered ? '#fef08a' : '#d4af37'}
                 strokeWidth="3.2"
-                style={{ filter: 'drop-shadow(0 0 4px #ef4444)' }}
+                style={{ filter: 'drop-shadow(0 0 5px rgba(212,175,55,0.85))' }}
               />
               <path
                 d="M 5 76 L 5 95 L 24 95"
                 fill="none"
-                stroke={isTargetHovered ? '#fca5a5' : '#ef4444'}
+                stroke={isTargetHovered ? '#fef08a' : '#d4af37'}
                 strokeWidth="3.2"
-                style={{ filter: 'drop-shadow(0 0 4px #ef4444)' }}
+                style={{ filter: 'drop-shadow(0 0 5px rgba(212,175,55,0.85))' }}
               />
               <path
                 d="M 76 95 L 95 95 L 95 76"
                 fill="none"
-                stroke={isTargetHovered ? '#fca5a5' : '#ef4444'}
+                stroke={isTargetHovered ? '#fef08a' : '#d4af37'}
                 strokeWidth="3.2"
-                style={{ filter: 'drop-shadow(0 0 4px #ef4444)' }}
+                style={{ filter: 'drop-shadow(0 0 5px rgba(212,175,55,0.85))' }}
               />
             </svg>
           </>
@@ -593,18 +688,18 @@ export default function PlayerSilhouette3D({
           visualEffect={fx}
         />
 
-        {/* Foco de mira orgânico no peito da sombra quando é alvo válido */}
+        {/* Foco de mira no peito da sombra em Dourado/Púrpura */}
         {targetable && (
           <div
             className={cn(
               'absolute inset-0 m-auto rounded-full pointer-events-none transition-all duration-300 z-30 animate-pulse',
               isTargetHovered
-                ? 'w-16 h-16 bg-red-600/35 shadow-[0_0_30px_rgba(239,68,68,0.95)]'
-                : 'w-14 h-14 bg-red-600/20 shadow-[0_0_20px_rgba(220,38,38,0.65)]'
+                ? 'w-16 h-16 bg-amber-400/25 shadow-[0_0_25px_rgba(212,175,55,0.85)]'
+                : 'w-12 h-12 bg-amber-500/15 shadow-[0_0_16px_rgba(212,175,55,0.5)]'
             )}
             style={{
               background:
-                'radial-gradient(circle, rgba(239,68,68,0.45) 0%, rgba(220,38,38,0.15) 55%, transparent 75%)',
+                'radial-gradient(circle, rgba(212,175,55,0.4) 0%, rgba(168,85,247,0.2) 55%, transparent 75%)',
             }}
           />
         )}

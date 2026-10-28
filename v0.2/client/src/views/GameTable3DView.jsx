@@ -21,7 +21,7 @@ import {
   VISUAL_EFFECT_BADGES,
 } from '../models/gameModel';
 import { CARD_META } from '../models/cardModel';
-import { seatPosition, TABLE_NAILS } from '../helpers/math3d';
+import { seatPosition, silhouettePosition, TABLE_NAILS } from '../helpers/math3d';
 import { useCamera3DController } from '../controllers/useCamera3DController';
 import InscryptionCard from '../components/InscryptionCard';
 import CardInspectModal from '../components/CardInspectModal';
@@ -113,8 +113,32 @@ export default function GameTable3DView({
     (p) => p.visualEffect && VISUAL_EFFECT_BADGES[p.visualEffect]
   );
 
+  // Estado de foco local no oponente (para realce e visualização de prévia tática)
+  const [hoveredOpponentId, setHoveredOpponentId] = React.useState(null);
+
   // Modo adaptativo da HUD: compacta elementos ao redor do retrato quando há carta(s) selecionada(s)
   const isSelectionMode = Boolean(canAct && selectedCardIds.length > 0);
+  // Modo de mira em primeira pessoa: ângulo baixo cinemático quando uma carta válida é selecionada
+  const isTargetingMode = Boolean(canAct && selectedCard);
+
+  React.useEffect(() => {
+    if (selectedCardIds.length === 0) {
+      setHoveredOpponentId(null);
+    }
+  }, [selectedCardIds.length]);
+
+  // Cancelamento confiável da mira via ESC
+  React.useEffect(() => {
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape' && selectedCardIds.length > 0) {
+        e.stopPropagation();
+        audio.play('click');
+        setSelectedCardIds([]);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectedCardIds.length, setSelectedCardIds]);
 
   // Verifica se a carta selecionada permite mirar em si mesmo (clicando no retrato central)
   const canSelfTarget = Boolean(
@@ -126,43 +150,57 @@ export default function GameTable3DView({
 
   const selectedMeta = selectedCard ? CARD_META[selectedCard.type] : null;
 
-  // Inclinação e escala 3D adaptativas: libera mais área útil para a mesa e inimigos durante a seleção
+  // Inclinação e perspectiva da mesa:
+  // - Modo normal: visão equilibrada levemente inclinada (28deg)
+  // - Modo de mira (isTargetingMode): perspectiva baixa de mesa (45deg), imersiva em primeira pessoa,
+  //   onde a superfície da mesa recua em profundidade e todos os oponentes ficam de frente para o jogador.
   const tablePitch =
     cameraZone === CAMERA_ZONES.PLAYERS
-      ? 24
+      ? 22
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? 52
-        : isSelectionMode
-          ? 25
-          : 28;
+        : isTargetingMode
+          ? compact
+            ? 41
+            : 46
+          : isSelectionMode
+            ? 25
+            : 28;
 
-  // Mesa posicionada mais abaixo na página (o header foi removido durante a partida).
-  // Apenas translateY/scale animam; o tamanho do layout permanece constante (sem reflow).
+  // Mesa reposicionada suavemente para dar espaço vertical aos oponentes durante a mira
   const tableTranslateY =
     cameraZone === CAMERA_ZONES.PLAYERS
       ? compact
-        ? 40
-        : 58
+        ? 42
+        : 60
       : cameraZone === CAMERA_ZONES.NOTEBOOK
         ? -210
-        : isSelectionMode
+        : isTargetingMode
           ? compact
-            ? 34
-            : 54
-          : compact
-            ? 26
-            : 42;
+            ? 52
+            : 70
+          : isSelectionMode
+            ? compact
+              ? 30
+              : 46
+            : compact
+              ? 24
+              : 38;
 
   const tableScale =
     cameraZone === CAMERA_ZONES.NOTEBOOK
       ? 0.82
-      : isSelectionMode
+      : isTargetingMode
         ? compact
-          ? 0.96
-          : 1
-        : compact
-          ? 0.9
-          : 0.94;
+          ? 0.98
+          : 1.04
+        : isSelectionMode
+          ? compact
+            ? 0.94
+            : 0.98
+          : compact
+            ? 0.9
+            : 0.94;
 
   const handleSelfTargetTrigger = () => {
     if (!canAct || !canSelfTarget || !selectedCard || !me) return;
@@ -201,20 +239,30 @@ export default function GameTable3DView({
       id="game-table-3d-viewport"
       ref={stageRef}
       data-hud-mode={isSelectionMode ? 'selection' : 'normal'}
+      data-targeting-mode={isTargetingMode ? 'targeting' : 'normal'}
       onMouseMove={handleMouseMove}
+      onContextMenu={(e) => {
+        if (selectedCardIds.length > 0) {
+          e.preventDefault();
+          audio.play('click');
+          setSelectedCardIds([]);
+        }
+      }}
       className="flex-1 min-h-0 flex flex-col justify-between relative overflow-hidden select-none inscryption-3d-stage"
     >
       {/* 1. AMBIÊNCIA PROFUNDA DA SALA CERIMONIAL */}
       <div
         className="pointer-events-none absolute inset-0 z-0 transition-transform duration-700 ease-out"
         style={{
-          transform: `translate3d(calc(var(--px, 0) * -2.5px), ${
+          transform: `translate3d(var(--bg-px, 0px), calc(var(--bg-py, 0px) + ${
             cameraZone === CAMERA_ZONES.PLAYERS
               ? 18
               : cameraZone === CAMERA_ZONES.NOTEBOOK
                 ? -45
-                : 0
-          }px, 0)`,
+                : isTargetingMode
+                  ? -18
+                  : 0
+          }px), 0)`,
         }}
       >
         <div
@@ -377,13 +425,17 @@ export default function GameTable3DView({
         <div
           className="relative"
           style={{
-            width: compact ? 'min(90vw, calc(100dvh - 300px))' : 'min(76vw, calc(100dvh - 330px))',
-            maxHeight: compact ? 'calc(100dvh - 300px)' : 'calc(100dvh - 330px)',
+            width: compact
+              ? 'min(92vw, calc(100dvh - 280px))'
+              : 'min(78vw, calc(100dvh - 300px))',
+            maxHeight: compact
+              ? 'calc(100dvh - 280px)'
+              : 'calc(100dvh - 300px)',
             aspectRatio: '1 / 1',
             transformStyle: 'preserve-3d',
             transform:
-              'rotateX(calc(var(--py, 0) * -0.45deg)) rotateZ(calc(var(--px, 0) * -0.35deg))',
-            transition: 'transform 0.25s ease-out',
+              'rotateX(var(--table-rx, 0deg)) rotateZ(var(--table-rz, 0deg))',
+            transition: 'transform 0.1s ease-out',
           }}
         >
         <motion.div
@@ -392,7 +444,7 @@ export default function GameTable3DView({
             y: tableTranslateY,
             scale: tableScale,
           }}
-          transition={{ type: 'spring', stiffness: 135, damping: 24, mass: 0.95 }}
+          transition={{ type: 'spring', stiffness: 135, damping: 22, mass: 0.9 }}
           style={{
             width: '100%',
             height: '100%',
@@ -416,40 +468,47 @@ export default function GameTable3DView({
             style={{ transform: 'translateZ(-9px) translateY(7px)' }}
           />
 
-          {/* CAMADA 0: SILHUETAS DOS OPONENTES SENTADOS ATRÁS DA MESA */}
+          {/* CAMADA 0: SILHUETAS DOS OPONENTES SENTADOS AO REDOR DA MESA (2 a 8 jogadores) */}
           {players.map((p, i) => {
             if (p.id === me?.id) return null;
-            const { angle } = seatPosition(i, localIndex, players.length);
-            const sinA = Math.sin(angle);
-            const cosA = Math.cos(angle);
-            const radX = sinA < -0.3 ? 53 : 56;
-            const radY = sinA < -0.3 ? 47 : 44;
-            const silX = 50 + radX * cosA;
-            const silY = 50 + radY * sinA;
-            const anchorY = sinA < -0.7 ? -70 : sinA < -0.3 ? -72 : -74;
+            const sil = silhouettePosition(i, localIndex, players.length);
             const targetable = isTargetable(p);
-            const dimmed = canAct && !!selectedCard && !targetable;
+            const isHoveredTarget = hoveredOpponentId === p.id;
+            const isAnyHovered = Boolean(hoveredOpponentId);
+            const isDimmedByOtherTarget = isAnyHovered && !isHoveredTarget && canAct && !!selectedCard;
+            const dimmed = (canAct && !!selectedCard && !targetable) || isDimmedByOtherTarget;
 
             return (
               <div
                 key={`silhouette-${p.id}`}
-                className="absolute z-10"
+                className="absolute"
                 style={{
-                  left: `${silX}%`,
-                  top: `${silY}%`,
+                  left: `${sil.x}%`,
+                  top: `${sil.y}%`,
+                  zIndex: isHoveredTarget ? 45 : 15,
                   transformStyle: 'preserve-3d',
                   transformOrigin: '50% 85%',
-                  transform: `translate(-50%, ${anchorY}%) translateZ(-24px) rotateX(${-tablePitch * 0.7}deg)`,
+                  transform: `translate(-50%, ${sil.anchorY}%) translateZ(14px) rotateX(${-tablePitch * 0.82}deg) scale(${sil.scale})`,
                 }}
               >
                 <PlayerSilhouette3D
                   player={p}
                   index={i}
+                  totalPlayers={players.length}
                   isMe={false}
                   targetable={targetable}
                   dimmed={dimmed}
+                  isFocused={isHoveredTarget}
+                  isDimmedByOtherTarget={isDimmedByOtherTarget}
+                  isLeftFlank={sil.isLeftFlank}
+                  isRightFlank={sil.isRightFlank}
                   selectedCard={selectedCard}
                   me={me}
+                  onHoverChange={(hovering) => {
+                    if (targetable) {
+                      setHoveredOpponentId(hovering ? p.id : null);
+                    }
+                  }}
                   onSeatClick={onSeatClick}
                   onDropCard={onDropCard}
                   onInspectCard={setInspectedCard}
